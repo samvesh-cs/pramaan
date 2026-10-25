@@ -73,6 +73,8 @@ For the MVP, we select **3 representative document types** that cover different 
 | `notary_date` | ❌ | ❌ | ✅ extract |
 | `signatory_name` | ❌ | ❌ | ✅ extract |
 
+The current backend validation schema also exposes compatible aliases: `certificate_number` for `document_number`, and `affidavit_date` / `deponent_name` for `notary_date` / `signatory_name`. Both names are retained in extraction output where applicable.
+
 ---
 
 ## 4. Key AICTE Definitions (from pages 12-15)

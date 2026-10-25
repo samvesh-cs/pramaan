@@ -31,6 +31,12 @@ async def test_e2e_real_sample_fire_safety(client: AsyncClient):
     assert upload_res.status_code == 201
     doc_data = upload_res.json()
     assert doc_data["processing_status"] == "processed"
+    assert doc_data["fields"]["institution_name"]["value"] == "Synthetic ABC Institute of Technology"
+    assert doc_data["fields"]["institution_name"]["status"] == "extracted"
+
+    application_res = await client.get(f"/api/applications/{app_id}")
+    assert application_res.status_code == 200
+    assert application_res.json()["documents"][0]["fields"]["institution_name"]["value"] == "Synthetic ABC Institute of Technology"
 
     # 3. Trigger validation
     val_res = await client.post(f"/api/applications/{app_id}/validate")

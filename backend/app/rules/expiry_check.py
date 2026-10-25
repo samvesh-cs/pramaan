@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any
 from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
-from app.rules.base import BaseRule
+from app.rules.base import BaseRule, OCR_CONFIDENCE_REVIEW_THRESHOLD
 from app.schemas.finding import FindingCreate
 
 
@@ -51,6 +51,34 @@ class ExpiryDateRule(BaseRule):
                         document_name=doc.original_filename,
                         evidence={"raw_text": expiry_data.get("raw_text") if expiry_data else None},
                         next_action="Review the certificate manually to confirm if an expiry date is specified.",
+                    )
+                )
+                continue
+
+            confidence = expiry_data.get("confidence")
+            if expiry_data.get("status") == "uncertain" or (
+                confidence is not None and confidence < OCR_CONFIDENCE_REVIEW_THRESHOLD
+            ):
+                findings.append(
+                    FindingCreate(
+                        rule_id=self.rule_id,
+                        status="unresolved",
+                        title=f"{checklist_info['display_name']} expiry date needs review",
+                        reason=(
+                            f"OCR confidence for the extracted expiry date was {confidence:.0%}, "
+                            f"below the {OCR_CONFIDENCE_REVIEW_THRESHOLD:.0%} review threshold."
+                        ),
+                        document_id=doc.id,
+                        document_name=doc.original_filename,
+                        evidence={
+                            "page_number": expiry_data.get("page_number"),
+                            "text": expiry_data.get("raw_text"),
+                            "field": "expiry_date",
+                            "value": expiry_data.get("value"),
+                            "bbox": expiry_data.get("bbox"),
+                            "confidence": confidence,
+                        },
+                        next_action="Review the certificate and confirm the expiry date before relying on this check.",
                     )
                 )
                 continue

@@ -47,15 +47,20 @@ def validate_file_metadata(filename: str, content_type: str, file_size: int) -> 
 
 def validate_pdf_content(file_path: Path) -> int:
     """Validate PDF integrity and verify page count limits."""
+    doc = None
     try:
-        doc = pymupdf.open(file_path)
+        # Parse from memory so malformed PDFs cannot keep the saved upload locked
+        # while the caller removes it after validation fails (notably on Windows).
+        doc = pymupdf.open(stream=file_path.read_bytes(), filetype="pdf")
         page_count = len(doc)
-        doc.close()
     except Exception as e:
         raise FileValidationError(
             code="INVALID_FILE_CONTENT",
             message=f"Corrupt or unreadable PDF document: {e}",
         )
+    finally:
+        if doc is not None:
+            doc.close()
 
     if page_count > settings.MAX_PAGES:
         raise FileValidationError(

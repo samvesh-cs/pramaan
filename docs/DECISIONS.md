@@ -64,6 +64,12 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 **Decision:** `docs/API_CONTRACT.md` is the source of truth for endpoints, JSON fields and status values.  
 **Reason:** Prevents inconsistent assumptions across frontend, OCR and backend workstreams.
 
+### D-013 — Low-confidence OCR review threshold
+**Status:** Accepted
+**Decision:** Treat OCR-derived field confidence below `0.70` as uncertain and return `unresolved` for checks that rely on that value. Digital PDF text extraction keeps confidence `null` and is not subject to this OCR threshold.
+**Reason:** Low-confidence OCR values should be confirmed by a reviewer instead of producing a pass or discrepancy finding. This is an implementation threshold, not an AICTE requirement.
+**Date / Owner:** 2026-10-26 / Integration
+
 ## Open questions — resolve before implementing rules
 
 ### Q-001 — Application category

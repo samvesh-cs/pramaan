@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any
 from app.schemas.finding import FindingCreate
 
+OCR_CONFIDENCE_REVIEW_THRESHOLD = 0.70
+
 
 class BaseRule(ABC):
     rule_id: str

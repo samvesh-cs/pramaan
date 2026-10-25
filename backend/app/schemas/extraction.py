@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -21,6 +21,7 @@ class FieldExtraction(BaseModel):
     confidence: Optional[float] = None
     page_number: Optional[int] = None
     bbox: Optional[list[float]] = None
+    status: Optional[Literal["extracted", "missing", "uncertain"]] = None
 
 
 class ExtractionResponse(BaseModel):

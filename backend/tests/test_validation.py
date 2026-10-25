@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 from app.rules.cross_document_check import InstitutionNameConsistencyRule, text_similarity
 from app.rules.expiry_check import ExpiryDateRule
+from app.rules.field_completeness import FieldCompletenessRule
 from app.rules.presence_check import DocumentPresenceRule
 from app.services.validation_engine import calculate_overall_status
 
@@ -37,7 +38,7 @@ async def test_validation_missing_documents(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_validation_with_all_documents(client: AsyncClient):
+async def test_validation_with_present_documents_and_unextractable_fields_does_not_pass(client: AsyncClient):
     app_res = await client.post(
         "/api/applications",
         json={"institution_name": "Synthetic ABC Engineering College", "application_category": "eoa", "academic_year": "2026-27"},
@@ -58,8 +59,10 @@ async def test_validation_with_all_documents(client: AsyncClient):
     assert val_res.status_code == 200
     report = val_res.json()
     assert len(report["missing_document_types"]) == 0
-    assert report["summary"]["missing"] == 0
-    assert report["overall_status"] == "checks_passed"
+    # Presence does not substitute for extracted evidence. The old synthetic fallback
+    # values were removed, so these generic PDFs must not pass field or expiry checks.
+    assert report["summary"]["missing"] > 0
+    assert report["overall_status"] == "missing_documents"
 
 
 @pytest.mark.asyncio
@@ -129,6 +132,35 @@ async def test_institution_name_mismatch_unit():
     assert findings[0].status == "flagged"
     assert findings[0].rule_id == "CONSISTENCY_001"
     assert "mismatch" in findings[0].title.lower()
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_required_field_is_unresolved():
+    rule = FieldCompletenessRule()
+
+    class MockDoc:
+        id = "doc_low_confidence"
+        document_type = "fire_safety_certificate"
+        original_filename = "fire.pdf"
+
+    class MockExtraction:
+        processing_status = "processed"
+        fields = {
+            "institution_name": {"value": "Synthetic ABC Engineering College", "confidence": 0.92},
+            "certificate_number": {"value": "FS-2026-100", "confidence": 0.64},
+            "issue_date": {"value": "2026-01-01", "confidence": 0.90},
+            "expiry_date": {"value": "2027-01-01", "confidence": 0.90},
+            "issuing_authority": {"value": "Fire Services", "confidence": 0.88},
+        }
+
+    findings = rule.evaluate({
+        "documents": [MockDoc()],
+        "extractions": {"doc_low_confidence": MockExtraction()},
+    })
+
+    assert len(findings) == 1
+    assert findings[0].status == "unresolved"
+    assert "certificate_number" in findings[0].evidence["fields"]
 
 
 @pytest.mark.asyncio

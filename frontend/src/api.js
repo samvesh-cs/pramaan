@@ -28,16 +28,16 @@ export async function listApplications() {
   if (USE_MOCKS) {
     await pause(260); return mockApplications()
   }
-  throw new Error('The API contract does not define an applications list endpoint.')
+  return request('/applications')
 }
 
 export async function getApplication(id) {
-  if (import.meta.env.VITE_USE_MOCKS !== 'false') { await pause(250); return mockApplications().find((item) => item.id === id) || null }
+  if (USE_MOCKS) { await pause(250); return mockApplications().find((item) => item.id === id) || null }
   return request(`/applications/${encodeURIComponent(id)}`)
 }
 
 export async function createApplication(payload) {
-  if (import.meta.env.VITE_USE_MOCKS !== 'false') {
+  if (USE_MOCKS) {
     await pause(650)
     const app = { ...payload, id: `app_demo_${Date.now()}`, created_at: new Date().toISOString(), overall_status: 'processing_incomplete', documents: [] }
     const apps = mockApplications(); apps.unshift(app); writeStore(STORAGE_KEY, apps); return app
@@ -46,7 +46,7 @@ export async function createApplication(payload) {
 }
 
 export async function uploadDocument(applicationId, file, documentType) {
-  if (import.meta.env.VITE_USE_MOCKS !== 'false') {
+  if (USE_MOCKS) {
     await pause(850)
     const doc = { id: `doc_demo_${Date.now()}`, application_id: applicationId, document_type: documentType, original_filename: file.name, mime_type: file.type || 'application/octet-stream', processing_status: 'uploaded' }
     const apps = mockApplications(); const app = apps.find((item) => item.id === applicationId)
@@ -58,7 +58,7 @@ export async function uploadDocument(applicationId, file, documentType) {
 }
 
 export async function runValidation(applicationId) {
-  if (import.meta.env.VITE_USE_MOCKS !== 'false') {
+  if (USE_MOCKS) {
     await pause(1300)
     const reports = mockReports(); const report = reports[applicationId]
     if (report) return report
@@ -79,7 +79,7 @@ export async function runValidation(applicationId) {
 }
 
 export async function getReport(applicationId) {
-  if (import.meta.env.VITE_USE_MOCKS !== 'false') { await pause(300); return mockReports()[applicationId] || null }
+  if (USE_MOCKS) { await pause(300); return mockReports()[applicationId] || null }
   return request(`/applications/${encodeURIComponent(applicationId)}/report`)
 }
 

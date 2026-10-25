@@ -9,6 +9,7 @@ from app.schemas.application import (
     ApplicationDetailResponse,
     ApplicationResponse,
 )
+from app.schemas.document import DocumentResponse
 from app.utils.id_generator import generate_id
 
 
@@ -53,7 +54,18 @@ class ApplicationService:
                 detail={"code": "APPLICATION_NOT_FOUND", "message": f"Application '{application_id}' not found.", "details": None},
             )
 
-        return ApplicationDetailResponse.model_validate(app_obj)
+        response = ApplicationDetailResponse.model_validate(app_obj)
+        response.documents = []
+        for document in app_obj.documents:
+            latest_extraction = max(
+                document.extractions,
+                key=lambda extraction: extraction.created_at,
+                default=None,
+            )
+            document_response = DocumentResponse.model_validate(document)
+            document_response.fields = latest_extraction.fields or {} if latest_extraction else {}
+            response.documents.append(document_response)
+        return response
 
     async def list_applications(
         self,

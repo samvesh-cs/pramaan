@@ -6,10 +6,11 @@ Provides automated institutional document compliance verification for AICTE Exte
 
 ## Tech Stack
 - **Framework:** FastAPI (Python 3.11+)
-- **Database:** PostgreSQL (with SQLAlchemy 2.0 Async + asyncpg) / SQLite (aiosqlite)
-- **PDF Processing:** PyMuPDF v2.0
+- **Database:** PostgreSQL (with SQLAlchemy 2.0 Async + asyncpg)
+- **PDF Processing:** PyMuPDF (version range in `requirements.txt`)
+- **OCR:** PaddleOCR 3.7.0 with PaddlePaddle 3.3.1
 - **Validation Engine:** Modular Python Rule Engine
-- **Contract:** Conforms 100% to `docs/API_CONTRACT.md`
+- **Contract:** Uses `docs/API_CONTRACT.md` for routes, statuses, and response shapes
 
 ## Getting Started
 
@@ -31,12 +32,11 @@ Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
-Default local configuration uses SQLite (`sqlite+aiosqlite:///./sih_prototype.db`) for instant zero-setup development and testing.
-
-To connect to PostgreSQL:
+Configure the required PostgreSQL connection in `.env`:
 ```env
 DATABASE_URL=postgresql+asyncpg://<username>:<password>@localhost:5432/<dbname>
 ```
+The API initializes its tables at startup. SQLite is used only by the isolated pytest setup, not as the application database.
 
 ### 4. Run the Dev Server
 ```bash

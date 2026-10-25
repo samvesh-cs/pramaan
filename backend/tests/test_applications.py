@@ -21,6 +21,23 @@ async def test_create_application(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_applications(client: AsyncClient):
+    await client.post(
+        "/api/applications",
+        json={
+            "institution_name": "Synthetic Queue College",
+            "application_category": "eoa",
+            "academic_year": "2026-27",
+        },
+    )
+
+    response = await client.get("/api/applications")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["institution_name"] == "Synthetic Queue College"
+
+
+@pytest.mark.asyncio
 async def test_get_application(client: AsyncClient):
     # 1. Create application
     payload = {
@@ -63,3 +80,18 @@ async def test_invalid_application_payload(client: AsyncClient):
     data = response.json()
     assert "error" in data
     assert data["error"]["code"] == "VALIDATION_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_rejects_unconfigured_application_category(client: AsyncClient):
+    response = await client.post(
+        "/api/applications",
+        json={
+            "institution_name": "Synthetic ABC Engineering College",
+            "application_category": "new_institution",
+            "academic_year": "2026-27",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_FAILED"

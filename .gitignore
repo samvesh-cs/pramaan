@@ -1,0 +1,104 @@
+# ==========================
+# SIH 26 Prototype .gitignore
+# ==========================
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+.env.local
+.env.*.local
+
+# ----- Node / Frontend -----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build output
+frontend/dist/
+frontend/build/
+.next/
+out/
+
+# ----- IDE / Editor -----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ----- Database -----
+*.db
+*.sqlite3
+
+# ----- Uploads (user uploaded documents) -----
+backend/uploads/
+uploads/
+
+# ----- Model caches (PaddleOCR etc.) -----
+.paddleocr/
+~/.paddleocr/
+paddle_models/
+inference/
+*.onnx
+*.pdmodel
+*.pdiparams
+
+# ----- Secrets / Credentials -----
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- Test / Coverage -----
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+.nox/
+
+# ----- OS files -----
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ----- Sensitive Documents -----
+# AICTE rulebook PDF (copyrighted regulatory document - do not commit)
+AICTE rulebook.pdf
+AICTE_rulebook.pdf
+*.pdf
+
+# If you need to commit specific PDFs, use git add -f <file>
+# But do NOT commit the AICTE rulebook or any real institutional documents.
+
+# ----- Misc -----
+*.bak
+*.tmp
+*.temp
+.cache/

@@ -67,24 +67,30 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 ## Open questions — resolve before implementing rules
 
 ### Q-001 — Application category
-**Status:** Open  
-**Question:** Are we selecting Extension of Approval (EoA) for an existing institution, or another category?  
-**Next action:** Confirm with the team and verify the current official AICTE handbook and applicable notice.
+**Status:** Resolved  
+**Decision:** Extension of Approval (EoA) — Self-Disclosure for existing institutions, as defined in AICTE APH 2024-2027 Chapter II and Annexure-2, Section 2.1.  
+**Resolved Date / Owner:** 2026-10-25 / Person 3 (Approved)
 
 ### Q-002 — Document types
-**Status:** Open  
-**Question:** Which two or three document types will be supported?  
-**Next action:** Select them from the chosen category's applicable official checklist. Record conditional applicability and the source clause.
+**Status:** Resolved  
+**Decision:** Three representative document types selected:
+1. `fire_safety_certificate` (Fire Safety Certificate / NOC — Annexure-2 §2.1.v)
+2. `building_completion_certificate` (Building Completion Certificate / Occupancy — Annexure-2 §2.1.iii)
+3. `affidavit_2` (Affidavit on Non-Judicial Stamp Paper — Annexure-2 §2.1.i & Format 2)  
+**Resolved Date / Owner:** 2026-10-25 / Person 3 (Approved)
 
 ### Q-003 — Required fields per document
-**Status:** Open  
-**Question:** Which fields will be extracted for each chosen document type?  
-**Next action:** Make a small field matrix; do not extract fields that are not used by a rule or report.
+**Status:** Resolved  
+**Decision:** Standard field matrix defined and documented in `docs/AICTE_RULEBOOK_REFERENCE.md` and `docs/PERSON3_IMPLEMENTATION_PLAN.md`:
+- `fire_safety_certificate`: `certificate_number`, `issuing_authority`, `issue_date`, `expiry_date`, `institution_name`, `institution_address`
+- `building_completion_certificate`: `certificate_number`, `issuing_authority`, `issue_date`, `institution_name`, `institution_address`, `approved_built_up_area_sqm`
+- `affidavit_2`: `affidavit_date`, `stamp_paper_value_inr`, `notary_registration_number`, `deponent_name`, `deponent_designation`, `institution_name`, `academic_year`  
+**Resolved Date / Owner:** 2026-10-25 / Person 3 (Approved)
 
 ### Q-004 — File size and page limits
-**Status:** Open  
-**Question:** What maximum file size and page count should be accepted for the demo?  
-**Next action:** Set limits that fit the development machine and test documents; document them in the README.
+**Status:** Resolved  
+**Decision:** Maximum file size: 10 MB per file. Maximum page count: 20 pages per document. Accepted formats: PDF, PNG, JPG/JPEG.  
+**Resolved Date / Owner:** 2026-10-25 / Person 3 (Approved)
 
 ### Q-005 — Database confirmation
 **Status:** Resolved  

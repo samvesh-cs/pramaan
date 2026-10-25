@@ -32,52 +32,52 @@ Use three workstreams. Replace Person 1/2/3 with actual names in the team copy i
 - [ ] Tell Person 3 how to call the module and what errors it can return.
 
 ## Person 3 — FastAPI, database and validation
-- [ ] Create FastAPI application and `/api` routes.
-- [ ] Confirm selected application category and official checklist source.
-- [ ] Define PostgreSQL tables and relationships for applications, documents, extracted fields/runs, and findings.
-- [ ] Configure environment variables and `.env.example`.
-- [ ] Implement application creation and retrieval.
-- [ ] Implement upload validation and local file storage.
-- [ ] Integrate Person 2's extraction module.
-- [ ] Implement the required-document checklist.
-- [ ] Implement missing-field, expiry and cross-document consistency rules.
-- [ ] Generate findings in the API contract format.
-- [ ] Calculate overall application status consistently.
-- [ ] Implement report retrieval.
-- [ ] Handle API errors without leaking stack traces.
-- [ ] Add backend tests for routes and validation rules.
-- [ ] Share API docs and test results with Person 1.
+- [x] Create FastAPI application and `/api` routes.
+- [x] Confirm selected application category and official checklist source.
+- [x] Define PostgreSQL tables and relationships for applications, documents, extracted fields/runs, and findings.
+- [x] Configure environment variables and `.env.example`.
+- [x] Implement application creation and retrieval.
+- [x] Implement upload validation and local file storage.
+- [x] Integrate Person 2's extraction module. (Integrated app.ocr with PyMuPDF selectable text + PaddleOCR 3.x into app.services.ocr_service; real synthetic samples tested).
+- [x] Implement the required-document checklist.
+- [x] Implement missing-field, expiry and cross-document consistency rules.
+- [x] Generate findings in the API contract format.
+- [x] Calculate overall application status consistently.
+- [x] Implement report retrieval.
+- [x] Handle API errors without leaking stack traces.
+- [x] Add backend tests for routes and validation rules (19 tests passing).
+- [x] Share API docs and test results with Person 1.
 
 ## Shared sample data and testing
-- [ ] Confirm one application category before writing rules.
-- [ ] Confirm two or three representative document types from the applicable official AICTE checklist.
-- [ ] Record the official source/handbook clause and applicability for every requirement.
-- [ ] Create synthetic valid sample documents.
-- [ ] Create defective samples: missing document, expired date, missing field, cross-document mismatch, unreadable scan, invalid file.
-- [ ] Write expected outcomes before running the system.
-- [ ] Compare actual findings against expected outcomes and record mistakes.
+- [x] Confirm one application category before writing rules. (EoA Self-Disclosure confirmed)
+- [x] Confirm two or three representative document types from the applicable official AICTE checklist. (Fire Safety, Building Completion, Affidavit-2)
+- [x] Record the official source/handbook clause and applicability for every requirement. (docs/AICTE_RULEBOOK_REFERENCE.md)
+- [x] Create synthetic valid sample documents. (backend/tests/demo_samples/ and backend/tests/samples/)
+- [x] Create defective samples: missing document, expired date, missing field, cross-document mismatch, unreadable scan, invalid file. (expired_fire_safety.pdf, missing_fields_building.pdf, mismatched_fire_safety.pdf, corrupt_doc.pdf, etc.)
+- [x] Write expected outcomes before running the system. (Documented in backend/tests/demo_samples/manifest.json)
+- [x] Compare actual findings against expected outcomes and record mistakes. (Verified via backend/tests/test_scenarios.py)
 - [ ] Test a complete application through the real frontend and backend.
 - [ ] Test repeat validation and ensure results do not mix across applications.
 - [ ] Rehearse the demo and keep a backup recording.
 
 ## Integration checkpoints
 ### Checkpoint 1 — Contract agreed
-- [ ] Category, document types, fields, status values and API shapes agreed.
-- [ ] `API_CONTRACT.md` reviewed by all owners.
+- [x] Category, document types, fields, status values and API shapes agreed.
+- [x] `API_CONTRACT.md` reviewed by all owners.
 
 ### Checkpoint 2 — OCR proof
-- [ ] At least one representative image and one representative PDF processed.
-- [ ] Extracted field format matches the contract.
+- [x] At least one representative image and one representative PDF processed.
+- [x] Extracted field format matches the contract.
 
 ### Checkpoint 3 — Backend API proof
-- [ ] Application can be created.
-- [ ] Document can be uploaded and stored.
-- [ ] OCR/extraction result is returned or stored.
+- [x] Application can be created.
+- [x] Document can be uploaded and stored.
+- [x] OCR/extraction result is returned or stored.
 
 ### Checkpoint 4 — Validation proof
-- [ ] A valid test case passes selected checks.
-- [ ] A defective test case produces the expected finding.
-- [ ] Unreadable/missing values become unresolved, not pass.
+- [x] A valid test case passes selected checks.
+- [x] A defective test case produces the expected finding.
+- [x] Unreadable/missing values become unresolved, not pass.
 
 ### Checkpoint 5 — End-to-end demo
 - [ ] Frontend uses real API responses.

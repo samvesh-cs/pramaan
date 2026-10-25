@@ -19,8 +19,12 @@ SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 def infer_document_type(pages: list[PageResult]) -> Optional[str]:
     """Heuristic helper to guess document type from content if not explicitly supplied."""
     full_text = "\n".join(p.text.lower() for p in pages)
-    if "fire" in full_text and ("safety" in full_text or "noc" in full_text):
+    if "fire" in full_text and ("safety" in full_text or "noc" in full_text or "rescue" in full_text):
         return "fire_safety_certificate"
+    if "affidavit" in full_text or "deponent" in full_text or "sworn" in full_text or "notary" in full_text:
+        return "affidavit_2"
+    if "completion" in full_text or "occupancy" in full_text or "building license" in full_text or "form d" in full_text:
+        return "building_completion_certificate"
     if "stability" in full_text or "structural" in full_text:
         return "structural_stability_certificate"
     if "deed" in full_text or "land" in full_text or "khasra" in full_text:

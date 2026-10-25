@@ -25,6 +25,7 @@ class ExtractedField(BaseModel):
     confidence: Optional[float] = None
     page_number: Optional[int] = None
     bbox: Optional[List[float]] = None  # [x1, y1, x2, y2]
+    status: Optional[str] = None  # 'extracted' | 'missing' | 'uncertain'
 
 
 class ExtractionResult(BaseModel):

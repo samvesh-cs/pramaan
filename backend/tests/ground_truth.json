@@ -7,42 +7,74 @@
       "institution_name": "Synthetic ABC Institute of Technology",
       "document_number": "FS-2026-881",
       "issue_date": "2026-02-10",
-      "expiry_date": "2027-02-09"
+      "expiry_date": "2027-02-09",
+      "issuing_authority": "Delhi Fire Services Department"
     }
   },
-  "scanned_structural_stability.png": {
-    "category": "scanned-style image",
-    "document_type": "structural_stability_certificate",
+  "expired_fire_safety.pdf": {
+    "category": "expired variant (PDF)",
+    "document_type": "fire_safety_certificate",
     "expected_processing_status": "processed",
     "expected_fields": {
       "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "SSC-2026-402",
-      "engineer_license_number": "STR-ENG-9821",
-      "issue_date": "2026-01-20",
-      "expiry_date": "2031-01-19"
+      "document_number": "FS-2023-104",
+      "issue_date": "2023-01-15",
+      "expiry_date": "2024-01-14",
+      "issuing_authority": "Delhi Fire Services Department"
     }
   },
-  "low_quality_land_deed.png": {
-    "category": "low-quality image",
-    "document_type": "land_title_deed",
+  "missing_field_fire_safety.pdf": {
+    "category": "missing-field variant (PDF)",
+    "document_type": "fire_safety_certificate",
     "expected_processing_status": "processed",
     "expected_fields": {
       "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "DEED-2026-5541",
-      "land_area": "10.5 Acres",
-      "issue_date": "2025-11-15"
-    }
-  },
-  "multipage_structural_stability.pdf": {
-    "category": "multi-page PDF",
-    "document_type": "structural_stability_certificate",
-    "expected_processing_status": "processed",
-    "expected_fields": {
-      "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "SSC-2026-905",
-      "engineer_license_number": "SE-LIC-4421",
+      "document_number": "FS-2026-550",
       "issue_date": "2026-03-01",
-      "expiry_date": "2029-02-28"
+      "expiry_date": null,
+      "issuing_authority": "Delhi Fire Services Department"
+    }
+  },
+  "scanned_building_completion.png": {
+    "category": "scanned-style image",
+    "document_type": "building_completion_certificate",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "document_number": "BCC-2025-901",
+      "issue_date": "2025-08-20",
+      "issuing_authority": "Greater Noida Industrial Development Authority"
+    }
+  },
+  "noisy_building_completion.png": {
+    "category": "noisy image variant",
+    "document_type": "building_completion_certificate",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "document_number": "BCC-2025-442",
+      "issue_date": "2025-11-10",
+      "issuing_authority": "Municipal Corporation of Greater Mumbai"
+    }
+  },
+  "clean_affidavit_2.pdf": {
+    "category": "clean PDF",
+    "document_type": "affidavit_2",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "notary_date": "2026-01-15",
+      "signatory_name": "Rajesh Kumar Sharma"
+    }
+  },
+  "tilted_affidavit_2.png": {
+    "category": "tilted image variant",
+    "document_type": "affidavit_2",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "notary_date": "2026-02-18",
+      "signatory_name": "Vikram Singh"
     }
   },
   "corrupt_doc.pdf": {
@@ -65,7 +97,7 @@
   },
   "password_protected.pdf": {
     "category": "bad input: password-protected PDF",
-    "document_type": "structural_stability_certificate",
+    "document_type": "building_completion_certificate",
     "expected_processing_status": "processing_failed",
     "expected_fields": {}
   }

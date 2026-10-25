@@ -15,6 +15,13 @@ with open(GT_PATH, "r", encoding="utf-8") as f:
     ground_truth = json.load(f)
 
 results = []
+failures = []
+total_fields_checked = 0
+passed_fields = 0
+
+print("=" * 80)
+print("RUNNING EVALUATION ON SYNTHETIC TEST SET")
+print("=" * 80)
 
 for filename, info in ground_truth.items():
     file_path = os.path.join(SAMPLES_DIR, filename)
@@ -23,17 +30,59 @@ for filename, info in ground_truth.items():
     expected_status = info["expected_processing_status"]
     expected_fields = info.get("expected_fields", {})
 
-    print(f"Processing {filename} ({category})...")
+    print(f"\nEvaluating: {filename} ({category}) [DocType: {doc_type}]")
     res = process_document(file_path, document_type=doc_type)
 
-    extracted_fields_dict = {}
-    if res.fields:
-        for f_name, f_obj in res.fields.items():
-            extracted_fields_dict[f_name] = {
-                "value": f_obj.value,
-                "confidence": f_obj.confidence,
-                "raw_text": f_obj.raw_text
-            }
+    doc_status_pass = (res.processing_status == expected_status)
+    if not doc_status_pass:
+        failures.append({
+            "filename": filename,
+            "type": "processing_status_mismatch",
+            "expected": expected_status,
+            "actual": res.processing_status,
+            "error": res.error
+        })
+
+    field_evaluations = {}
+    for f_name, expected_val in expected_fields.items():
+        total_fields_checked += 1
+        actual_field_obj = res.fields.get(f_name)
+        actual_val = actual_field_obj.value if actual_field_obj else None
+        actual_status = actual_field_obj.status if actual_field_obj else "not_returned"
+        actual_conf = actual_field_obj.confidence if actual_field_obj else None
+        actual_raw = actual_field_obj.raw_text if actual_field_obj else None
+
+        # Check match
+        if expected_val is None:
+            # Expected to be missing
+            is_match = (actual_val is None) and (actual_status == "missing")
+        else:
+            is_match = (str(actual_val).strip() == str(expected_val).strip())
+
+        if is_match:
+            passed_fields += 1
+            verdict = "PASS"
+        else:
+            verdict = "FAIL"
+            failures.append({
+                "filename": filename,
+                "field": f_name,
+                "expected": expected_val,
+                "actual": actual_val,
+                "status": actual_status,
+                "confidence": actual_conf
+            })
+
+        print(f"  [{verdict}] {f_name:22s} | Expected: {str(expected_val):<35s} | Actual: {str(actual_val):<35s} | Status: {actual_status:<10s} | Conf: {str(actual_conf)}")
+
+        field_evaluations[f_name] = {
+            "expected": expected_val,
+            "actual": actual_val,
+            "verdict": verdict,
+            "status": actual_status,
+            "confidence": actual_conf,
+            "raw_text": actual_raw
+        }
 
     results.append({
         "filename": filename,
@@ -41,25 +90,31 @@ for filename, info in ground_truth.items():
         "document_type": doc_type,
         "expected_status": expected_status,
         "actual_status": res.processing_status,
+        "doc_status_pass": doc_status_pass,
         "error": res.error,
-        "expected_fields": expected_fields,
-        "extracted_fields": extracted_fields_dict
+        "fields": field_evaluations
     })
 
 eval_out_path = os.path.join(BASE_DIR, "evaluation_results.json")
 with open(eval_out_path, "w", encoding="utf-8") as f:
-    json.dump(results, f, indent=2)
+    json.dump({
+        "summary": {
+            "total_documents": len(ground_truth),
+            "total_fields": total_fields_checked,
+            "passed_fields": passed_fields,
+            "failed_fields": total_fields_checked - passed_fields,
+            "total_failures": len(failures)
+        },
+        "failures": failures,
+        "details": results
+    }, f, indent=2)
 
-print("\n--- EVALUATION SUMMARY ---")
-for r in results:
-    status_match = "PASS" if r["expected_status"] == r["actual_status"] else "FAIL"
-    print(f"[{status_match}] {r['filename']} ({r['category']}) -> status: {r['actual_status']}")
-    if r["error"]:
-        print(f"    Error handled: {r['error']}")
-    if r["expected_fields"]:
-        for k, v in r["expected_fields"].items():
-            act = r["extracted_fields"].get(k, {})
-            act_val = act.get("value")
-            act_conf = act.get("confidence")
-            match = "EXACT" if str(act_val) == str(v) else "MISMATCH"
-            print(f"    - {k:25s} | Expected: {v} | Extracted: {act_val} (conf: {act_conf}) [{match}]")
+print("\n" + "=" * 80)
+print(f"EVALUATION SUMMARY: {passed_fields}/{total_fields_checked} fields PASS ({len(failures)} total failures)")
+print("=" * 80)
+if failures:
+    print("\nFAILURES FOUND:")
+    for f in failures:
+        print(f" - {f}")
+else:
+    print("\nNO FAILURES FOUND! ALL CASES PASSED.")

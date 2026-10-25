@@ -18,18 +18,18 @@ Use three workstreams. Replace Person 1/2/3 with actual names in the team copy i
 - [ ] Verify the frontend works with actual backend responses.
 
 ## Person 2 — PaddleOCR and document extraction
-- [ ] Set up a Python virtual environment and document compatible Python/PaddlePaddle/PaddleOCR versions.
-- [ ] Test PaddleOCR independently on one image.
-- [ ] Use PyMuPDF to extract selectable text from digital PDFs.
-- [ ] Render scanned PDF pages to images and run PaddleOCR.
-- [ ] Process JPG and PNG images.
-- [ ] Extract only fields needed for the selected document types.
-- [ ] Return the exact internal data structure in `API_CONTRACT.md`.
-- [ ] Preserve raw text snippets, page numbers, confidence when available, and bounding boxes when available.
-- [ ] Represent uncertain/missing fields explicitly; never invent values.
-- [ ] Handle unreadable, corrupt and unsupported documents without crashing.
-- [ ] Add tests using the agreed sample documents.
-- [ ] Tell Person 3 how to call the module and what errors it can return.
+- [x] Set up a Python virtual environment and document compatible Python/PaddlePaddle/PaddleOCR versions.
+- [x] Test PaddleOCR independently on one image.
+- [x] Use PyMuPDF to extract selectable text from digital PDFs.
+- [x] Render scanned PDF pages to images and run PaddleOCR.
+- [x] Process JPG and PNG images.
+- [x] Extract only fields needed for the selected document types.
+- [x] Return the exact internal data structure in `API_CONTRACT.md`.
+- [x] Preserve raw text snippets, page numbers, confidence when available, and bounding boxes when available.
+- [x] Represent uncertain/missing fields explicitly; never invent values.
+- [x] Handle unreadable, corrupt and unsupported documents without crashing.
+- [x] Add tests using the agreed sample documents.
+- [x] Tell Person 3 how to call the module and what errors it can return.
 
 ## Person 3 — FastAPI, database and validation
 - [ ] Create FastAPI application and `/api` routes.
@@ -62,12 +62,12 @@ Use three workstreams. Replace Person 1/2/3 with actual names in the team copy i
 
 ## Integration checkpoints
 ### Checkpoint 1 — Contract agreed
-- [ ] Category, document types, fields, status values and API shapes agreed.
-- [ ] `API_CONTRACT.md` reviewed by all owners.
+- [x] Category, document types, fields, status values and API shapes agreed.
+- [x] `API_CONTRACT.md` reviewed by all owners.
 
 ### Checkpoint 2 — OCR proof
-- [ ] At least one representative image and one representative PDF processed.
-- [ ] Extracted field format matches the contract.
+- [x] At least one representative image and one representative PDF processed.
+- [x] Extracted field format matches the contract.
 
 ### Checkpoint 3 — Backend API proof
 - [ ] Application can be created.

@@ -1,198 +1,361 @@
-[
-  {
-    "filename": "clean_fire_safety.pdf",
-    "category": "clean PDF",
-    "document_type": "fire_safety_certificate",
-    "expected_status": "processed",
-    "actual_status": "processed",
-    "error": null,
-    "expected_fields": {
-      "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "FS-2026-881",
-      "issue_date": "2026-02-10",
-      "expiry_date": "2027-02-09"
-    },
-    "extracted_fields": {
-      "institution_name": {
-        "value": "Synthetic ABC Institute of Technology",
-        "confidence": null,
-        "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
-      },
-      "document_number": {
-        "value": "FS-2026-881",
-        "confidence": null,
-        "raw_text": "Certificate No: FS-2026-881"
-      },
-      "issue_date": {
-        "value": "2026-02-10",
-        "confidence": null,
-        "raw_text": "Date of Issue: 10/02/2026"
-      },
-      "expiry_date": {
-        "value": "2027-02-09",
-        "confidence": null,
-        "raw_text": "Valid Until: 09/02/2027"
+{
+  "summary": {
+    "total_documents": 11,
+    "total_fields": 29,
+    "passed_fields": 29,
+    "failed_fields": 0,
+    "total_failures": 0
+  },
+  "failures": [],
+  "details": [
+    {
+      "filename": "clean_fire_safety.pdf",
+      "category": "clean PDF",
+      "document_type": "fire_safety_certificate",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Name of the Institution: Synthetic ABC Institute of Technology"
+        },
+        "document_number": {
+          "expected": "FS-2026-881",
+          "actual": "FS-2026-881",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Certificate No: FS-2026-881"
+        },
+        "issue_date": {
+          "expected": "2026-02-10",
+          "actual": "2026-02-10",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Date of Issue: 10/02/2026"
+        },
+        "expiry_date": {
+          "expected": "2027-02-09",
+          "actual": "2027-02-09",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Valid Upto: 09/02/2027"
+        },
+        "issuing_authority": {
+          "expected": "Delhi Fire Services Department",
+          "actual": "Delhi Fire Services Department",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Issuing Authority: Delhi Fire Services Department"
+        }
       }
-    }
-  },
-  {
-    "filename": "scanned_structural_stability.png",
-    "category": "scanned-style image",
-    "document_type": "structural_stability_certificate",
-    "expected_status": "processed",
-    "actual_status": "processed",
-    "error": null,
-    "expected_fields": {
-      "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "SSC-2026-402",
-      "engineer_license_number": "STR-ENG-9821",
-      "issue_date": "2026-01-20",
-      "expiry_date": "2031-01-19"
     },
-    "extracted_fields": {
-      "institution_name": {
-        "value": "Synthetic ABC Institute of Technology",
-        "confidence": 0.9926,
-        "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
-      },
-      "document_number": {
-        "value": "SSC-2026-402",
-        "confidence": 0.9853,
-        "raw_text": "Certificate No: SSC-2026-402"
-      },
-      "engineer_license_number": {
-        "value": "STR-ENG-9821",
-        "confidence": 0.9958,
-        "raw_text": "Engineer License Number: STR-ENG-9821"
-      },
-      "issue_date": {
-        "value": "2026-01-20",
-        "confidence": 0.9995,
-        "raw_text": "Date of Inspection: 20/01/2026"
-      },
-      "expiry_date": {
-        "value": "2031-01-19",
-        "confidence": 0.9966,
-        "raw_text": "Valid Until: 19/01/2031"
+    {
+      "filename": "expired_fire_safety.pdf",
+      "category": "expired variant (PDF)",
+      "document_type": "fire_safety_certificate",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
+        },
+        "document_number": {
+          "expected": "FS-2023-104",
+          "actual": "FS-2023-104",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Certificate No: FS-2023-104"
+        },
+        "issue_date": {
+          "expected": "2023-01-15",
+          "actual": "2023-01-15",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Date of Issue: 15/01/2023"
+        },
+        "expiry_date": {
+          "expected": "2024-01-14",
+          "actual": "2024-01-14",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Valid Until: 14/01/2024"
+        },
+        "issuing_authority": {
+          "expected": "Delhi Fire Services Department",
+          "actual": "Delhi Fire Services Department",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Issuing Authority: Delhi Fire Services Department"
+        }
       }
-    }
-  },
-  {
-    "filename": "low_quality_land_deed.png",
-    "category": "low-quality image",
-    "document_type": "land_title_deed",
-    "expected_status": "processed",
-    "actual_status": "processed",
-    "error": null,
-    "expected_fields": {
-      "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "DEED-2026-5541",
-      "land_area": "10.5 Acres",
-      "issue_date": "2025-11-15"
     },
-    "extracted_fields": {
-      "institution_name": {
-        "value": "Synthetic ABC Institute of Technology",
-        "confidence": 0.9997,
-        "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
-      },
-      "document_number": {
-        "value": "DEED-2026-5541",
-        "confidence": 0.9789,
-        "raw_text": "Deed No: DEED-2026-5541"
-      },
-      "land_area": {
-        "value": "10.5 Acres",
-        "confidence": 0.9906,
-        "raw_text": "Total Land Area: 10.5 Acres"
-      },
-      "issue_date": {
-        "value": "2025-11-15",
-        "confidence": 0.9996,
-        "raw_text": "Date of Registration: 15/11/2025"
+    {
+      "filename": "missing_field_fire_safety.pdf",
+      "category": "missing-field variant (PDF)",
+      "document_type": "fire_safety_certificate",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Premises of: Synthetic ABC Institute of Technology"
+        },
+        "document_number": {
+          "expected": "FS-2026-550",
+          "actual": "FS-2026-550",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "NOC No: FS-2026-550"
+        },
+        "issue_date": {
+          "expected": "2026-03-01",
+          "actual": "2026-03-01",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Date of Issue: 01/03/2026"
+        },
+        "expiry_date": {
+          "expected": null,
+          "actual": null,
+          "verdict": "PASS",
+          "status": "missing",
+          "confidence": null,
+          "raw_text": null
+        },
+        "issuing_authority": {
+          "expected": "Delhi Fire Services Department",
+          "actual": "Delhi Fire Services Department",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Issuing Authority: Delhi Fire Services Department"
+        }
       }
-    }
-  },
-  {
-    "filename": "multipage_structural_stability.pdf",
-    "category": "multi-page PDF",
-    "document_type": "structural_stability_certificate",
-    "expected_status": "processed",
-    "actual_status": "processed",
-    "error": null,
-    "expected_fields": {
-      "institution_name": "Synthetic ABC Institute of Technology",
-      "document_number": "SSC-2026-905",
-      "engineer_license_number": "SE-LIC-4421",
-      "issue_date": "2026-03-01",
-      "expiry_date": "2029-02-28"
     },
-    "extracted_fields": {
-      "institution_name": {
-        "value": "Synthetic ABC Institute of Technology",
-        "confidence": null,
-        "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
-      },
-      "document_number": {
-        "value": "SSC-2026-905",
-        "confidence": null,
-        "raw_text": "Certificate No: SSC-2026-905"
-      },
-      "engineer_license_number": {
-        "value": "SE-LIC-4421",
-        "confidence": null,
-        "raw_text": "Engineer License Number: SE-LIC-4421"
-      },
-      "issue_date": {
-        "value": "2026-03-01",
-        "confidence": null,
-        "raw_text": "Date of Inspection: 01/03/2026"
-      },
-      "expiry_date": {
-        "value": "2029-02-28",
-        "confidence": null,
-        "raw_text": "Valid Until: 28/02/2029"
+    {
+      "filename": "scanned_building_completion.png",
+      "category": "scanned-style image",
+      "document_type": "building_completion_certificate",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9999,
+          "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
+        },
+        "document_number": {
+          "expected": "BCC-2025-901",
+          "actual": "BCC-2025-901",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9995,
+          "raw_text": "Certificate No: BCC-2025-901"
+        },
+        "issue_date": {
+          "expected": "2025-08-20",
+          "actual": "2025-08-20",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9993,
+          "raw_text": "Date of Issue: 20/08/2025"
+        },
+        "issuing_authority": {
+          "expected": "Greater Noida Industrial Development Authority",
+          "actual": "Greater Noida Industrial Development Authority",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9851,
+          "raw_text": "Issuing Authority: Greater Noida Industrial Development Authority"
+        }
       }
+    },
+    {
+      "filename": "noisy_building_completion.png",
+      "category": "noisy image variant",
+      "document_type": "building_completion_certificate",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9966,
+          "raw_text": "Name of the Institution: Synthetic ABC Institute of Technology"
+        },
+        "document_number": {
+          "expected": "BCC-2025-442",
+          "actual": "BCC-2025-442",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9941,
+          "raw_text": "Certificate No: BCC-2025-442"
+        },
+        "issue_date": {
+          "expected": "2025-11-10",
+          "actual": "2025-11-10",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9856,
+          "raw_text": "Date of Completion: 10/11/2025"
+        },
+        "issuing_authority": {
+          "expected": "Municipal Corporation of Greater Mumbai",
+          "actual": "Municipal Corporation of Greater Mumbai",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9911,
+          "raw_text": "Issuing Authority: Municipal Corporation of Greater Mumbai"
+        }
+      }
+    },
+    {
+      "filename": "clean_affidavit_2.pdf",
+      "category": "clean PDF",
+      "document_type": "affidavit_2",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "on behalf of\nSynthetic ABC Institute of Technology do hereby solemnly affirm and state:"
+        },
+        "notary_date": {
+          "expected": "2026-01-15",
+          "actual": "2026-01-15",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "Sworn before me on: 15/01/2026"
+        },
+        "signatory_name": {
+          "expected": "Rajesh Kumar Sharma",
+          "actual": "Rajesh Kumar Sharma",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": null,
+          "raw_text": "I, Rajesh Kumar Sharma, Chairman"
+        }
+      }
+    },
+    {
+      "filename": "tilted_affidavit_2.png",
+      "category": "tilted image variant",
+      "document_type": "affidavit_2",
+      "expected_status": "processed",
+      "actual_status": "processed",
+      "doc_status_pass": true,
+      "error": null,
+      "fields": {
+        "institution_name": {
+          "expected": "Synthetic ABC Institute of Technology",
+          "actual": "Synthetic ABC Institute of Technology",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9998,
+          "raw_text": "Institution Name: Synthetic ABC Institute of Technology"
+        },
+        "notary_date": {
+          "expected": "2026-02-18",
+          "actual": "2026-02-18",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9887,
+          "raw_text": "Sworn before me on: 18/02/2026"
+        },
+        "signatory_name": {
+          "expected": "Vikram Singh",
+          "actual": "Vikram Singh",
+          "verdict": "PASS",
+          "status": "extracted",
+          "confidence": 0.9846,
+          "raw_text": "Deponent Name: Vikram Singh"
+        }
+      }
+    },
+    {
+      "filename": "corrupt_doc.pdf",
+      "category": "bad input: corrupt file",
+      "document_type": "fire_safety_certificate",
+      "expected_status": "processing_failed",
+      "actual_status": "processing_failed",
+      "doc_status_pass": true,
+      "error": "Document parsing error: Failed to open file 'C:\\\\Users\\\\admin\\\\Desktop\\\\sih-prototype-main\\\\sih-prototype-main\\\\backend\\\\tests\\\\samples\\\\corrupt_doc.pdf' as type pdf.",
+      "fields": {}
+    },
+    {
+      "filename": "empty_doc.pdf",
+      "category": "bad input: empty file",
+      "document_type": "fire_safety_certificate",
+      "expected_status": "processing_failed",
+      "actual_status": "processing_failed",
+      "doc_status_pass": true,
+      "error": "Document parsing error: Cannot open empty file: filename='C:\\\\Users\\\\admin\\\\Desktop\\\\sih-prototype-main\\\\sih-prototype-main\\\\backend\\\\tests\\\\samples\\\\empty_doc.pdf'.",
+      "fields": {}
+    },
+    {
+      "filename": "unsupported_format.docx",
+      "category": "bad input: unsupported type",
+      "document_type": "fire_safety_certificate",
+      "expected_status": "processing_failed",
+      "actual_status": "processing_failed",
+      "doc_status_pass": true,
+      "error": "Unsupported file type '.docx'. Supported types: .jpeg, .jpg, .pdf, .png",
+      "fields": {}
+    },
+    {
+      "filename": "password_protected.pdf",
+      "category": "bad input: password-protected PDF",
+      "document_type": "building_completion_certificate",
+      "expected_status": "processing_failed",
+      "actual_status": "processing_failed",
+      "doc_status_pass": true,
+      "error": "Document parsing error: document closed or encrypted",
+      "fields": {}
     }
-  },
-  {
-    "filename": "corrupt_doc.pdf",
-    "category": "bad input: corrupt file",
-    "document_type": "fire_safety_certificate",
-    "expected_status": "processing_failed",
-    "actual_status": "processing_failed",
-    "error": "Document parsing error: Failed to open file 'C:\\\\Users\\\\admin\\\\Desktop\\\\sih-prototype-main\\\\sih-prototype-main\\\\backend\\\\tests\\\\samples\\\\corrupt_doc.pdf' as type pdf.",
-    "expected_fields": {},
-    "extracted_fields": {}
-  },
-  {
-    "filename": "empty_doc.pdf",
-    "category": "bad input: empty file",
-    "document_type": "fire_safety_certificate",
-    "expected_status": "processing_failed",
-    "actual_status": "processing_failed",
-    "error": "Document parsing error: Cannot open empty file: filename='C:\\\\Users\\\\admin\\\\Desktop\\\\sih-prototype-main\\\\sih-prototype-main\\\\backend\\\\tests\\\\samples\\\\empty_doc.pdf'.",
-    "expected_fields": {},
-    "extracted_fields": {}
-  },
-  {
-    "filename": "unsupported_format.docx",
-    "category": "bad input: unsupported type",
-    "document_type": "fire_safety_certificate",
-    "expected_status": "processing_failed",
-    "actual_status": "processing_failed",
-    "error": "Unsupported file type '.docx'. Supported types: .jpeg, .jpg, .pdf, .png",
-    "expected_fields": {},
-    "extracted_fields": {}
-  },
-  {
-    "filename": "password_protected.pdf",
-    "category": "bad input: password-protected PDF",
-    "document_type": "structural_stability_certificate",
-    "expected_status": "processing_failed",
-    "actual_status": "processing_failed",
-    "error": "Document parsing error: document closed or encrypted",
-    "expected_fields": {},
-    "extracted_fields": {}
-  }
-]
+  ]
+}

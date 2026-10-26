@@ -1,0 +1,72 @@
+{
+  "clean_fire_safety.pdf": {
+    "category": "clean PDF",
+    "document_type": "fire_safety_certificate",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "document_number": "FS-2026-881",
+      "issue_date": "2026-02-10",
+      "expiry_date": "2027-02-09"
+    }
+  },
+  "scanned_structural_stability.png": {
+    "category": "scanned-style image",
+    "document_type": "structural_stability_certificate",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "document_number": "SSC-2026-402",
+      "engineer_license_number": "STR-ENG-9821",
+      "issue_date": "2026-01-20",
+      "expiry_date": "2031-01-19"
+    }
+  },
+  "low_quality_land_deed.png": {
+    "category": "low-quality image",
+    "document_type": "land_title_deed",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "document_number": "DEED-2026-5541",
+      "land_area": "10.5 Acres",
+      "issue_date": "2025-11-15"
+    }
+  },
+  "multipage_structural_stability.pdf": {
+    "category": "multi-page PDF",
+    "document_type": "structural_stability_certificate",
+    "expected_processing_status": "processed",
+    "expected_fields": {
+      "institution_name": "Synthetic ABC Institute of Technology",
+      "document_number": "SSC-2026-905",
+      "engineer_license_number": "SE-LIC-4421",
+      "issue_date": "2026-03-01",
+      "expiry_date": "2029-02-28"
+    }
+  },
+  "corrupt_doc.pdf": {
+    "category": "bad input: corrupt file",
+    "document_type": "fire_safety_certificate",
+    "expected_processing_status": "processing_failed",
+    "expected_fields": {}
+  },
+  "empty_doc.pdf": {
+    "category": "bad input: empty file",
+    "document_type": "fire_safety_certificate",
+    "expected_processing_status": "processing_failed",
+    "expected_fields": {}
+  },
+  "unsupported_format.docx": {
+    "category": "bad input: unsupported type",
+    "document_type": "fire_safety_certificate",
+    "expected_processing_status": "processing_failed",
+    "expected_fields": {}
+  },
+  "password_protected.pdf": {
+    "category": "bad input: password-protected PDF",
+    "document_type": "structural_stability_certificate",
+    "expected_processing_status": "processing_failed",
+    "expected_fields": {}
+  }
+}

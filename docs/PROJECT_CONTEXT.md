@@ -46,9 +46,9 @@ Institutional applications may include multiple documents whose presence, requir
 - Synthetic test data with known expected outcomes and recorded evaluation results.
 
 ## 5. Application category and checklist
-The team must confirm and record the selected application category before implementing regulatory rules. Extension of Approval (EoA) for an existing institution is a candidate because it is a recurring workflow, but the choice must be confirmed against the relevant current official AICTE handbook and notices.
+The selected category is Extension of Approval (EoA) — Self-Disclosure for existing institutions, recorded in `docs/DECISIONS.md` and referenced in `docs/AICTE_RULEBOOK_REFERENCE.md`.
 
-The required-document checklist must come from the applicable official AICTE requirement for the chosen category and route. A requirement may be:
+The prototype configures three representative EoA document types from the recorded APH 2024-2027 clauses: Fire Safety Certificate, Building Completion/Occupancy Certificate, and Affidavit-2. This is an MVP subset, not a complete EoA checklist. A requirement may be:
 - `required`
 - `required_if_applicable`
 - `not_applicable`

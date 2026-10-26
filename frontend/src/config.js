@@ -1,14 +1,14 @@
-export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
+// Real API mode is the default. Opt into browser-only demo data explicitly.
+export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
 
-// EoA is the contract's candidate code, not a team-confirmed category.
-export const APPLICATION_CATEGORIES = [{ code: 'eoa', label: 'Extension of Approval (EoA)', configuredAssumption: true }]
+export const APPLICATION_CATEGORIES = [{ code: 'eoa', label: 'Extension of Approval (EoA)' }]
 
-// Demonstration checklist only. Replace with team-confirmed, source-backed configuration.
+// Matches the backend EoA MVP checklist and the recorded APH 2024-2027 clauses.
 export const DOCUMENT_TYPES = [
-  { code: 'fire_safety_certificate', label: 'Fire safety certificate', reference: 'Demonstration requirement' },
-  { code: 'building_safety_certificate', label: 'Building safety certificate', reference: 'Demonstration requirement' },
-  { code: 'audited_accounts', label: 'Audited accounts', reference: 'Demonstration requirement' },
+  { code: 'fire_safety_certificate', label: 'Fire Safety Certificate', reference: 'APH 2024-2027, Annexure-2, §2.1(v)' },
+  { code: 'building_completion_certificate', label: 'Occupancy / Completion Certificate', reference: 'APH 2024-2027, Annexure-2, §2.1(iii), Clause 7.17' },
+  { code: 'affidavit_2', label: 'Affidavit-2', reference: 'APH 2024-2027, Annexure-2, §2.1(i)' },
 ]
 
 export const CHECK_STATUSES = ['pass', 'flagged', 'missing', 'unresolved', 'not_applicable']

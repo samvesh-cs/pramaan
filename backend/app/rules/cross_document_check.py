@@ -1,6 +1,6 @@
 import re
 from typing import Any
-from app.rules.base import BaseRule
+from app.rules.base import BaseRule, OCR_CONFIDENCE_REVIEW_THRESHOLD
 from app.schemas.finding import FindingCreate
 
 
@@ -52,6 +52,34 @@ class InstitutionNameConsistencyRule(BaseRule):
 
             if not name_field or not name_field.get("value"):
                 # Missing field is handled by FieldCompletenessRule
+                continue
+
+            confidence = name_field.get("confidence")
+            if name_field.get("status") == "uncertain" or (
+                confidence is not None and confidence < OCR_CONFIDENCE_REVIEW_THRESHOLD
+            ):
+                findings.append(
+                    FindingCreate(
+                        rule_id=self.rule_id,
+                        status="unresolved",
+                        title="Institution name consistency check needs review",
+                        reason=(
+                            f"OCR confidence for the institution name in '{doc.original_filename}' "
+                            f"was {confidence:.0%}, below the {OCR_CONFIDENCE_REVIEW_THRESHOLD:.0%} review threshold."
+                        ),
+                        document_id=doc.id,
+                        document_name=doc.original_filename,
+                        evidence={
+                            "page_number": name_field.get("page_number"),
+                            "text": name_field.get("raw_text"),
+                            "field": "institution_name",
+                            "value": name_field.get("value"),
+                            "bbox": name_field.get("bbox"),
+                            "confidence": confidence,
+                        },
+                        next_action="Review the institution name on the source page before comparing it with the application record.",
+                    )
+                )
                 continue
 
             doc_name_val = str(name_field["value"])

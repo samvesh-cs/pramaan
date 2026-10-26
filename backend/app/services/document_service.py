@@ -96,7 +96,6 @@ class DocumentService:
             extraction_result = await extraction_service.extract(
                 file_path=saved_path,
                 document_type=document_type,
-                institution_name=application.institution_name,
             )
             extraction_status = extraction_result.get("processing_status", "processed")
             extraction_error = extraction_result.get("error")
@@ -121,7 +120,9 @@ class DocumentService:
         await db.commit()
         await db.refresh(doc_model)
 
-        return DocumentResponse.model_validate(doc_model)
+        response = DocumentResponse.model_validate(doc_model)
+        response.fields = extraction_result.get("fields", {})
+        return response
 
     async def list_documents(
         self,

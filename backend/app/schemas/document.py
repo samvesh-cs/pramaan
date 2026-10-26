@@ -1,5 +1,6 @@
 from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from typing import Any
+from pydantic import BaseModel, ConfigDict, Field
 
 DocumentProcessingStatus = Literal["uploaded", "processing", "processed", "processing_failed"]
 
@@ -13,3 +14,4 @@ class DocumentResponse(BaseModel):
     original_filename: str
     mime_type: str
     processing_status: DocumentProcessingStatus
+    fields: dict[str, dict[str, Any]] = Field(default_factory=dict)

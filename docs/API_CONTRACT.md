@@ -64,7 +64,7 @@ Response: `201 Created`
 }
 ```
 
-`application_category` is a stable code, not a display label. Initial candidate code: `eoa`; the team must confirm the category before treating it as final. Do not support other categories in the Basic MVP.
+`application_category` is a stable code, not a display label. The selected Basic MVP category is `eoa` (EoA Self-Disclosure); other categories are not supported.
 
 ### Get application
 `GET /api/applications/{application_id}`
@@ -82,6 +82,11 @@ Response:
 }
 ```
 
+### List applications
+`GET /api/applications`
+
+Response: `200 OK`, an array of the application response objects above, ordered newest first. This additive endpoint supports the reviewer queue used by the frontend.
+
 ## 4. Upload document
 `POST /api/applications/{application_id}/documents`
 
@@ -98,9 +103,22 @@ Response: `201 Created`
   "document_type": "fire_safety_certificate",
   "original_filename": "sample_fire_certificate.pdf",
   "mime_type": "application/pdf",
-  "processing_status": "uploaded"
+  "processing_status": "uploaded",
+  "fields": {
+    "document_number": {
+      "value": "FS-2026-104",
+      "normalized_value": "FS-2026-104",
+      "raw_text": "Certificate No: FS-2026-104",
+      "confidence": 0.94,
+      "page_number": 1,
+      "bbox": [100, 180, 330, 210],
+      "status": "extracted"
+    }
+  }
 }
 ```
+
+`fields` contains the latest extraction result using the field structure in section 5. It may be empty if processing has not produced fields. Application detail responses include this property on each document so the reviewer can inspect actual extracted values.
 
 The server must validate file size, extension and detected content type. Do not trust the filename alone. The exact maximum file size must be set in configuration and documented in the README.
 
@@ -168,6 +186,8 @@ Rules:
 - `value` is the parsed value; use `null` if not reliably extracted.
 - `raw_text` preserves the supporting original snippet when available.
 - `confidence` is a number from `0` to `1` when supplied by OCR, otherwise `null`. Do not fabricate confidence for PDF text extraction.
+- `status` is `extracted`, `missing`, or `uncertain`; it describes extraction certainty, not a compliance result.
+- For validation, OCR confidence below `0.70` is treated as uncertain and produces an `unresolved` check for a rule that relies on that value. This is a prototype review threshold, not an AICTE requirement.
 - `bbox` is `[x1, y1, x2, y2]` in the coordinate system of the processed page image. If the coordinates are not available, use `null`.
 - `page_number` is 1-based.
 - The field list can contain only fields configured for the selected document type; this example shows the common fields for illustration.
@@ -216,7 +236,7 @@ Response:
     "unresolved": 0,
     "not_applicable": 0
   },
-  "missing_document_types": ["audited_accounts"],
+  "missing_document_types": ["affidavit_2"],
   "findings": [],
   "generated_at": "2026-10-24T12:05:00Z"
 }
@@ -250,6 +270,7 @@ Do not return sensitive internal details or stack traces to the client.
 
 ## 9. Minimum endpoints
 - `POST /api/applications`
+- `GET /api/applications`
 - `GET /api/applications/{application_id}`
 - `POST /api/applications/{application_id}/documents`
 - `GET /api/applications/{application_id}/documents`

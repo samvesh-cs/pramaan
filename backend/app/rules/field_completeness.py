@@ -1,6 +1,6 @@
 from typing import Any
 from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
-from app.rules.base import BaseRule
+from app.rules.base import BaseRule, OCR_CONFIDENCE_REVIEW_THRESHOLD
 from app.schemas.finding import FindingCreate
 
 FIELD_RULE_MAP = {
@@ -49,11 +49,20 @@ class FieldCompletenessRule(BaseRule):
 
             extracted_fields = extraction.fields or {}
             missing_fields: list[str] = []
+            uncertain_fields: list[str] = []
 
             for field_name in required_fields:
                 field_data = extracted_fields.get(field_name)
                 if not field_data or field_data.get("value") is None:
                     missing_fields.append(field_name)
+                elif (
+                    field_data.get("status") == "uncertain"
+                    or (
+                        field_data.get("confidence") is not None
+                        and field_data["confidence"] < OCR_CONFIDENCE_REVIEW_THRESHOLD
+                    )
+                ):
+                    uncertain_fields.append(field_name)
 
             if missing_fields:
                 findings.append(
@@ -68,7 +77,28 @@ class FieldCompletenessRule(BaseRule):
                         next_action="Ensure the uploaded document contains clear text for all mandatory fields or manually review the file.",
                     )
                 )
-            else:
+            if uncertain_fields:
+                findings.append(
+                    FindingCreate(
+                        rule_id=rule_id,
+                        status="unresolved",
+                        title=f"Low-confidence fields in {checklist_info['display_name']}",
+                        reason=(
+                            f"OCR confidence was below {OCR_CONFIDENCE_REVIEW_THRESHOLD:.0%} for: "
+                            f"{', '.join(uncertain_fields)}. These values need human confirmation."
+                        ),
+                        document_id=doc.id,
+                        document_name=doc.original_filename,
+                        evidence={
+                            "fields": {
+                                field_name: extracted_fields[field_name]
+                                for field_name in uncertain_fields
+                            }
+                        },
+                        next_action="Review the source page and confirm each low-confidence extracted value.",
+                    )
+                )
+            if not missing_fields and not uncertain_fields:
                 findings.append(
                     FindingCreate(
                         rule_id=rule_id,

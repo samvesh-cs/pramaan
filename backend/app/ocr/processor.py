@@ -79,6 +79,15 @@ def process_document(
             error=f"Document parsing error: {str(e)}"
         )
 
+    if not any(page.text.strip() for page in pages):
+        return ExtractionResult(
+            document_id=document_id,
+            document_type=document_type,
+            processing_status="processing_failed",
+            pages=pages,
+            error="No readable text could be extracted from the document.",
+        )
+
     # 4. Resolve document type
     resolved_type = document_type
     if not resolved_type:

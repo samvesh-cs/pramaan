@@ -1,0 +1,108 @@
+{
+  "institution_name": "Synthetic ABC Institute of Technology",
+  "academic_year": "2026-27",
+  "category": "eoa",
+  "scenarios": [
+    {
+      "id": "scenario_1_valid",
+      "title": "All 3 Mandatory Documents Valid & Consistent",
+      "documents": [
+        {
+          "type": "fire_safety_certificate",
+          "file": "valid_fire_safety.pdf"
+        },
+        {
+          "type": "building_completion_certificate",
+          "file": "valid_building_completion.pdf"
+        },
+        {
+          "type": "affidavit_2",
+          "file": "valid_affidavit_2.pdf"
+        }
+      ],
+      "expected_status": "checks_passed",
+      "expected_summary": {
+        "pass": 6,
+        "flagged": 0,
+        "missing": 0,
+        "unresolved": 0
+      }
+    },
+    {
+      "id": "scenario_2_missing_doc",
+      "title": "Missing Mandatory Affidavit-2",
+      "documents": [
+        {
+          "type": "fire_safety_certificate",
+          "file": "valid_fire_safety.pdf"
+        },
+        {
+          "type": "building_completion_certificate",
+          "file": "valid_building_completion.pdf"
+        }
+      ],
+      "expected_status": "missing_documents",
+      "expected_missing_types": [
+        "affidavit_2"
+      ]
+    },
+    {
+      "id": "scenario_3_expired",
+      "title": "Expired Fire Safety Certificate",
+      "documents": [
+        {
+          "type": "fire_safety_certificate",
+          "file": "expired_fire_safety.pdf"
+        },
+        {
+          "type": "building_completion_certificate",
+          "file": "valid_building_completion.pdf"
+        },
+        {
+          "type": "affidavit_2",
+          "file": "valid_affidavit_2.pdf"
+        }
+      ],
+      "expected_status": "discrepancies_found",
+      "expected_flags": [
+        "EXPIRY_001"
+      ]
+    },
+    {
+      "id": "scenario_4_missing_field",
+      "title": "Missing Mandatory Fields in Building Certificate",
+      "documents": [
+        {
+          "type": "building_completion_certificate",
+          "file": "missing_fields_building.pdf"
+        }
+      ],
+      "expected_status": "missing_documents",
+      "expected_missing_fields": [
+        "FIELD_002"
+      ]
+    },
+    {
+      "id": "scenario_5_name_mismatch",
+      "title": "Cross-Document Institution Name Mismatch",
+      "documents": [
+        {
+          "type": "fire_safety_certificate",
+          "file": "mismatched_fire_safety.pdf"
+        },
+        {
+          "type": "building_completion_certificate",
+          "file": "valid_building_completion.pdf"
+        },
+        {
+          "type": "affidavit_2",
+          "file": "valid_affidavit_2.pdf"
+        }
+      ],
+      "expected_status": "discrepancies_found",
+      "expected_flags": [
+        "CONSISTENCY_001"
+      ]
+    }
+  ]
+}

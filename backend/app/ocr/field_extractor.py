@@ -280,6 +280,7 @@ def extract_fire_safety_fields(pages: List[PageResult], full_text: str) -> Dict[
         r"(?:NOC|Certificate|Ref)[:\s]+([A-Za-z0-9\-\/\.\_]+)",
     ]
     fields["document_number"] = extract_regex_field(pages, full_text, doc_num_patterns)
+    fields["certificate_number"] = fields["document_number"]
 
     # 3. issue_date
     issue_date_patterns = [
@@ -332,6 +333,7 @@ def extract_building_completion_fields(pages: List[PageResult], full_text: str) 
         r"(?:Plan\s*Approval\s*(?:No|Number|\#)|License\s*(?:No|Number|\#))[:\s]+([A-Za-z0-9\-\/\.\_]+)",
     ]
     fields["document_number"] = extract_regex_field(pages, full_text, doc_num_patterns)
+    fields["certificate_number"] = fields["document_number"]
 
     # 3. issue_date
     issue_date_patterns = [
@@ -384,6 +386,8 @@ def extract_affidavit_2_fields(pages: List[PageResult], full_text: str) -> Dict[
         r"(?:Signature\s*of\s*(?:the\s*)?Deponent)[\s\n]+([A-Za-z\.\s]+)",
     ]
     fields["signatory_name"] = extract_regex_field(pages, full_text, signatory_patterns, is_signatory=True)
+    fields["affidavit_date"] = fields["notary_date"]
+    fields["deponent_name"] = fields["signatory_name"]
 
     return fields
 

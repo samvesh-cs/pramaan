@@ -4,8 +4,8 @@
 
 ## 1. Project Overview
 
-**Project:** AI-powered Application Validation and Document Compliance Verification  
-**Problem Statement:** SIH 2026 — PS 26261  
+**Project:** AI-powered Application Validation and Document Compliance Verification
+**Problem Statement:** SIH 2026 — PS 26261
 **Objective:** Integrate the existing frontend, backend, OCR, database, and validation engine into one working application.
 
 ### Tech Stack
@@ -100,35 +100,37 @@ Record only tests actually executed.
 
 | Test | Status | Notes |
 |---|---|---|
-| `npm run lint` (frontend) | Passed | ESLint completed without errors. |
-| `npm run build` (frontend) | Passed | Vite production build completed. |
-| Frontend lint + build after live-workflow fixes | Passed | Completed after report-state and API-mode fixes. |
-| `python -m compileall -q app` (backend) | Passed | Python modules compiled. |
-| `.venv\Scripts\python.exe -m pytest -q` (backend) | Passed before final PDF fix | 22 passed in 177.17s. Run from `backend/`; tests use an isolated in-memory SQLite fixture. Rerun after the final PDF cleanup fix. |
-| `.venv\Scripts\python.exe -m pytest -q tests\test_documents.py` | Not completed | Started after the PDF cleanup fix, produced no output, and was interrupted after more than two minutes. Do not treat this run as passed. |
-| Scanned PNG OCR | Passed | `scanned_structural_stability.png`; processed, 350 characters, no error. |
-| PostgreSQL connection | Passed | PostgreSQL 18.4 started on loopback port 5433; schema initialized against disposable `sih_prototype_integration`. Port 5432 was occupied, so existing instance/configuration was left untouched. |
-| Live backend startup | Passed | FastAPI startup and schema initialization succeeded with `DATABASE_URL` set only in the process environment. |
-| Live browser/API/database workflow | Passed | Browser created synthetic application `app_5c48599a`; three synthetic PDFs were uploaded and shown with extracted fields. Validation returned 7 passed and 3 flagged findings due to the intentional institution-name mismatch. |
-| Corrupt PDF upload after cleanup fix | Passed | HTTP 400 `INVALID_FILE_CONTENT`; rejected file cleanup verified. |
-| `git diff --check` | Passed with line-ending notices | No whitespace errors were reported; line-ending notices were observed. |
+| `npm run lint` (frontend) | Passed | Re-run after the integration commit; ESLint completed without errors. |
+| `npm run build` (frontend) | Passed | Re-run after the integration commit; Vite production build completed. |
+| `$env:DATABASE_URL='sqlite+aiosqlite:///:memory:'; .venv\Scripts\python.exe -m pytest -v tests\test_documents.py` | Passed | From `backend/`; 4 passed in 7.92s after the final PDF cleanup fix. Uses the isolated SQLite test setup. |
+| `$env:DATABASE_URL='sqlite+aiosqlite:///:memory:'; .venv\Scripts\python.exe -m pytest -v` | Passed | From `backend/`; 22 passed in 4.28s after the final PDF cleanup fix. Uses the isolated SQLite test setup. |
+| PostgreSQL service | Partial | Windows service `postgresql-x64-18` is running. Ignored `backend/.env` currently points at the literal placeholder database `<dbname>`, which does not exist. No local database or credentials were changed. |
+| Fresh FastAPI startup | Partial | Uvicorn reached “Application startup complete,” but schema initialization warned because `<dbname>` does not exist. `/health` returned 200. The ignored venv had a missing asyncpg extension; reinstalling asyncpg 0.32.0 fixed that environment issue. |
+| Fresh frontend server | Partial | Vite started at `http://127.0.0.1:5173/`; an HTTP request returned 200. The complete browser-driven React workflow was not verified in this run. |
+| Fresh PostgreSQL API workflow | Blocked | Synthetic application creation returned HTTP 500 because `<dbname>` does not exist. No upload or validation request completed. |
+| Corrupt PDF upload after cleanup fix | Passed (earlier integration run) | HTTP 400 `INVALID_FILE_CONTENT`; rejected upload cleanup was verified. |
+| Scanned PNG OCR | Passed (earlier integration run) | Synthetic scanned image processed; 350 characters, no error. |
+| Remote branch | Passed | `git ls-remote --heads origin integration` returned `e8ecd562c3f9c5a14e1576807dc4c5d800a3cd87`. |
 
 Use these statuses: Not run, In progress, Passed, Failed, Blocked.
 
+
 ## 6. Current Checkpoint
 
-**Current branch:** `integration` as reported by the integration run; verify with `git branch --show-current` before resuming.  
-**Current phase:** Integration complete; local test services stopped and temporary artifacts removed.  
-**Last completed task:** PostgreSQL startup, browser workflow, API validation/report, and malformed-PDF rejection/cleanup verification.  
-**Current task:** Review the working tree and changes, rerun tests after the final PDF fix, and prepare a safe local commit.
+**Current branch:** `integration`; `HEAD` and verified `origin/integration` both resolve to `e8ecd562c3f9c5a14e1576807dc4c5d800a3cd87` (`Integrate frontend backend and OCR`).
+**Current phase:** Integration is committed and pushed. Post-fix backend tests and frontend checks passed. Local PostgreSQL end-to-end setup remains incomplete.
+**Last completed task:** Focused document tests (4 passed), full backend suite (22 passed), frontend lint/build, and verification of matching local/remote commit hashes.
+**Current task:** Configure a real local PostgreSQL database in `backend/.env`, then rerun fresh application creation, upload, validation, and report retrieval.
 
-**Working-tree/commit status:** The integration changes were reported as **uncommitted** at the last checkpoint. Do not assume they are committed or pushed. Verify with `git status`, `git log -1 --oneline`, and `git branch --show-current`.
+**Working-tree/commit status (2026-10-26):** The only pre-existing change was deletion of tracked `ocr/.gitkeep`; it was preserved. This tracker is now modified and uncommitted. No code changes were made. Local `backend/.env`, virtual environment, frontend dependencies/build output, and uploads are ignored. The asyncpg package in the ignored environment was reinstalled as `asyncpg 0.32.0`; no tracked files changed.
+
+**Local setup (PowerShell):** Create a PostgreSQL role/database in pgAdmin (or with `createuser` / `createdb` using an administrator account). If `backend/.env` does not exist, copy `.env.example` to `.env`. In ignored `backend/.env`, set `DATABASE_URL=postgresql+asyncpg://<your_user>:<your_password>@localhost:5432/<your_database>`; never commit credentials. From `backend/`, run `python -m venv .venv`, `.\.venv\Scripts\Activate.ps1`, `python -m pip install -r requirements.txt`, then `uvicorn app.main:app --reload --port 8000`. In a second PowerShell window, from `frontend/`, run `npm install` and `npm run dev`; open `http://localhost:5173/`. To run backend tests, from `backend/`: `$env:DATABASE_URL='sqlite+aiosqlite:///:memory:'; .venv\Scripts\python.exe -m pytest -v tests\test_documents.py` and `$env:DATABASE_URL='sqlite+aiosqlite:///:memory:'; .venv\Scripts\python.exe -m pytest -v`. Frontend checks from `frontend/`: `npm run lint` and `npm run build`.
 
 **Files changed:** Root/frontend setup docs and environment defaults; API contract and decision record; backend OCR/extraction schemas, persistence responses, validation uncertainty rules, upload validation and tests; frontend checklist/API/mock behavior and audit/report state handling; this tracker.
 
-**Current errors:** No unresolved integration error was reported in the live workflow. The live flow exposed (1) an empty report hiding the audit action, (2) a stale mock-mode branch sending live validation to `localStorage`, and (3) malformed-PDF cleanup failing on Windows due to an open-file lock. All three were fixed and live behavior was reverified. The focused document test run after the PDF fix did not complete, so the final backend test status remains unverified.
+**Current errors:** The focused and full backend suites passed after the final PDF cleanup fix. The real local PostgreSQL path is not configured: the ignored `backend/.env` uses the literal placeholder database `<dbname>`, so FastAPI schema creation warns and application creation returns HTTP 500.
 
-**Last successful checks:** Backend pytest reported 22 passed **before** the final PDF cleanup fix; frontend lint/build passed after frontend fixes; live PostgreSQL/browser workflow passed; corrupt PDF returned HTTP 400 after the fix; scanned-image OCR passed; `git diff --check` passed with line-ending notices. The temporary PostgreSQL cluster is stopped, and the disposable database and test artifacts were removed.
+**Last successful checks:** Focused document tests (4 passed in 7.92s) and full backend suite (22 passed in 4.28s) after the final PDF cleanup fix; `npm run lint`; `npm run build`; frontend HTTP response 200; `/health` response 200; remote `origin/integration` confirmed at the current `HEAD`; corrupt PDF rejection/cleanup and scanned-image OCR from the earlier integration run. The prior live PostgreSQL/browser success recorded above was from the earlier temporary database run, not this fresh-start check.
 
 ## 7. Issues and Decisions
 
@@ -144,16 +146,10 @@ Record:
 
 ## 8. Next Actions
 
-1. **Inspect repository state first:** run `git branch --show-current`, `git status`, `git diff --check`, `git diff --stat`, and review the actual diff. Inspect untracked files separately. Do not overwrite or discard work.
-2. **Review for sensitive or temporary files:** ensure no secrets, `.env` credentials, uploaded test documents, temporary database files, logs, or generated `__pycache__` files are accidentally included.
-3. **Rerun focused document tests** from `backend/` with verbose output and a reasonable timeout. If they hang or fail, record the actual result and investigate; do not mark them passed based only on the live API check.
-4. **Rerun the full backend test suite** after the final PDF cleanup fix.
-5. **Rerun frontend lint/build** if any frontend files changed during subsequent work.
-6. **Configure and verify normal local PostgreSQL development access** without disturbing the existing PostgreSQL instance/configuration. The temporary cluster and disposable database have already been removed.
-7. **Update this tracker** with new test results and actual branch/working-tree status.
-8. **Stage only reviewed files**, inspect the staged diff, then create a local commit on `integration` only when changes are understood and checks are satisfactory.
-9. **Push `integration` only after verifying the commit** and remote target. Do not force-push.
-10. **Do not merge into `main` without explicit approval** and successful fresh-start verification.
+1. Create a local PostgreSQL role/database in pgAdmin or with `createuser` and `createdb`; set `backend/.env` `DATABASE_URL` to that database without committing credentials.
+2. Rerun FastAPI and React, then verify synthetic application creation, uploads, validation, and report retrieval against PostgreSQL.
+3. Review and commit the tracker update and confirm the `ocr/.gitkeep` deletion with its owner before publishing any new commit. Do not force-push.
+4. Do not merge into `main` without explicit approval and successful fresh-start verification.
 
 ## 9. Instructions for Resuming Work
 

@@ -32,15 +32,18 @@ Institutional applications may include multiple documents whose presence, requir
 9. Demonstrate the same workflow on valid and deliberately defective synthetic test cases.
 
 ## 4. Basic MVP features — in scope
-- Create one sample institutional application.
-- Upload PDF and image documents.
+- Authentication and role-based access control with two roles: `INSTITUTION` and `REVIEWER`.
+- Create institutional applications linked to authenticated institution accounts (1:1 institution mapping).
+- Application lifecycle state management: `draft` (institution uploads/validates) -> `submitted` (locked for AICTE committee review).
+- Resubmission workflow: institutions can spawn a new application revision prefilled from prior report findings.
+- Upload PDF and image documents (with server-side MIME and magic-byte checks).
 - Required-document checklist and missing-document detection.
 - OCR/text extraction using PaddleOCR when needed.
 - Basic field extraction for selected supported document types.
 - Expiry and completeness checks where applicable.
 - Cross-document consistency checks.
 - Validation report with finding, reason, affected document, evidence, and next action.
-- One basic reviewer view.
+- Scrutiny queue and human-in-the-loop audit verification decisions for AICTE reviewers.
 - Overall validation status showing missing documents, discrepancies, and unresolved checks.
 - Basic error handling for invalid uploads, unsupported types, and failed OCR.
 - Synthetic test data with known expected outcomes and recorded evaluation results.
@@ -60,9 +63,10 @@ Use synthetic names and values in the demo. Clearly label them as synthetic.
 ## 6. Recommended technology stack
 - Frontend: React, Vite, Tailwind CSS.
 - Backend: Python, FastAPI.
+- Authentication: JWT (HS256) access tokens + HTTP-only rotating refresh tokens + bcrypt password hashing.
 - OCR: PaddleOCR.
 - PDF processing: PyMuPDF.
-- Database: PostgreSQL (selected project stack).
+- Database: PostgreSQL (with SQLite compatibility for local/test environments via Alembic).
 - API/data schemas: Pydantic.
 - Validation: custom Python rule functions using standard libraries such as `re` and `datetime`.
 - File storage: local files under `backend/uploads/` for the prototype.
@@ -77,8 +81,17 @@ Avoid adding extra services unless a demonstrated requirement justifies them.
 - Claims that OCR or visual checks prove authenticity or forgery.
 - Advanced AI-based forgery detection.
 - Complex analytics, predictive risk scoring, or large infrastructure image/video analysis.
-- Authentication/role-based access unless explicitly required by the demo environment.
-- Duplicate detection, OCR evidence highlighting, configurable-rules UI, audit history, PDF report export, email alerts, or resubmission workflow. These are optional future features and must not delay the core workflow.
+- Multi-factor authentication (MFA) or SSO/DigiLocker integration.
+
+## 7a. Authentication, Roles & Scrutiny Security Model
+- **Two Defined Roles:**
+  - `INSTITUTION`: Educational college user. Self-registers, creates and manages only their own applications, uploads documents to draft applications, runs preliminary validation on drafts, submits applications to AICTE, and views their validation reports.
+  - `REVIEWER`: Official AICTE scrutiny committee member. Read-only access to all *submitted* applications, documents, extracted fields, and reports. Reviews findings, records human-in-the-loop decisions (`verified`, `confirmed_discrepancy`, `requested_resubmission`, `escalated`). Reviewers cannot self-register.
+- **Provisioning Reviewers:** Reviewers are provisioned via the idempotent CLI seed script (`scripts/seed_reviewer.py`) or via the one-time admin setup endpoint (`POST /api/auth/admin/setup`) authenticated with `X-Admin-Setup-Token`.
+- **Session Architecture:** Short-lived access tokens (60 min default for demo UX) with rotating refresh tokens stored in secure, HTTP-only cookies with token family reuse detection.
+- **Application Locking & Resubmission:** Once submitted to AICTE, an application is locked (`status = 'submitted'`). Uploads (`POST .../documents`) and re-validation (`POST .../validate`) reject with 409 `APPLICATION_LOCKED`. Based on the scrutiny report, institutions can initiate a new application prefilled from the previous report.
+- **IDOR Protection:** Cross-tenant access to draft applications or unowned applications returns HTTP 404 (not 403) to prevent resource enumeration.
+- **Fail-Fast Security:** In non-debug mode (`DEBUG=false`), the application strictly refuses to start if `JWT_SECRET_KEY` is using the development default.
 
 ## 8. Accuracy and reviewer principles
 - OCR output is not guaranteed to be correct.

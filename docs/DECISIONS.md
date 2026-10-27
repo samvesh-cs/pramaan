@@ -70,6 +70,16 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 **Reason:** Low-confidence OCR values should be confirmed by a reviewer instead of producing a pass or discrepancy finding. This is an implementation threshold, not an AICTE requirement.
 **Date / Owner:** 2026-10-26 / Integration
 
+### D-014 — Authentication and role-based access control
+**Status:** Accepted  
+**Decision:** Implement authentication and role-based authorization with two explicit roles:
+1. `INSTITUTION`: Self-registers, manages own applications, uploads documents to draft applications, runs preliminary validation on drafts, submits applications to AICTE, and views their validation reports. 1:1 institution per user account.
+2. `REVIEWER`: AICTE scrutiny committee auditor. Read-only access to all *submitted* applications, documents, and reports; can audit findings and record verification determinations. Reviewers cannot self-register; they are provisioned via CLI seed script or one-time admin setup route (`POST /api/auth/admin/setup`) protected by `X-Admin-Setup-Token`.
+3. Application lifecycle locking: Once submitted to AICTE, an application is locked (`status = 'submitted'`). Uploads and re-validation reject with 409 `APPLICATION_LOCKED`. Based on the report, institutions can initiate a new application revision prefilled from prior findings.
+4. Security & Tokens: Stateless JWT access tokens (60 min default for demo UX) with rotating HTTP-only refresh tokens. Cross-tenant draft access returns 404 to prevent IDOR enumeration. Fail-fast validation enforces production secrets when `DEBUG=false`.  
+**Reason:** Satisfies multi-tenant security requirements, human-in-the-loop review boundaries, and seamless demo UX without requiring external SSO infrastructure.  
+**Date / Owner:** 2026-10-27 / Integration
+
 ## Open questions — resolve before implementing rules
 
 ### Q-001 — Application category

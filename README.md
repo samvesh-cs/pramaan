@@ -119,12 +119,54 @@ The application reads these backend settings from `backend/.env` when started fr
 | `API_PREFIX` | API route prefix | `/api` |
 | `DEBUG` | SQL echo and internal error logging behavior | `true` |
 | `CORS_ORIGINS` | Comma-separated allowed browser origins | `http://localhost:5173,http://localhost:3000` |
+| `JWT_SECRET_KEY` | HS256 secret for signing JWT access tokens | Default dev key in `config.py` (fail-fast in prod) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime in minutes | `60` |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token lifetime in days | `7` |
+| `ADMIN_SETUP_TOKEN` | Bearer token for one-time admin setup route | `admin-setup-secret-pramaan-2026` |
+| `RATE_LIMIT_ENABLED` | Global endpoint rate limiter flag | `true` |
 
-At application startup, `backend/app/main.py` calls `init_db()`, which uses SQLAlchemy `Base.metadata.create_all` in `backend/app/database.py`. This creates missing tables; it is not a schema migration system. Alembic configuration exists, but there are no migration revision scripts in the repository. No destructive database reset is needed. A database connection failure is printed as a warning and startup continues, so check the backend log and make a real API/database request to confirm connectivity; `/health` alone only confirms that the FastAPI process responds.
+At application startup, `backend/app/main.py` calls `init_db()`, which initializes tables via Alembic and SQLAlchemy. In non-debug mode (`DEBUG=false`), the server enforces a fail-fast security check and refuses to boot if `JWT_SECRET_KEY` is left as the development default.
 
-With the backend running and the database ready, run `Invoke-RestMethod http://localhost:8000/api/applications` in PowerShell. A successful response (an empty list for a new database) confirms that this database-backed endpoint can query PostgreSQL.
+## Authentication and Role-Based Scrutiny
 
-Backend tests override the database dependency with an in-memory SQLite database in `backend/tests/conftest.py`. They do not require PostgreSQL or a `DATABASE_URL`, though the project's Python dependencies still need to be installed. OCR-related tests can additionally depend on PaddleOCR and its model runtime.
+Pramaan enforces strict role separation between educational applicants and regulatory scrutiny reviewers:
+
+1. **`INSTITUTION` (College Applicant):**
+   - Can register a new institutional user account (1:1 institution mapping).
+   - Manages draft applications, uploads documents, runs preliminary checks.
+   - Submits application to AICTE, locking it for official committee scrutiny.
+   - Can spawn a revised application prefilled from the validated report findings.
+2. **`REVIEWER` (AICTE Scrutiny Committee):**
+   - Has read access to all *submitted* applications, documents, and reports.
+   - Reviews rule findings and records human-in-the-loop decisions (`Mark Verified`, `Confirm Discrepancy`, `Request Resubmission`, `Escalate`).
+   - Reviewers **cannot self-register**. They are provisioned via CLI seed scripts or the one-time admin setup endpoint.
+
+### Demo Credentials
+
+| Role | Email | Password |
+|---|---|---|
+| **AICTE Reviewer** | `reviewer@aicte-india.org` | `Reviewer@AICTE2026` |
+| **Demo Institution** | `institution@engg-college.edu.in` | `College@Pramaan2026` |
+
+Quick-fill buttons for both roles are available directly on the login screen (`/login`).
+
+### Seeding Accounts & Admin Setup
+
+To seed the demo accounts from the command line:
+
+```powershell
+cd backend
+.\.venv\Scripts\python scripts/seed_reviewer.py
+.\.venv\Scripts\python scripts/seed_demo_institution.py
+```
+
+Alternatively, provision an initial reviewer via the protected one-time admin setup endpoint:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/auth/admin/setup `
+  -Headers @{ "X-Admin-Setup-Token" = "admin-setup-secret-pramaan-2026"; "Content-Type" = "application/json" } `
+  -Body '{"email": "auditor@aicte-india.org", "password": "SecurePassword123"}'
+```
 
 ## Run the backend and frontend
 
@@ -136,7 +178,7 @@ cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-The API is at `http://localhost:8000/api`; interactive documentation is at `http://localhost:8000/docs`. The health endpoint is `http://localhost:8000/health`. Startup attempts to initialize the database tables and creates the upload directory.
+The API is at `http://localhost:8000/api`; interactive documentation is at `http://localhost:8000/docs` (hidden when `DEBUG=false`). The health endpoint is `http://localhost:8000/health`.
 
 Start the frontend in a second window:
 
@@ -145,21 +187,18 @@ cd frontend
 npm run dev
 ```
 
-Vite is configured to bind to `127.0.0.1`; its default development URL is `http://127.0.0.1:5173`. `frontend/src/config.js` defaults to real API mode and uses `http://localhost:8000` as the API base. `frontend/src/api.js` sends requests to that host under `/api`. The API must be running for live application creation, uploads, validation, and report retrieval.
-
-To use the isolated browser-only demonstration, set `VITE_USE_MOCKS=true` in `frontend/.env.local` and restart Vite. This mode stores synthetic applications and demonstration reports in browser local storage; it does not call the backend or run its OCR/rules. Set it back to `false` for live mode.
+Visit `http://localhost:5173` to access the application. Unauthenticated users are automatically redirected to `/login`.
 
 ## Tests and checks
 
-Run backend tests from `backend/`:
+Run the full backend test suite (49 unit, auth, security enforcement, and scenario tests):
 
 ```powershell
-python -m pytest -q
+cd backend
+.\.venv\Scripts\python -m pytest -v
 ```
 
-The suite covers API routes, upload handling, OCR integration, validation rules, and the synthetic scenarios in `backend/tests/test_scenarios.py`. Its test database is in-memory SQLite; PostgreSQL is not needed. **This command could not be executed in the documentation session because neither `python` nor the Windows `py` launcher was available.**
-
-There is no frontend test script configured in `frontend/package.json`. The configured lint and production build commands are:
+Run frontend linting and production build verification:
 
 ```powershell
 cd frontend
@@ -167,23 +206,29 @@ npm run lint
 npm run build
 ```
 
-Both commands were run successfully during this documentation update. `lint` runs ESLint. `build` runs the Vite production build. There is no configured test script or migration command documented by the repository.
-
 ## API workflow
 
-The frontend uses these live endpoints (base URL `http://localhost:8000/api`):
+The application uses these authenticated API endpoints (base URL `http://localhost:8000/api`):
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `POST` | `/applications` | Create an EoA application record |
-| `GET` | `/applications` | List applications in the review queue |
-| `GET` | `/applications/{application_id}` | Retrieve application, documents, and latest extracted fields |
-| `POST` | `/applications/{application_id}/documents` | Upload one file with a `document_type` form field |
-| `GET` | `/applications/{application_id}/documents` | List document records |
-| `POST` | `/applications/{application_id}/validate` | Run the configured rules and generate findings |
-| `GET` | `/applications/{application_id}/report` | Retrieve the saved validation report |
+| Method | Endpoint | Auth Role | Purpose |
+|---|---|---|---|
+| `POST` | `/auth/register` | Public | Register new institution account (Reviewer registration blocked) |
+| `POST` | `/auth/login` | Public | Authenticate; returns access token and sets HTTP-only refresh cookie |
+| `POST` | `/auth/refresh` | Public | Rotate refresh token and issue new JWT access token |
+| `POST` | `/auth/logout` | Authenticated | Revoke refresh token and clear cookie |
+| `GET` | `/auth/me` | Authenticated | Return profile of currently signed-in user |
+| `POST` | `/auth/admin/setup` | Token (`X-Admin-Setup-Token`) | One-time admin setup to provision first reviewer |
+| `POST` | `/applications` | `INSTITUTION` | Create an EoA application record |
+| `GET` | `/applications` | Authenticated | List applications (own for Institution, submitted for Reviewer) |
+| `GET` | `/applications/{id}` | Authenticated | Scoped retrieval (returns 404 on unowned/unauthorized) |
+| `POST` | `/applications/{id}/submit` | `INSTITUTION` | Submit application to AICTE; locks application from further edits |
+| `POST` | `/applications/{id}/documents` | `INSTITUTION` | Upload file (rejects with 409 if application is submitted) |
+| `GET` | `/applications/{id}/documents` | Authenticated | List document records |
+| `POST` | `/applications/{id}/validate` | `INSTITUTION` | Run preliminary validation (rejects with 409 if submitted) |
+| `GET` | `/applications/{id}/report` | Authenticated | Retrieve the saved validation report |
+| `PATCH` | `/applications/{id}/findings/{id}` | `REVIEWER` | Record reviewer verification determination on submitted application |
 
-FastAPI's interactive request interface is available at `http://localhost:8000/docs` while the backend is running.
+FastAPI's interactive request interface is available at `http://localhost:8000/docs` while `DEBUG=true`.
 
 ## Known limitations
 

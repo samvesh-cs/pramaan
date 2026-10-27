@@ -20,16 +20,16 @@ def create_dummy_pdf(text: str = "Test Content") -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_validation_missing_documents(client: AsyncClient):
+async def test_validation_missing_documents(institution_client: AsyncClient):
     # Create application without documents
-    app_res = await client.post(
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Synthetic ABC College", "application_category": "eoa", "academic_year": "2026-27"},
     )
     app_id = app_res.json()["id"]
 
     # Run validation
-    val_res = await client.post(f"/api/applications/{app_id}/validate")
+    val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
     report = val_res.json()
     assert report["overall_status"] == "processing_incomplete"
@@ -38,8 +38,8 @@ async def test_validation_missing_documents(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_validation_with_present_documents_and_unextractable_fields_does_not_pass(client: AsyncClient):
-    app_res = await client.post(
+async def test_validation_with_present_documents_and_unextractable_fields_does_not_pass(institution_client: AsyncClient):
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Synthetic ABC Engineering College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -51,11 +51,11 @@ async def test_validation_with_present_documents_and_unextractable_fields_does_n
         pdf_bytes = create_dummy_pdf(f"Content for {dt}")
         files = {"file": (f"{dt}.pdf", pdf_bytes, "application/pdf")}
         data = {"document_type": dt}
-        upload_res = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+        upload_res = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
         assert upload_res.status_code == 201
 
     # Validate
-    val_res = await client.post(f"/api/applications/{app_id}/validate")
+    val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
     report = val_res.json()
     assert len(report["missing_document_types"]) == 0
@@ -164,20 +164,18 @@ async def test_low_confidence_required_field_is_unresolved():
 
 
 @pytest.mark.asyncio
-async def test_get_report_endpoint(client: AsyncClient):
-    app_res = await client.post(
+async def test_get_report_endpoint(institution_client: AsyncClient):
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Synthetic ABC Engineering College", "application_category": "eoa", "academic_year": "2026-27"},
     )
     app_id = app_res.json()["id"]
 
     # Validate first
-    await client.post(f"/api/applications/{app_id}/validate")
+    await institution_client.post(f"/api/applications/{app_id}/validate")
 
-    # Fetch report
-    report_res = await client.get(f"/api/applications/{app_id}/report")
-    assert report_res.status_code == 200
-    report = report_res.json()
-    assert report["application_id"] == app_id
-    assert "summary" in report
-    assert "findings" in report
+    # Institution report access is gated until reviewer finalization.
+    report_res = await institution_client.get(f"/api/applications/{app_id}/report")
+    assert report_res.status_code == 409
+    assert report_res.json()["error"]["code"] == "SCRUTINY_PENDING"
+

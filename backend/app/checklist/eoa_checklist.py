@@ -1,5 +1,14 @@
 from typing import Any
 
+# AICTE APH 2024-2027 Table 2.1 Statutory TER Charges for Extension of Approval (EoA)
+EOA_STATUTORY_TER_FEES: dict[str, int] = {
+    "government_aided": 50000,
+    "minority_unaided": 75000,
+    "private_unaided": 100000,
+    "standalone_pgdm": 150000,
+    "default": 100000,
+}
+
 EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
     "fire_safety_certificate": {
         "display_name": "Fire Safety Certificate",
@@ -40,24 +49,41 @@ EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
         ],
         "description": "Sworn Affidavit with digital signature of Chairman/Secretary on e-stamp paper",
     },
-}
-
-EOA_MVP_DOCUMENT_TYPES = list(EOA_DOCUMENT_CHECKLIST.keys())
-
-# Full EoA checklist reference for future expansions
-EOA_FULL_CHECKLIST: dict[str, dict[str, Any]] = {
-    **EOA_DOCUMENT_CHECKLIST,
     "ter_payment_receipt": {
         "display_name": "TER Payment Receipt",
-        "applicability": "required",
-        "source": "APH 2024-2027, Annexure-2, §2.1(ii)",
+        "applicability": "required_if_applicable",
+        "source": "APH 2024-2027, Annexure-2, §2.1(ii) & Table 2.1",
+        "has_expiry": False,
+        "required_fields": [
+            "institution_name",
+            "receipt_number",
+            "transaction_date",
+            "amount_inr",
+        ],
+        "description": "Payment receipt of Technical Education Regulatory (TER) charges paid via AICTE portal",
     },
     "structural_stability_certificate": {
         "display_name": "Structural Stability Certificate",
         "applicability": "required_if_applicable",
         "source": "APH 2024-2027, Annexure-2, §2.1(iv)",
-        "condition": "Building > 30 years from Completion Certificate issue",
+        "condition": "Mandatory only if Building is > 30 years old from date of Completion Certificate",
+        "has_expiry": False,
+        "required_fields": [
+            "institution_name",
+            "certificate_number",
+            "engineer_license_number",
+            "issue_date",
+        ],
+        "description": "Certificate from registered Structural Engineer regarding building stability (> 30 yrs)",
     },
+}
+
+# Supported document types for upload
+EOA_MVP_DOCUMENT_TYPES = list(EOA_DOCUMENT_CHECKLIST.keys())
+
+# Full EoA checklist reference for broader handbook roadmap
+EOA_FULL_CHECKLIST: dict[str, dict[str, Any]] = {
+    **EOA_DOCUMENT_CHECKLIST,
     "satellite_map": {
         "display_name": "Satellite Map with Lat/Long",
         "applicability": "required",

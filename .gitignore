@@ -1,7 +1,10 @@
 # ==========================
 # SIH 26 Prototype .gitignore
 # ==========================
-
+__pycache__/
+*.pyc
+venv/
+.env
 # ----- Python -----
 __pycache__/
 *.py[cod]

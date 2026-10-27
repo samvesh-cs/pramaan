@@ -25,6 +25,8 @@ class ApplicationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    owner_id: str | None = None
+    status: str = "draft"
     institution_name: str
     application_category: str
     academic_year: str
@@ -36,9 +38,12 @@ class ApplicationDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    owner_id: str | None = None
+    status: str = "draft"
     institution_name: str
     application_category: str
     academic_year: str
     overall_status: OverallStatus
     documents: list[DocumentResponse] = []
     findings: list[FindingResponse] = []
+

@@ -18,18 +18,18 @@ Use three workstreams. Replace Person 1/2/3 with actual names in the team copy i
 - [ ] Verify the frontend works with actual backend responses.
 
 ## Person 2 — PaddleOCR and document extraction
-- [ ] Set up a Python virtual environment and document compatible Python/PaddlePaddle/PaddleOCR versions.
-- [ ] Test PaddleOCR independently on one image.
-- [ ] Use PyMuPDF to extract selectable text from digital PDFs.
-- [ ] Render scanned PDF pages to images and run PaddleOCR.
-- [ ] Process JPG and PNG images.
-- [ ] Extract only fields needed for the selected document types.
-- [ ] Return the exact internal data structure in `API_CONTRACT.md`.
-- [ ] Preserve raw text snippets, page numbers, confidence when available, and bounding boxes when available.
-- [ ] Represent uncertain/missing fields explicitly; never invent values.
-- [ ] Handle unreadable, corrupt and unsupported documents without crashing.
-- [ ] Add tests using the agreed sample documents.
-- [ ] Tell Person 3 how to call the module and what errors it can return.
+- [x] Set up a Python virtual environment and document compatible Python/PaddlePaddle/PaddleOCR versions.
+- [x] Test PaddleOCR independently on one image.
+- [x] Use PyMuPDF to extract selectable text from digital PDFs.
+- [x] Render scanned PDF pages to images and run PaddleOCR.
+- [x] Process JPG and PNG images.
+- [x] Extract only fields needed for the selected document types.
+- [x] Return the exact internal data structure in `API_CONTRACT.md`.
+- [x] Preserve raw text snippets, page numbers, confidence when available, and bounding boxes when available.
+- [x] Represent uncertain/missing fields explicitly; never invent values.
+- [x] Handle unreadable, corrupt and unsupported documents without crashing.
+- [x] Add tests using the agreed sample documents.
+- [x] Tell Person 3 how to call the module and what errors it can return.
 
 ## Person 3 — FastAPI, database and validation
 - [x] Create FastAPI application and `/api` routes.
@@ -45,17 +45,17 @@ Use three workstreams. Replace Person 1/2/3 with actual names in the team copy i
 - [x] Calculate overall application status consistently.
 - [x] Implement report retrieval.
 - [x] Handle API errors without leaking stack traces.
-- [x] Add backend tests for routes and validation rules (19 tests passing).
+- [x] Add backend tests for routes and validation rules (14 tests passing).
 - [x] Share API docs and test results with Person 1.
 
 ## Shared sample data and testing
 - [x] Confirm one application category before writing rules. (EoA Self-Disclosure confirmed)
 - [x] Confirm two or three representative document types from the applicable official AICTE checklist. (Fire Safety, Building Completion, Affidavit-2)
 - [x] Record the official source/handbook clause and applicability for every requirement. (docs/AICTE_RULEBOOK_REFERENCE.md)
-- [x] Create synthetic valid sample documents. (backend/tests/demo_samples/ and backend/tests/samples/)
-- [x] Create defective samples: missing document, expired date, missing field, cross-document mismatch, unreadable scan, invalid file. (expired_fire_safety.pdf, missing_fields_building.pdf, mismatched_fire_safety.pdf, corrupt_doc.pdf, etc.)
-- [x] Write expected outcomes before running the system. (Documented in backend/tests/demo_samples/manifest.json)
-- [x] Compare actual findings against expected outcomes and record mistakes. (Verified via backend/tests/test_scenarios.py)
+- [x] Create synthetic valid sample documents. (backend/tests/samples/ and backend/tests/test_samples/)
+- [x] Create defective samples: missing document, expired date, missing field, cross-document mismatch, unreadable scan, invalid file. (corrupt_doc.pdf, empty_doc.pdf, password_protected.pdf, etc.)
+- [ ] Write expected outcomes before running the system.
+- [ ] Compare actual findings against expected outcomes and record mistakes.
 - [ ] Test a complete application through the real frontend and backend.
 - [ ] Test repeat validation and ensure results do not mix across applications.
 - [ ] Rehearse the demo and keep a backup recording.

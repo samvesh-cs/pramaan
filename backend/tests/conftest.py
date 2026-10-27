@@ -52,3 +52,48 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+class FakeUser:
+    def __init__(
+        self,
+        role: str,
+        id: str = "inst-test-1",
+        email: str = "institution@test-college.edu",
+        is_active: bool = True,
+    ):
+        self.id = id
+        self.role = role
+        self.email = email
+        self.is_active = is_active
+        self.institution = None
+
+
+@pytest_asyncio.fixture
+async def institution_client(client: AsyncClient) -> AsyncGenerator[AsyncClient, None]:
+    from app.auth.dependencies import get_current_user
+
+    user = FakeUser(
+        role="INSTITUTION",
+        id="inst-test-1",
+        email="principal@test-college.edu",
+    )
+    app.dependency_overrides[get_current_user] = lambda: user
+    yield client
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+
+@pytest_asyncio.fixture
+async def reviewer_client(client: AsyncClient) -> AsyncGenerator[AsyncClient, None]:
+    from app.auth.dependencies import get_current_user
+
+    user = FakeUser(
+        role="REVIEWER",
+        id="rev-test-1",
+        email="reviewer@aicte-india.org",
+    )
+    app.dependency_overrides[get_current_user] = lambda: user
+    yield client
+    app.dependency_overrides.pop(get_current_user, None)
+

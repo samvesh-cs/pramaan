@@ -12,7 +12,21 @@ from app.schemas.extraction import (
     PageExtraction,
     RegionExtraction,
 )
-from app.schemas.finding import CheckStatus, EvidenceSchema, FindingCreate, FindingResponse
+from app.schemas.finding import (
+    CheckStatus,
+    EvidenceSchema,
+    FindingCreate,
+    FindingResponse,
+    FindingReviewUpdate,
+)
+from app.schemas.auth import (
+    AdminSetupRequest,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.schemas.report import ReportResponse, SummaryCount
 
 __all__ = [
@@ -24,6 +38,7 @@ __all__ = [
     "DocumentProcessingStatus",
     "FindingCreate",
     "FindingResponse",
+    "FindingReviewUpdate",
     "CheckStatus",
     "EvidenceSchema",
     "ExtractionResponse",
@@ -34,4 +49,10 @@ __all__ = [
     "SummaryCount",
     "ErrorResponse",
     "ErrorDetail",
+    "RegisterRequest",
+    "LoginRequest",
+    "AdminSetupRequest",
+    "TokenResponse",
+    "UserResponse",
+    "MessageResponse",
 ]

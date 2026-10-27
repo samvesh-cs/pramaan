@@ -14,9 +14,9 @@ def create_dummy_pdf(text: str = "Dummy Test Document") -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_upload_valid_pdf_document(client: AsyncClient):
+async def test_upload_valid_pdf_document(institution_client: AsyncClient):
     # Create application
-    app_res = await client.post(
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Synthetic ABC Engineering College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -26,7 +26,7 @@ async def test_upload_valid_pdf_document(client: AsyncClient):
     files = {"file": ("fire_cert.pdf", pdf_bytes, "application/pdf")}
     data = {"document_type": "fire_safety_certificate"}
 
-    res = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    res = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
     assert res.status_code == 201
     doc_data = res.json()
     assert doc_data["application_id"] == app_id
@@ -37,8 +37,8 @@ async def test_upload_valid_pdf_document(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_upload_unsupported_file_extension(client: AsyncClient):
-    app_res = await client.post(
+async def test_upload_unsupported_file_extension(institution_client: AsyncClient):
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Test College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -47,7 +47,7 @@ async def test_upload_unsupported_file_extension(client: AsyncClient):
     files = {"file": ("test.exe", b"binary content", "application/octet-stream")}
     data = {"document_type": "fire_safety_certificate"}
 
-    res = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    res = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
     assert res.status_code == 400
     err = res.json().get("error")
     assert err is not None
@@ -55,8 +55,8 @@ async def test_upload_unsupported_file_extension(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_upload_invalid_document_type(client: AsyncClient):
-    app_res = await client.post(
+async def test_upload_invalid_document_type(institution_client: AsyncClient):
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Test College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -66,7 +66,7 @@ async def test_upload_invalid_document_type(client: AsyncClient):
     files = {"file": ("test.pdf", pdf_bytes, "application/pdf")}
     data = {"document_type": "unsupported_category_doc"}
 
-    res = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    res = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
     assert res.status_code == 400
     err = res.json().get("error")
     assert err is not None
@@ -74,8 +74,8 @@ async def test_upload_invalid_document_type(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_documents(client: AsyncClient):
-    app_res = await client.post(
+async def test_list_documents(institution_client: AsyncClient):
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Test College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -85,10 +85,11 @@ async def test_list_documents(client: AsyncClient):
     files = {"file": ("bcc.pdf", pdf_bytes, "application/pdf")}
     data = {"document_type": "building_completion_certificate"}
 
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
 
-    list_res = await client.get(f"/api/applications/{app_id}/documents")
+    list_res = await institution_client.get(f"/api/applications/{app_id}/documents")
     assert list_res.status_code == 200
     docs = list_res.json()
     assert len(docs) == 1
     assert docs[0]["document_type"] == "building_completion_certificate"
+

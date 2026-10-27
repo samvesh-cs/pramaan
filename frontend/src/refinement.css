@@ -650,6 +650,376 @@ body { background: #c9c5ba; }
 @keyframes holo-page-reveal { 0% { clip-path: inset(0 0 0 100%); opacity: .74; transform: translate3d(7px, 0, 0); } 54% { clip-path: inset(0 0 0 28%); opacity: 1; } 100% { clip-path: inset(0); opacity: 1; transform: translate3d(0, 0, 0); } }
 @keyframes upload-scan { from { transform: translate3d(0, 18px, 0); } to { transform: translate3d(0, 137px, 0); } }
 
+/* ==============================================================================
+   Auditor Verification Desk & Human-in-the-Loop Actions
+   ============================================================================== */
+.auditor-badge-card {
+  margin: 14px 0 6px;
+  padding: 12px 14px;
+  background: rgba(101, 142, 111, 0.1);
+  border-left: 3px solid #4c725e;
+  border-radius: 2px;
+}
+.auditor-badge-card.is-flagged {
+  background: rgba(204, 133, 102, 0.1);
+  border-left-color: #a26752;
+}
+.auditor-badge-card.is-resubmission {
+  background: rgba(216, 166, 108, 0.12);
+  border-left-color: #d8a66c;
+}
+.auditor-badge-card.is-escalated {
+  background: rgba(188, 79, 71, 0.1);
+  border-left-color: #bc4f47;
+}
+.auditor-badge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.auditor-decision-tag {
+  font: 9px var(--mono);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #3b5c4b;
+  text-transform: uppercase;
+}
+.is-flagged .auditor-decision-tag { color: #a26752; }
+.is-resubmission .auditor-decision-tag { color: #b78750; }
+.is-escalated .auditor-decision-tag { color: #bc4f47; }
+
+.auditor-date {
+  font: 8px var(--mono);
+  color: #7d847b;
+}
+.auditor-reviewer-id {
+  font-size: 11px;
+  font-weight: 600;
+  color: #344c4b;
+  margin: 0 0 4px;
+}
+.auditor-notes {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #55625e;
+  font-style: italic;
+}
+
+.auditor-action-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(38, 59, 66, 0.15);
+}
+.button-auditor {
+  font-size: 10px;
+  padding: 6px 12px;
+  border-radius: 2px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+.button-auditor-verify {
+  background: #4c725e;
+  color: #fff;
+  border: 1px solid #3d5e4d;
+}
+.button-auditor-verify:hover {
+  background: #3c5d4c;
+}
+.button-auditor-resubmit {
+  background: #d8a66c;
+  color: #263b42;
+  border: 1px solid #b78750;
+}
+.button-auditor-resubmit:hover {
+  background: #c99355;
+}
+.button-auditor-escalate {
+  background: transparent;
+  color: #a26752;
+  border: 1px solid rgba(162, 103, 82, 0.4);
+}
+.button-auditor-escalate:hover {
+  background: rgba(162, 103, 82, 0.08);
+}
+.button-inspect-doc {
+  background: transparent;
+  color: #486d70;
+  border: 1px solid rgba(72, 109, 112, 0.35);
+  margin-left: auto;
+}
+.button-inspect-doc:hover {
+  background: rgba(72, 109, 112, 0.08);
+}
+
+/* ==============================================================================
+   Auditor Review Modal
+   ============================================================================== */
+.auditor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(22, 35, 38, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.auditor-modal {
+  width: 100%;
+  max-width: 520px;
+  background: var(--paper);
+  border: 1px solid rgba(38, 59, 66, 0.25);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.22);
+  padding: 24px;
+}
+.auditor-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.auditor-modal-head h3 {
+  margin: 4px 0 0;
+  font: 500 20px var(--display);
+  color: var(--carbon-deep);
+}
+.finding-target-title {
+  font-size: 11px;
+  color: #5d6764;
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  background: rgba(38, 59, 66, 0.06);
+}
+.modal-field {
+  margin-bottom: 14px;
+}
+.modal-field label {
+  display: block;
+  font: 9px var(--mono);
+  letter-spacing: 0.08em;
+  color: #636d6a;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.modal-field input, .modal-field select, .modal-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(38, 59, 66, 0.25);
+  background: #dedbd1;
+  color: #2b3e40;
+  font-size: 11px;
+  border-radius: 0;
+}
+.modal-field textarea {
+  resize: vertical;
+}
+.auditor-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* ==============================================================================
+   Document Viewer Drawer
+   ============================================================================== */
+.viewer-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(22, 35, 38, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: flex-end;
+}
+.viewer-drawer {
+  width: 100%;
+  max-width: 760px;
+  height: 100%;
+  background: var(--paper);
+  border-left: 1px solid rgba(38, 59, 66, 0.25);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+.viewer-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(38, 59, 66, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: rgba(220, 216, 206, 0.6);
+}
+.viewer-header h3 {
+  margin: 4px 0 6px;
+  font: 500 18px var(--display);
+  color: var(--carbon-deep);
+}
+.viewer-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.viewer-meta span {
+  font: 9px var(--mono);
+  color: #68726f;
+}
+.bbox-pill {
+  padding: 2px 7px;
+  background: rgba(216, 166, 108, 0.18);
+  border: 1px solid rgba(216, 166, 108, 0.4);
+  color: #8c5d2c;
+  border-radius: 2px;
+}
+.viewer-evidence-snippet {
+  padding: 12px 24px;
+  background: rgba(216, 166, 108, 0.08);
+  border-bottom: 1px solid rgba(38, 59, 66, 0.1);
+}
+.snippet-label {
+  display: block;
+  font: 8px var(--mono);
+  letter-spacing: 0.1em;
+  color: #8f6e47;
+  margin-bottom: 4px;
+}
+.viewer-evidence-snippet blockquote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #384e4f;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 6px 10px;
+  border-left: 2px solid var(--copper);
+}
+.viewer-frame-container {
+  flex: 1;
+  position: relative;
+  background: #4a5456;
+}
+.viewer-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.viewer-footer {
+  padding: 14px 24px;
+  border-top: 1px solid rgba(38, 59, 66, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ==============================================================================
+   Official AICTE Scrutiny Dossier Print Styling
+   ============================================================================== */
+.official-print-dossier {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 10pt !important;
+  }
+  .sidebar, .topbar, .footer, .report-bottom-nav, .auditor-action-bar,
+  .button, .quiet-link, .custom-cursor, .holo-transition, .ambient-contours,
+  .report-overview, .report-summary, .reported-missing {
+    display: none !important;
+  }
+  .app-shell, .main-area, .page-stage, .report-page {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    background: #fff !important;
+  }
+  .official-print-dossier {
+    display: block !important;
+    page-break-after: always;
+  }
+  .dossier-print-header {
+    text-align: center;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10pt;
+    margin-bottom: 16pt;
+  }
+  .dossier-emblem-text {
+    font-size: 11pt;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+  }
+  .dossier-council-title {
+    font-size: 14pt;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    margin-top: 4pt;
+  }
+  .dossier-subtitle {
+    font-size: 8.5pt;
+    margin-top: 2pt;
+    color: #444;
+  }
+  .dossier-doc-title {
+    font-size: 10pt;
+    font-weight: bold;
+    margin-top: 8pt;
+    text-transform: uppercase;
+    background: #eee;
+    padding: 4pt;
+    border: 1px solid #ccc;
+  }
+  .dossier-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12pt 0;
+  }
+  .dossier-table th, .dossier-table td {
+    border: 1px solid #333;
+    padding: 5pt 7pt;
+    font-size: 8.5pt;
+    text-align: left;
+  }
+  .dossier-table th {
+    background: #f0f0f0;
+    font-weight: bold;
+  }
+  .dossier-signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 25pt;
+    margin-top: 45pt;
+    page-break-inside: avoid;
+  }
+  .signature-block {
+    text-align: center;
+    border-top: 1px solid #000;
+    padding-top: 6pt;
+    font-size: 8.5pt;
+  }
+  .findings-section {
+    padding-top: 10pt !important;
+  }
+  .finding {
+    page-break-inside: avoid;
+    border: 1px solid #aaa !important;
+    margin-bottom: 8pt;
+    padding: 8pt !important;
+  }
+}
+
 /* Focused shell refinements: compact navigation with one responsive toggle. */
 .brand { gap: 12px; margin-bottom: 30px; }
 .brand-mark { width: 34px; height: 34px; flex: none; border: 0; transform: none; color: inherit; font-size: 0; }

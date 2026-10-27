@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from httpx import AsyncClient
 
-SAMPLE_DIR = Path("tests/demo_samples")
+SAMPLE_DIR = Path(__file__).parent / "demo_samples"
 
 
 def read_sample(filename: str) -> bytes:

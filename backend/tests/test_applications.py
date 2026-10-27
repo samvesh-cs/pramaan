@@ -3,13 +3,13 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_create_application(client: AsyncClient):
+async def test_create_application(institution_client: AsyncClient):
     payload = {
         "institution_name": "Synthetic ABC Engineering College",
         "application_category": "eoa",
         "academic_year": "2026-27",
     }
-    response = await client.post("/api/applications", json=payload)
+    response = await institution_client.post("/api/applications", json=payload)
     assert response.status_code == 201
     data = response.json()
     assert data["institution_name"] == payload["institution_name"]
@@ -21,8 +21,8 @@ async def test_create_application(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_applications(client: AsyncClient):
-    await client.post(
+async def test_list_applications(institution_client: AsyncClient):
+    await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic Queue College",
@@ -31,25 +31,25 @@ async def test_list_applications(client: AsyncClient):
         },
     )
 
-    response = await client.get("/api/applications")
+    response = await institution_client.get("/api/applications")
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["institution_name"] == "Synthetic Queue College"
 
 
 @pytest.mark.asyncio
-async def test_get_application(client: AsyncClient):
+async def test_get_application(institution_client: AsyncClient):
     # 1. Create application
     payload = {
         "institution_name": "Test Engineering Institute",
         "application_category": "eoa",
         "academic_year": "2026-27",
     }
-    create_res = await client.post("/api/applications", json=payload)
+    create_res = await institution_client.post("/api/applications", json=payload)
     app_id = create_res.json()["id"]
 
     # 2. Get application
-    get_res = await client.get(f"/api/applications/{app_id}")
+    get_res = await institution_client.get(f"/api/applications/{app_id}")
     assert get_res.status_code == 200
     data = get_res.json()
     assert data["id"] == app_id
@@ -59,8 +59,8 @@ async def test_get_application(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_application(client: AsyncClient):
-    response = await client.get("/api/applications/non_existent_app_id")
+async def test_get_nonexistent_application(institution_client: AsyncClient):
+    response = await institution_client.get("/api/applications/non_existent_app_id")
     assert response.status_code == 404
     error = response.json().get("error")
     assert error is not None
@@ -68,14 +68,14 @@ async def test_get_nonexistent_application(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_invalid_application_payload(client: AsyncClient):
+async def test_invalid_application_payload(institution_client: AsyncClient):
     # Invalid academic year format
     payload = {
         "institution_name": "Test",
         "application_category": "eoa",
         "academic_year": "invalid-year",
     }
-    response = await client.post("/api/applications", json=payload)
+    response = await institution_client.post("/api/applications", json=payload)
     assert response.status_code == 422
     data = response.json()
     assert "error" in data
@@ -83,8 +83,8 @@ async def test_invalid_application_payload(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_rejects_unconfigured_application_category(client: AsyncClient):
-    response = await client.post(
+async def test_rejects_unconfigured_application_category(institution_client: AsyncClient):
+    response = await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic ABC Engineering College",
@@ -95,3 +95,4 @@ async def test_rejects_unconfigured_application_category(client: AsyncClient):
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_FAILED"
+

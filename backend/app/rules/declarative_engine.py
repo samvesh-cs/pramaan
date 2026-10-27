@@ -70,8 +70,8 @@ class DeclarativeRuleEngine:
         for idx, rule_dict in enumerate(raw_content["rules"]):
             try:
                 rule_cfg = DeclarativeRuleConfig(**rule_dict)
-                # Verify that clause_id exists in clause registry
-                if not self.clause_registry.get(rule_cfg.clause_id):
+                # Verify that clause_id exists in clause registry if specified
+                if rule_cfg.clause_id and not self.clause_registry.get(rule_cfg.clause_id):
                     logger.warning(
                         "Rule '%s' references unknown clause '%s'",
                         rule_cfg.rule_id,
@@ -98,7 +98,7 @@ class DeclarativeRuleEngine:
         if not rule_cfg.is_active:
             return []
 
-        clause_ref = self.clause_registry.get(rule_cfg.clause_id)
+        clause_ref = self.clause_registry.get(rule_cfg.clause_id) if rule_cfg.clause_id else None
         findings: list[FindingCreate] = []
 
         # Example operator evaluation

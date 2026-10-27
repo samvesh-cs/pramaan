@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 SeverityLevel = Literal["critical", "high", "medium", "low", "info"]
-SignalType = Literal["rule", "tamper", "issuer", "duplicate"]
+SignalType = Literal["rule", "tamper", "issuer", "duplicate", "internal_check"]
 
 
 class ClauseCitation(BaseModel):
@@ -20,6 +20,8 @@ class ClauseCitation(BaseModel):
     pdf_page: int
     title: str
     summary: Optional[str] = None
+    cross_reference_notes: Optional[str] = None
+    excerpt: str
 
 
 class RuleCondition(BaseModel):
@@ -46,7 +48,7 @@ class DeclarativeRuleConfig(BaseModel):
     title: str
     category: str = "eoa"
     document_type: Optional[str] = None
-    clause_id: str
+    clause_id: Optional[str] = None
     severity: SeverityLevel = "medium"
     signal_type: SignalType = "rule"
     condition: RuleCondition

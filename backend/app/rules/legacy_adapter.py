@@ -13,19 +13,44 @@ from app.schemas.rule_definition import ClauseCitation, SeverityLevel, SignalTyp
 # Mapping existing rule IDs to statutory clause keys and severities
 RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
     "DOC_PRESENCE_001": {
-        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_CHECK": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_001": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_002": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_003": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_004": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
         "severity": "critical",
         "signal_type": "rule",
     },
     "FIELD_001": {
-        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
+        "clause_id": None,
         "severity": "high",
-        "signal_type": "rule",
+        "signal_type": "internal_check",
     },
     "FIELD_002": {
-        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
+        "clause_id": None,
         "severity": "high",
-        "signal_type": "rule",
+        "signal_type": "internal_check",
     },
     "EXPIRY_001": {
         "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
@@ -33,17 +58,22 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "signal_type": "rule",
     },
     "CONSISTENCY_001": {
-        "clause_id": "APH_2024_27_AFFIDAVIT_2",
+        "clause_id": None,
         "severity": "critical",
-        "signal_type": "rule",
+        "signal_type": "internal_check",
     },
     "TER_PAYMENT_001": {
         "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
-        "severity": "high",
+        "severity": "info",
         "signal_type": "rule",
     },
     "STRUCTURAL_001": {
-        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV",
+        "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+        "severity": "high",
+        "signal_type": "rule",
+    },
+    "STRUCTURAL_STABILITY_001": {
+        "clause_id": "APH_2024_27_CLAUSE_6_17_H",
         "severity": "high",
         "signal_type": "rule",
     },

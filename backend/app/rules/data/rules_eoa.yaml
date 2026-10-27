@@ -6,7 +6,7 @@ rules:
   - rule_id: "DOC_PRESENCE_001"
     title: "Mandatory Document Presence Check"
     category: "eoa"
-    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1"
     severity: "critical"
     signal_type: "rule"
     condition:
@@ -22,14 +22,14 @@ rules:
   - rule_id: "FIELD_001"
     title: "Mandatory Field Completeness"
     category: "eoa"
-    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+    clause_id: null
     severity: "high"
-    signal_type: "rule"
+    signal_type: "internal_check"
     condition:
       operator: "exists"
       field: "required_fields"
     pass_title: "Mandatory Certificate Fields Extracted"
-    pass_reason_template: "All required statutory fields ({extracted_count}/{total_count}) extracted successfully from {document_type}."
+    pass_reason_template: "All required fields ({extracted_count}/{total_count}) extracted successfully from {document_type}."
     flag_title: "Mandatory Fields Missing in Document"
     flag_reason_template: "Document {document_name} is missing mandatory fields required for scrutiny: {missing_fields}."
     next_action: "Ensure the uploaded scan clearly shows certificate numbers and authority signatures."
@@ -46,18 +46,18 @@ rules:
       operator: "date_not_expired"
       field: "valid_until"
     pass_title: "Fire Safety Certificate Currently Valid"
-    pass_reason_template: "Certificate is valid until {valid_until}, satisfying APH 2024-2027 Clause 7.16 norms."
+    pass_reason_template: "Certificate is valid until {valid_until}, satisfying APH 2024-2027 Clause 6.17(i) norms."
     flag_title: "Fire Safety Certificate Expired"
-    flag_reason_template: "Certificate expired on {valid_until} and is not valid for academic session {academic_year} per APH Clause 7.16."
+    flag_reason_template: "Certificate expired on {valid_until} and is not valid for academic session {academic_year} per APH Clause 6.17(i)."
     next_action: "Obtain and upload a renewed Fire Safety Certificate from the state fire authority."
     is_active: true
 
   - rule_id: "CONSISTENCY_001"
     title: "Cross-Document Institution Name Consistency"
     category: "eoa"
-    clause_id: "APH_2024_27_AFFIDAVIT_2"
+    clause_id: null
     severity: "critical"
-    signal_type: "rule"
+    signal_type: "internal_check"
     condition:
       operator: "consistent_across_documents"
       field: "institution_name"
@@ -73,35 +73,34 @@ rules:
     category: "eoa"
     document_type: "ter_payment_receipt"
     clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_II"
-    severity: "high"
+    severity: "info"
     signal_type: "rule"
     condition:
-      operator: "greater_or_equal"
+      operator: "custom"
       field: "amount"
-      target_value: 100000
-      unit: "INR"
-    pass_title: "TER Fee Payment Valid"
-    pass_reason_template: "Payment receipt confirms statutory TER charges of INR {amount} paid, meeting Table 2.1 schedule."
-    flag_title: "TER Charges Underpaid"
-    flag_reason_template: "Payment of INR {amount} is below the statutory requirement of INR {target_value} specified in Chapter II Table 2.1."
-    next_action: "Pay balance TER fee online on AICTE portal and upload updated pay-in receipt."
-    is_active: true
+      target_value: null
+    pass_title: "TER Fee Receipt Submitted"
+    pass_reason_template: "Pay receipt from AICTE Web-Portal submitted per Annexure-2 §2.1(ii)."
+    flag_title: "TER Charges Payment Unverified"
+    flag_reason_template: "Annexure-2 §2.1(ii) specifies pay receipt 'if any'; amount check is inactive/unverified as Table 2.1 charges vary by institution category."
+    next_action: "Auditor discretion: verify portal payment receipt if applicable."
+    is_active: false
 
   - rule_id: "STRUCTURAL_001"
     title: "Building Age & Structural Stability Verification"
     category: "eoa"
     document_type: "building_completion_certificate"
-    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV"
+    clause_id: "APH_2024_27_CLAUSE_6_17_H"
     severity: "high"
     signal_type: "rule"
     condition:
       operator: "date_lte_years"
-      field: "completion_date"
+      field: "completion_certificate_issue_date"
       target_value: 30
       unit: "years"
     pass_title: "Structural Stability Requirement Satisfied"
-    pass_reason_template: "Building completed on {completion_date} (age {age_years} years <= 30 years); separate structural stability certificate not required."
+    pass_reason_template: "Building completion certificate issue date {issue_date} (age {age_years} years <= 30 years); structural stability certificate not required."
     flag_title: "Structural Stability Certificate Required (> 30 Years)"
-    flag_reason_template: "Building is {age_years} years old (completed {completion_date}). Annexure-2 §2.1(iv) mandates a Structural Stability Certificate from a registered Structural Engineer."
-    next_action: "Upload valid Structural Stability Certificate from a certified structural engineer."
+    flag_reason_template: "Building is {age_years} years old from Completion Certificate issue date {issue_date}. Clause 6.17(h) and Annexure-2 §2.1(iv) mandate a valid Structural Stability Certificate (5-year validity). Government buildings > 50 years are governed under the Government Building Act, 1899 exception."
+    next_action: "Upload valid Structural Stability Certificate (valid within 5 years) or government building authority letter."
     is_active: true

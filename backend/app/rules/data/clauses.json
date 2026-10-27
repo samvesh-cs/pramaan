@@ -1,4 +1,14 @@
 {
+  "APH_2024_27_ANNEX_2_CLAUSE_2_1": {
+    "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+    "chapter_or_annexure": "Annexure-2",
+    "clause_number": "2.1",
+    "handbook_page": 81,
+    "pdf_page": 97,
+    "title": "Documents to be Uploaded for EoA based on Self-Disclosure",
+    "summary": "Mandatory checklist of supporting documents and affidavits duly authenticated by Chairman/Secretary of the Trust/Society/Company for Extension of Approval.",
+    "excerpt": "Documents to be uploaded for the issuance of EoA based on Self-Disclosure/after a break in the preceding Academic Years/ Restoration of Intake"
+  },
   "APH_2024_27_ANNEX_2_CLAUSE_2_1_I": {
     "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_I",
     "chapter_or_annexure": "Annexure-2",
@@ -6,7 +16,8 @@
     "handbook_page": 81,
     "pdf_page": 97,
     "title": "Affidavit-2 Digital Signature Requirement",
-    "summary": "Affidavit-2 on e-stamp paper with digital signature of Chairman/Secretary of the Trust/Society/Company."
+    "summary": "Affidavit-2 with digital signature of the Chairman/Secretary of the Trust/Society/Company on an e-stamp paper of Rs. 100/- duly sworn before a First Class Judicial Magistrate or Notary or an Oath Commissioner.",
+    "excerpt": "An Affidavit 2 with digital signature of the Chairman/ Secretary of the Trust/ Society/ Company on an e-stamp paper of Rs. 100/- duly sworn before a First Class Judicial Magistrate or Notary or an Oath Commissioner."
   },
   "APH_2024_27_ANNEX_2_CLAUSE_2_1_II": {
     "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
@@ -14,8 +25,9 @@
     "clause_number": "2.1(ii)",
     "handbook_page": 81,
     "pdf_page": 97,
-    "title": "Payment Receipt of TER Charges",
-    "summary": "Copy of pay-in slip / payment receipt in respect of Technical Education Regulatory (TER) charges paid as per Table 2.1."
+    "title": "AICTE Web-Portal Payment Receipt (if any)",
+    "summary": "Copy of pay receipt print made on AICTE Web-Portal if any, in respect of Extension of Approval for the respective Academic Year.",
+    "excerpt": "Copy of pay receipt print made on AICTE Web-Portal if any, in respect of Extension of Approval for the respective Academic Year."
   },
   "APH_2024_27_ANNEX_2_CLAUSE_2_1_III": {
     "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_III",
@@ -23,8 +35,10 @@
     "clause_number": "2.1(iii)",
     "handbook_page": 81,
     "pdf_page": 97,
-    "title": "Building Completion / Occupancy Certificate",
-    "summary": "Certificate from Competent Authority (Building License / Form D / Completion / Occupancy) as specified in Clause 7.17 and Annexure-14."
+    "title": "Building Occupancy / Completion Certificate",
+    "summary": "Valid Occupancy/ Completion Certificate/ Building License/ Form D issued by the Competent Authority as cross-referred to Clause 7.17 (drafting cross-reference to Chapter VI Clause 6.17(g)).",
+    "cross_reference_notes": "Annexure-2 §2.1(iii) literally cites 'Clause 7.17 of the Approval Process Handbook', which is a drafting cross-reference to Chapter VI Clause 6.17(g).",
+    "excerpt": "As per Clause 7.17 of the Approval Process Handbook, valid Occupancy/ Completion Certificate/ Building License/ Form D issued by the Competent Authority."
   },
   "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV": {
     "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV",
@@ -32,8 +46,9 @@
     "clause_number": "2.1(iv)",
     "handbook_page": 81,
     "pdf_page": 97,
-    "title": "Structural Stability for Buildings Older than 30 Years",
-    "summary": "Valid Structural Stability Certificate from registered Structural Engineer if the building is more than thirty years old."
+    "title": "Structural Stability Certificate (> 30 Years)",
+    "summary": "Valid Structural Stability Certificate from registered Structural Engineer if Building is more than thirty years from the issue of Completion Certificate.",
+    "excerpt": "Valid Structural Stability Certificate from the registered Structural Engineer, if the Building is more than thirty years from the issue of Completion Certificate that the Building is fit for human habitation."
   },
   "APH_2024_27_ANNEX_2_CLAUSE_2_1_V": {
     "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
@@ -41,8 +56,9 @@
     "clause_number": "2.1(v)",
     "handbook_page": 81,
     "pdf_page": 97,
-    "title": "Valid Fire and Life Safety Certificate",
-    "summary": "Valid Fire Safety Certificate issued by the Competent Authority of the respective State/UT Government as per Clause 7.16."
+    "title": "Valid Fire Safety Certificate",
+    "summary": "A valid Fire Safety Certificate issued by the Competent Authority.",
+    "excerpt": "A valid Fire Safety Certificate issued by the Competent Authority."
   },
   "APH_2024_27_CHAP_2_TABLE_2_1": {
     "clause_id": "APH_2024_27_CHAP_2_TABLE_2_1",
@@ -51,25 +67,59 @@
     "handbook_page": 13,
     "pdf_page": 29,
     "title": "TER Fee Schedule for Extension of Approval (EoA)",
-    "summary": "Statutory TER charges schedule payable online to AICTE based on institution category and program levels."
+    "summary": "Statutory Technical Education Regulatory (TER) Charges schedule payable online to AICTE based on institution category.",
+    "excerpt": "Table 2.1. Technical Education Regulatory (TER) Charges"
   },
-  "APH_2024_27_CLAUSE_7_16": {
-    "clause_id": "APH_2024_27_CLAUSE_7_16",
-    "chapter_or_annexure": "Chapter VII",
-    "clause_number": "7.16",
-    "handbook_page": 70,
-    "pdf_page": 88,
-    "title": "Fire and Life Safety Norms",
-    "summary": "Mandates that institution buildings must possess a valid Fire and Life Safety Certificate from designated state fire authorities."
+  "APH_2024_27_CLAUSE_6_17_G": {
+    "clause_id": "APH_2024_27_CLAUSE_6_17_G",
+    "chapter_or_annexure": "Chapter VI",
+    "clause_number": "6.17(g)",
+    "handbook_page": 57,
+    "pdf_page": 73,
+    "title": "Occupancy Certificate Norms & Government Building Act Exemption",
+    "summary": "Occupancy Certificate/ Completion Certificate/ Building License/ Form D (as applicable) shall be obtained from Competent Authority. For Government Buildings, the Government Building Act, 1899 is applicable.",
+    "cross_reference_notes": "Annexure-2 §2.1(iii) cross-refers to this clause as 'Clause 7.17'.",
+    "excerpt": "Occupancy Certificate/ Completion Certificate/ Building License/ Form D (as applicable) shall be obtained from the Competent Authority (as per standard format prescribed by the issuing Authority). For Government Buildings, the Government Building Act, 1899 is applicable."
   },
-  "APH_2024_27_CLAUSE_7_17": {
-    "clause_id": "APH_2024_27_CLAUSE_7_17",
-    "chapter_or_annexure": "Chapter VII",
-    "clause_number": "7.17",
-    "handbook_page": 70,
-    "pdf_page": 88,
-    "title": "Occupancy Certificate Norms",
-    "summary": "Mandates that building completion and occupancy certificates must be issued by the designated local planning or municipal authority."
+  "APH_2024_27_CLAUSE_6_17_H": {
+    "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+    "chapter_or_annexure": "Chapter VI",
+    "clause_number": "6.17(h)",
+    "handbook_page": 57,
+    "pdf_page": 73,
+    "title": "Structural Stability Certificate 30-Year Rule & 5-Year Validity",
+    "summary": "After expiry of thirty years from issue of Completion Certificate, Structural Stability Certificate from registered Structural Engineer certifying human habitation safety is mandatory. Structural Stability Certificate is valid for a period of FIVE years from date of issue.",
+    "excerpt": "After the expiry of a period of thirty years from the issue of Completion Certificate, a Structural Stability Certificate from the registered Structural Engineer for the purpose of certifying that the Building is safe for human habitation shall be produced. Structural Stability Certificate is valid for a period of FIVE years from the date of issue."
+  },
+  "APH_2024_27_CLAUSE_6_17_I": {
+    "clause_id": "APH_2024_27_CLAUSE_6_17_I",
+    "chapter_or_annexure": "Chapter VI",
+    "clause_number": "6.17(i)",
+    "handbook_page": 57,
+    "pdf_page": 73,
+    "title": "Mandatory Fire Safety Certificate",
+    "summary": "A valid Fire Safety Certificate shall be obtained from the Competent Authority.",
+    "excerpt": "A valid Fire Safety Certificate shall be obtained from the Competent Authority."
+  },
+  "APH_2024_27_CLAUSE_6_17_J": {
+    "clause_id": "APH_2024_27_CLAUSE_6_17_J",
+    "chapter_or_annexure": "Chapter VI",
+    "clause_number": "6.17(j)",
+    "handbook_page": 57,
+    "pdf_page": 73,
+    "title": "State-Wise Competent Authorities Reference",
+    "summary": "State wise Competent Authorities for issuing the Certificates pertaining to the Land/ Building including Occupancy Certificate as given in Annexure-14 of the Approval Process Handbook.",
+    "excerpt": "State wise Competent Authorities for issuing the Certificates pertaining to the Land/ Building including Occupancy Certificate as given in Annexure-14 of the Approval Process Handbook."
+  },
+  "APH_2024_27_ANNEX_3_CLAUSE_3_1_D": {
+    "clause_id": "APH_2024_27_ANNEX_3_CLAUSE_3_1_D",
+    "chapter_or_annexure": "Annexure-3",
+    "clause_number": "3.1(d)",
+    "handbook_page": 86,
+    "pdf_page": 102,
+    "title": "Fire Department Certificate Requirement",
+    "summary": "Fire and life Safety Certificate from Fire Department of the concerned State Government authority is to be taken before submitting the application at AICTE.",
+    "excerpt": "Fire and life Safety Certificate from Fire Department of the concerned State Government authority is to be taken before submitting the application at AICTE."
   },
   "APH_2024_27_ANNEX_14": {
     "clause_id": "APH_2024_27_ANNEX_14",
@@ -77,8 +127,9 @@
     "clause_number": "Annexure-14",
     "handbook_page": 163,
     "pdf_page": 179,
-    "title": "State-Wise Designated Competent Authorities",
-    "summary": "Official designated authorities across 36 States/UTs to issue certificates regarding Land Use, Site Plan, Building Plan, and Completion/Occupancy."
+    "title": "State Wise Competent Authorities for Land & Building",
+    "summary": "State Wise Competent Authorities to issue Certificates with Respect to the Land/ Building (Land Use, Site Plan, Building Plan, Occupation Certificate). Note: Annexure-14 has no fire-authority column; fire issuer plausibility is department-level only.",
+    "excerpt": "State Wise Competent Authorities to issue Certificates with Respect to the Land/ Building"
   },
   "APH_2024_27_AFFIDAVIT_2": {
     "clause_id": "APH_2024_27_AFFIDAVIT_2",
@@ -86,7 +137,8 @@
     "clause_number": "Affidavit-2",
     "handbook_page": 186,
     "pdf_page": 202,
-    "title": "Format of Affidavit-2 by Chairman/Secretary",
-    "summary": "Standard format of Affidavit-2 on non-judicial stamp paper declaring compliance with AICTE norms and DSC authentication."
+    "title": "Format of Affidavit-2",
+    "summary": "Standard format of Affidavit-2 submitted under Chapter I/II/IV on non-judicial stamp paper declaring compliance with AICTE norms and DSC authentication.",
+    "excerpt": "AFFIDAVIT-2 (For the applications submitted under Chapter I/II/IV except Closure of the Institution)"
   }
 }

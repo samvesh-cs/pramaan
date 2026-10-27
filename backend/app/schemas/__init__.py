@@ -19,6 +19,14 @@ from app.schemas.finding import (
     FindingResponse,
     FindingReviewUpdate,
 )
+from app.schemas.auth import (
+    AdminSetupRequest,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.schemas.report import ReportResponse, SummaryCount
 
 __all__ = [
@@ -41,4 +49,10 @@ __all__ = [
     "SummaryCount",
     "ErrorResponse",
     "ErrorDetail",
+    "RegisterRequest",
+    "LoginRequest",
+    "AdminSetupRequest",
+    "TokenResponse",
+    "UserResponse",
+    "MessageResponse",
 ]

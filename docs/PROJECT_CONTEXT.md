@@ -151,6 +151,7 @@ erDiagram
 - `reviewer_notes` (VARCHAR Nullable): Human auditor notes.
 - `reviewed_by` (VARCHAR Nullable): Auditor email or name.
 - `reviewed_at` (TIMESTAMPTZ Nullable).
+- `requires_reviewer_decision` (computed API field): `true` for `flagged`, `missing`, or `unresolved`; `false` for `pass` and `not_applicable`.
 
 ---
 

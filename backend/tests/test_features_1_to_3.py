@@ -78,7 +78,9 @@ async def test_auditor_review_finding_and_status_recalculation(institution_clien
     report = val_res.json()
     assert report["overall_status"] == "processing_incomplete"
     assert report["findings"]
-    finding_id = report["findings"][0]["id"]
+    reviewable_findings = [finding for finding in report["findings"] if finding["requires_reviewer_decision"]]
+    assert reviewable_findings
+    finding_id = reviewable_findings[0]["id"]
 
     # Institution submits application so reviewer can review it
     submit_res = await institution_client.post(f"/api/applications/{app_id}/submit")
@@ -104,7 +106,7 @@ async def test_auditor_review_finding_and_status_recalculation(institution_clien
     updated_finding = patch_res.json()
     assert updated_finding["reviewer_decision"] == "verified"
     assert updated_finding["reviewer_notes"] == "Physically verified original document at regional office."
-    assert updated_finding["reviewed_by"] == "Dr. A. Sharma (Scrutiny Committee)"
+    assert updated_finding["reviewed_by"] == "reviewer@aicte.edu"
     assert updated_finding["reviewed_at"] is not None
 
 

@@ -7,6 +7,7 @@ from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
 from app.models.application import Application
 from app.models.document import Document
 from app.models.finding import Finding
+from app.utils.review_policy import finding_has_recorded_decision, finding_requires_reviewer_decision
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationDetailResponse,
@@ -186,14 +187,23 @@ class ApplicationService:
                 },
             )
 
-        pending_count = sum(1 for finding in findings if not finding.reviewer_decision or not finding.reviewed_at)
-        if pending_count:
+        pending_findings = [
+            finding
+            for finding in findings
+            if finding_requires_reviewer_decision(finding)
+            and not finding_has_recorded_decision(finding)
+        ]
+        if pending_findings:
+            pending_count = len(pending_findings)
             raise HTTPException(
                 status_code=409,
                 detail={
                     "code": "FINDINGS_PENDING_REVIEW",
                     "message": f"Review all {pending_count} remaining finding{'s' if pending_count != 1 else ''} before finalizing.",
-                    "details": {"pending_findings": pending_count},
+                    "details": {
+                        "pending_findings": pending_count,
+                        "pending_finding_ids": [finding.id for finding in pending_findings],
+                    },
                 },
             )
 

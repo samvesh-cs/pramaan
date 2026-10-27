@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import (
@@ -8,6 +9,7 @@ from app.auth.dependencies import (
 )
 from app.database import get_db
 from app.models.application import Application
+from app.models.finding import Finding
 from app.models.user import User
 from app.schemas.finding import (
     AcknowledgeDuplicateRequest,
@@ -53,6 +55,25 @@ async def validate_application(
                 "details": None,
             },
         )
+
+    if current_user.role == "REVIEWER" and application.status == "submitted":
+        existing_decision = await db.scalar(
+            select(Finding.id)
+            .where(
+                Finding.application_id == application.id,
+                or_(Finding.reviewer_decision.is_not(None), Finding.reviewed_at.is_not(None)),
+            )
+            .limit(1)
+        )
+        if existing_decision:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "SCRUTINY_HAS_REVIEW_DECISIONS",
+                    "message": "Checks cannot be rerun after a reviewer decision is recorded because rerunning would replace the audit findings.",
+                    "details": None,
+                },
+            )
 
     return await validation_engine.validate_application(db, application.id)
 
@@ -102,8 +123,8 @@ async def review_finding(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "REVIEW_FINALIZED", "message": "Scrutiny has been finalized. Reviewer decisions are read-only.", "details": None},
         )
-    if not payload.reviewed_by:
-        payload.reviewed_by = current_user.email
+    # Reviewer identity comes from the authenticated account, never a client-supplied value.
+    payload.reviewed_by = current_user.email
 
     return await validation_engine.review_finding(
         db=db,
@@ -139,5 +160,5 @@ async def acknowledge_duplicate(
         application_id=application.id,
         finding_id=finding_id,
         reviewer_notes=payload.reviewer_notes,
-        reviewed_by=payload.reviewed_by or current_user.email,
+        reviewed_by=current_user.email,
     )

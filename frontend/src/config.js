@@ -20,5 +20,5 @@ export const STATUS_LABELS = {
   unresolved_checks: 'Unresolved checks', processing_incomplete: 'Processing incomplete', checks_passed: 'Checks passed',
   uploaded: 'Uploaded', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed',
   pass: 'Passed', flagged: 'Flagged for review', missing: 'Missing', unresolved: 'Unresolved', not_applicable: 'Not applicable',
-  verified: 'Verified by Auditor', confirmed_discrepancy: 'Confirmed Discrepancy', requested_resubmission: 'Resubmission Requested', escalated: 'Escalated to Committee',
+  verified: 'Verified by Auditor', confirmed_discrepancy: 'Confirmed Discrepancy', requested_resubmission: 'Awaiting institution resubmission', escalated: 'Escalated for further review',
 }

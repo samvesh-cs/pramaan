@@ -117,6 +117,20 @@ button, a, label[for="file-input"] { cursor: pointer; }
 .review-finalization h2 { margin: 5px 0; color: var(--carbon-deep); font: 650 20px/1.2 var(--sans); }
 .review-finalization p { margin: 0; color: #58665f; font-size: 12px; line-height: 1.45; }
 .review-finalization .submission-feedback { flex-basis: 100%; background: rgba(168, 94, 76, .07); color: #7d483c; }
+.review-pending-list { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 9px 0 0; padding-left: 17px; color: #7c5138; font-size: 11px; line-height: 1.5; }
+.review-feedback { margin: 0 0 14px; padding: 10px 12px; border-left: 2px solid #416a63; background: rgba(65, 106, 99, .08); color: #315b4c; font-size: 12px; }
+.review-feedback.is-success { border-left-color: #416a63; }
+.review-lock-note { padding: 8px 10px; border-left: 2px solid #a8743f; background: rgba(168, 116, 63, .08); color: #77532f; font-size: 11px; line-height: 1.45; }
+.review-state-note { width: fit-content; margin: 8px 0 12px; padding: 4px 8px; border-left: 2px solid #a8743f; background: rgba(168, 116, 63, .09); color: #77532f; font-size: 11px; font-weight: 650; }
+.review-state-note.is-not-required { border-left-color: #71817a; background: rgba(113, 129, 122, .08); color: #596761; }
+.auditor-badge-card.is-requested_resubmission { border-left-color: #a8743f; background: rgba(168, 116, 63, .07); }
+.auditor-badge-card.is-escalated { border-left-color: #77678e; background: rgba(119, 103, 142, .07); }
+.review-action-description { margin: 0 0 2px; color: #58665f; font-size: 13px; line-height: 1.55; }
+.reviewer-identity-note { margin: -4px 0 0; color: #71817a; font-size: 11px; }
+.auditor-modal .submission-feedback { grid-column: auto; color: #7d483c; background: rgba(168, 94, 76, .07); }
+.auditor-modal textarea { min-height: 100px; resize: vertical; }
+.button-auditor:disabled { opacity: .58; cursor: wait; }
+.spinner-small { width: 14px; height: 14px; border-width: 2px; }
 .review-complete-note { display: flex; align-items: center; gap: 8px; margin-top: 22px; padding: 12px 14px; border-left: 3px solid #416a63; background: #edf3ed; color: #315b4c; font-size: 12px; font-weight: 600; }
 .overall-status-label { color: #596761; font-size: 10px; }
 

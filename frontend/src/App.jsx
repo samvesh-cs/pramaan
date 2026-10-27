@@ -7,6 +7,7 @@ import { useAuth } from './auth/useAuth'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { buildReviewerDecisionPayload, hasRecordedReviewerDecision, pendingReviewerFindings, requiresReviewerDecision, REVIEW_ACTIONS, reviewerStateLabel } from './reviewWorkflow'
 
 const iconPaths = {
   overview: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></>,
@@ -669,33 +670,33 @@ function AuditWorkspace() {
   </div>
 }
 
-function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verified', onSave }) {
-  const { user } = useAuth()
-  const [decision, setDecision] = useState(initialDecision)
-  const [notes, setNotes] = useState('')
-  const [reviewerName, setReviewerName] = useState(() => user?.email || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
+function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error }) {
+  const action = REVIEW_ACTIONS[decision]
+  const [details, setDetails] = useState('')
+  const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (finding) {
-      setDecision(finding.reviewer_decision || initialDecision)
-      setNotes(finding.reviewer_notes || '')
-      setReviewerName(finding.reviewed_by || user?.email || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
+      setDetails(finding.reviewer_decision === decision ? finding.reviewer_notes || '' : '')
+      setFormError('')
     }
-  }, [finding, initialDecision, user?.email])
+  }, [finding, decision])
 
-  if (!isOpen || !finding) return null
-
+  if (!isOpen || !finding || !action) return null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    let payload
+    try {
+      payload = buildReviewerDecisionPayload(decision, details)
+    } catch (err) {
+      setFormError(err.message)
+      return
+    }
     setSaving(true)
     try {
-      const saved = await onSave(finding.id, {
-        reviewer_decision: decision,
-        reviewer_notes: notes.trim() || 'Auditor verified against physical records and regulatory handbook.',
-        reviewed_by: reviewerName.trim() || 'AICTE Scrutiny Auditor',
-      })
+      const saved = await onSave(finding.id, payload)
       if (saved !== false) onClose()
     } finally {
       setSaving(false)
@@ -703,44 +704,35 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
   }
 
   return (
-    <div className="auditor-modal-backdrop" onClick={onClose}>
+    <div className="auditor-modal-backdrop" onClick={() => !saving && onClose()}>
       <div className="auditor-modal" onClick={(e) => e.stopPropagation()}>
         <div className="auditor-modal-head">
           <div>
-            <span className="eyebrow">HUMAN-IN-THE-LOOP SCRUTINY DESK</span>
-            <h3>Reviewer Verification Decision</h3>
+            <span className="eyebrow">HUMAN REVIEW · {reviewerStateLabel(finding)}</span>
+            <h3>{action.title}</h3>
           </div>
-          <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={18}/></button>
+          <button type="button" className="icon-button" onClick={onClose} disabled={saving} aria-label="Close"><Icon name="close" size={18}/></button>
         </div>
         <form onSubmit={handleSubmit} className="auditor-modal-body">
           <p className="finding-target-title"><b>Target finding:</b> {finding.title}</p>
+          <p className="review-action-description">{action.description}</p>
           <div className="modal-field">
-            <label>Auditor Decision</label>
-            <select value={decision} onChange={(e) => setDecision(e.target.value)}>
-              <option value="verified">Mark Verified (Accept Discrepancy / Rule Satisfied)</option>
-              <option value="confirmed_discrepancy">Confirm Discrepancy (Enforce Flag)</option>
-              <option value="requested_resubmission">Request Document Resubmission</option>
-              <option value="escalated">Escalate to Appellate Committee</option>
-            </select>
-          </div>
-          <div className="modal-field">
-            <label>Reviewer Identity</label>
-            <input type="text" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} required />
-          </div>
-          <div className="modal-field">
-            <label>Auditor Justification / Assessment Notes</label>
+            <label htmlFor="review-action-details">{action.fieldLabel}</label>
             <textarea
+              id="review-action-details"
               rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Provide regulatory justification or portal verification reference (e.g. Verified via state fire portal records)."
+              value={details}
+              onChange={(e) => { setDetails(e.target.value); setFormError('') }}
+              placeholder={action.placeholder}
               required
             />
           </div>
+          <p className="reviewer-identity-note">Recorded under the signed-in reviewer account.</p>
+          {(formError || error) && <div className="submission-feedback is-error" role="alert">{formError || error}</div>}
           <div className="auditor-modal-actions">
             <button type="button" className="button button-secondary" onClick={onClose} disabled={saving}>Cancel</button>
             <button type="submit" className="button button-primary" disabled={saving}>
-              {saving ? 'Saving Decision…' : 'Record Decision & Recalculate'}
+              {saving ? 'Saving…' : action.submitLabel}
             </button>
           </div>
         </form>
@@ -855,7 +847,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
 function ValidationReport() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isReviewer, isInstitution } = useAuth()
+  const { user, isReviewer, isInstitution } = useAuth()
   const [app, setApp] = useState(null)
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -865,6 +857,9 @@ function ValidationReport() {
   const [drawerDoc, setDrawerDoc] = useState(null)
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState('')
+  const [savingFindingId, setSavingFindingId] = useState(null)
+  const [reviewFeedback, setReviewFeedback] = useState('')
+  const [reviewError, setReviewError] = useState('')
 
   const load = () => {
     setLoading(true)
@@ -886,24 +881,51 @@ function ValidationReport() {
   useEffect(load, [id, isInstitution])
 
   const handleOpenReview = (finding, decisionType) => {
+    setReviewError('')
+    setReviewFeedback('')
+    if (decisionType === 'verified') {
+      void handleSaveReview(finding.id, { reviewer_decision: 'verified' })
+      return
+    }
     setModalInitialDecision(decisionType)
     setModalFinding(finding)
   }
 
   const handleSaveReview = async (findingId, reviewPayload) => {
+    if (savingFindingId) return false
+    setSavingFindingId(findingId)
+    setReviewError('')
+    setReviewFeedback('')
     try {
-      await reviewFinding(id, findingId, reviewPayload)
-      load()
+      const saved = await reviewFinding(id, findingId, {
+        ...reviewPayload,
+        reviewed_by: user?.email,
+      })
+      setReport((current) => current && ({
+        ...current,
+        findings: current.findings.map((finding) => finding.id === findingId ? { ...finding, ...saved } : finding),
+      }))
+      const message = reviewPayload.reviewer_decision === 'verified'
+        ? 'Finding marked verified.'
+        : REVIEW_ACTIONS[reviewPayload.reviewer_decision]?.successLabel || 'Reviewer decision recorded.'
+      setReviewFeedback(message)
+      getApplication(id).then((latestApp) => {
+        if (latestApp) {
+          setApp(latestApp)
+          setReport((current) => current && ({ ...current, overall_status: latestApp.overall_status || current.overall_status }))
+        }
+      }).catch(() => {})
       return true
     } catch (err) {
-      setError(`Could not save reviewer decision: ${err.message}`)
+      setReviewError(`Could not save reviewer decision: ${err.message}`)
       return false
+    } finally {
+      setSavingFindingId(null)
     }
   }
 
   const handleFinalizeReview = async () => {
     if (finalizing) return
-    if (!window.confirm('Finalize this scrutiny review? The completed report will become available to the institution, and review decisions will become read-only.')) return
     if (!window.confirm('Finalize this scrutiny review? The completed report will become available to the institution, and review decisions will become read-only.')) return
     setFinalizing(true)
     setFinalizeError('')
@@ -970,7 +992,9 @@ function ValidationReport() {
 
   const summary = report.summary || {}
   const findings = Array.isArray(report.findings) ? report.findings : []
-  const pendingReviewerCount = findings.filter((finding) => !finding.reviewer_decision || !finding.reviewed_at).length
+  const pendingFindings = pendingReviewerFindings(findings)
+  const pendingReviewerCount = pendingFindings.length
+  const hasRecordedDecisions = findings.some((finding) => finding.reviewer_decision || finding.reviewed_at)
   const summaryStatuses = CHECK_STATUSES.filter((status) => Number.isFinite(summary[status]))
   const reportedMissingTypes = Array.isArray(report.missing_document_types) ? report.missing_document_types : []
   const missingTypesCoveredByFindings = reportedMissingTypes.every((code) => {
@@ -1005,7 +1029,7 @@ function ValidationReport() {
                 <Icon name="plus" size={16} /> Create New Application from Report
               </button>
             )}
-            {isReviewer && app?.status !== 'review_completed' && (
+            {isReviewer && app?.status === 'submitted' && !hasRecordedDecisions && (
               <button
                 type="button"
                 className="button button-secondary"
@@ -1023,6 +1047,9 @@ function ValidationReport() {
               >
                 Re-run Scrutiny Checks
               </button>
+            )}
+            {isReviewer && app?.status === 'submitted' && hasRecordedDecisions && (
+              <span className="review-lock-note">Checks are locked after a reviewer decision to preserve the audit record.</span>
             )}
             <button type="button" className="button button-primary" onClick={handlePrint}>
               <Icon name="printer" size={16} /> Export Scrutiny Dossier (PDF)
@@ -1080,6 +1107,7 @@ function ValidationReport() {
           </div>
           <span className="data-note">{findings.length} {findings.length === 1 ? 'finding' : 'findings'}</span>
         </div>
+        {reviewFeedback && <div className="review-feedback is-success" role="status">{reviewFeedback}</div>}
         {findings.length === 0 ? (
           <EmptyState title="No findings provided" text="The service returned no findings for this report." />
         ) : (
@@ -1092,6 +1120,8 @@ function ValidationReport() {
                 onReview={handleOpenReview}
                 onInspectDoc={handleInspectDoc}
                 isReviewer={isReviewer && app?.status !== 'review_completed'}
+                saving={savingFindingId === finding.id}
+                reviewBusy={Boolean(savingFindingId)}
               />
             ))}
           </div>
@@ -1104,8 +1134,14 @@ function ValidationReport() {
             <div className="eyebrow">REVIEWER ACTION</div>
             <h2 id="finalize-review-heading">Finalize scrutiny</h2>
             <p>{pendingReviewerCount
-              ? `${pendingReviewerCount} finding${pendingReviewerCount === 1 ? '' : 's'} still need a recorded reviewer decision.`
-              : 'All findings have reviewer decisions. Finalizing makes this report available to the institution and locks further review changes.'}</p>
+              ? `${pendingReviewerCount} finding${pendingReviewerCount === 1 ? '' : 's'} in an open review state still need action.`
+              : 'All findings that require reviewer action have a recorded decision. Finalizing closes scrutiny; resubmission and escalation outcomes remain distinct from compliance.'}</p>
+            {pendingReviewerCount > 0 && (
+              <ul className="review-pending-list">
+                {pendingFindings.slice(0, 3).map((finding) => <li key={finding.id}>{finding.title || finding.rule_id}</li>)}
+                {pendingReviewerCount > 3 && <li>And {pendingReviewerCount - 3} more</li>}
+              </ul>
+            )}
           </div>
           <button type="button" className="button button-primary" disabled={finalizing || pendingReviewerCount > 0 || findings.length === 0} onClick={handleFinalizeReview}>
             {finalizing ? 'Finalizing review…' : 'Finalize scrutiny'} <Icon name="check" size={17}/>
@@ -1212,8 +1248,10 @@ function ValidationReport() {
                       <em>"{f.reviewer_notes}"</em><br/>
                       <small>— {f.reviewed_by} ({f.reviewed_at ? new Date(f.reviewed_at).toLocaleDateString('en-IN') : ''})</small>
                     </div>
-                  ) : (
+                  ) : requiresReviewerDecision(f) ? (
                     <span>Pending Scrutiny Desk Verification</span>
+                  ) : (
+                    <span>No reviewer decision required for this check.</span>
                   )}
                 </td>
               </tr>
@@ -1241,8 +1279,9 @@ function ValidationReport() {
         isOpen={!!modalFinding}
         onClose={() => setModalFinding(null)}
         finding={modalFinding}
-        initialDecision={modalInitialDecision}
+        decision={modalInitialDecision}
         onSave={handleSaveReview}
+        error={reviewError}
       />
 
       <DocumentViewerDrawer
@@ -1265,7 +1304,7 @@ const findingContext = {
 
 function displayFieldName(value) { return value?.replaceAll('_', ' ') }
 
-function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
+function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, reviewBusy }) {
   const evidence = finding.evidence
   const status = finding.status || 'unresolved'
   const source = finding.document_name || (finding.document_id ? `Document ID ${finding.document_id}` : 'Application-level finding; no document was specified')
@@ -1273,6 +1312,8 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
   const reason = finding.reason?.trim()
   const nextAction = finding.next_action?.trim()
   const reviewerDecision = finding.reviewer_decision
+  const decisionRequired = requiresReviewerDecision(finding)
+  const reviewState = reviewerStateLabel(finding)
 
   return (
     <article className={`finding finding-${status}`}>
@@ -1289,9 +1330,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
         {reviewerDecision && (
           <div className={`auditor-badge-card is-${reviewerDecision}`}>
             <div className="auditor-badge-head">
-              <span className="auditor-decision-tag">
-                ✓ {STATUS_LABELS[reviewerDecision] || reviewerDecision}
-              </span>
+              <span className="auditor-decision-tag">{reviewState}</span>
               {finding.reviewed_at && (
                 <span className="auditor-date">
                   {new Date(finding.reviewed_at).toLocaleString('en-IN', {
@@ -1309,6 +1348,11 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
             {finding.reviewer_notes && (
               <p className="auditor-notes">"{finding.reviewer_notes}"</p>
             )}
+          </div>
+        )}
+        {!reviewerDecision && (
+          <div className={`review-state-note ${decisionRequired ? 'is-pending' : 'is-not-required'}`}>
+            {reviewState}
           </div>
         )}
 
@@ -1365,19 +1409,21 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
         </section>
 
         <div className="auditor-action-bar">
-            {isReviewer && (
+          {isReviewer && decisionRequired && !hasRecordedReviewerDecision(finding) && (
             <>
               <button
                 type="button"
                 className="button-auditor button-auditor-verify"
                 onClick={() => onReview(finding, 'verified')}
+                disabled={reviewBusy}
               >
-                <Icon name="check" size={14} /> Mark Verified
+                {saving ? <span className="spinner spinner-small"/> : <Icon name="check" size={14} />} {saving ? 'Saving…' : 'Mark Verified'}
               </button>
               <button
                 type="button"
                 className="button-auditor button-auditor-resubmit"
                 onClick={() => onReview(finding, 'requested_resubmission')}
+                disabled={reviewBusy}
               >
                 <Icon name="alert" size={14} /> Request Resubmission
               </button>
@@ -1385,6 +1431,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
                 type="button"
                 className="button-auditor button-auditor-escalate"
                 onClick={() => onReview(finding, 'escalated')}
+                disabled={reviewBusy}
               >
                 <Icon name="shield" size={14} /> Escalate
               </button>

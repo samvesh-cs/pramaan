@@ -76,6 +76,12 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 **Reason:** Submission queues an application for human review; it is not itself a scrutiny decision. Persisting the distinction prevents premature report disclosure and duplicate submissions.
 **Date / Owner:** 2026-10-27 / Integration
 
+### D-016 — Require reviewer actions only for open findings
+**Status:** Accepted
+**Decision:** `flagged`, `missing`, and `unresolved` findings require a recorded reviewer action before scrutiny can be finalized. `pass` and `not_applicable` findings do not. Resubmission requests and escalations require action-specific notes; those decisions do not turn the underlying validation outcome into a pass. A recorded finding decision cannot be overwritten, and scrutiny cannot be rerun after a reviewer action because a rerun replaces findings.
+**Reason:** Informational checks should not create false pending work. The API exposes the requirement on each finding and the finalization endpoint enforces the same rule.
+**Date / Owner:** 2026-10-28 / Integration
+
 ### D-014 — Authentication and role-based access control
 **Status:** Accepted  
 **Decision:** Implement authentication and role-based authorization with two explicit roles:

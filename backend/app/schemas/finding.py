@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field, model_validator
+
+from app.utils.review_policy import finding_requires_reviewer_decision
 
 CheckStatus = Literal["pass", "flagged", "missing", "unresolved", "not_applicable"]
 ReviewerDecision = Literal["verified", "confirmed_discrepancy", "requested_resubmission", "escalated"]
@@ -30,6 +32,12 @@ class FindingReviewUpdate(BaseModel):
     reviewer_notes: Optional[str] = None
     reviewed_by: Optional[str] = None
 
+    @model_validator(mode="after")
+    def require_action_details(self):
+        if self.reviewer_decision in {"requested_resubmission", "escalated"} and not (self.reviewer_notes or "").strip():
+            raise ValueError("Provide the information requested from the institution or the reason for escalation.")
+        return self
+
 
 
 class AcknowledgeDuplicateRequest(BaseModel):
@@ -53,3 +61,8 @@ class FindingResponse(BaseModel):
     reviewer_notes: Optional[str] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+
+    @computed_field
+    @property
+    def requires_reviewer_decision(self) -> bool:
+        return finding_requires_reviewer_decision(self)

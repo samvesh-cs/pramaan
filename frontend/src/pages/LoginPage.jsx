@@ -46,11 +46,6 @@ export function LoginPage() {
     <div className="flex min-h-[calc(100vh-140px)] items-center justify-center px-4 py-8">
       <div className="w-full max-w-md rounded-2xl border border-[#263b42]/20 bg-[#fbf9f4] p-7 shadow-xl shadow-stone-900/5 sm:p-9">
         <div className="mb-6 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#263b42]/15 bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wider text-[#6b7771]">
-            <span>AICTE PS 26261</span>
-            <span>·</span>
-            <span>SECURE ACCESS</span>
-          </div>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#1c3035]">Sign in to Pramaan</h1>
           <p className="mt-1 text-xs text-[#5d6a64]">
             Document Scrutiny and Compliance Verification Workspace
@@ -103,7 +98,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[#274548] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f373a] disabled:opacity-60"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[#274548] py-2.5 text-sm font-semibold text-red-500 transition hover:bg-[#1f373a] disabled:opacity-60"
           >
             {isSubmitting ? (
               <>
@@ -130,7 +125,7 @@ export function LoginPage() {
               }
               className="rounded-lg border border-[#263b42]/15 bg-white/80 p-2 text-left text-xs transition hover:border-[#2f5e5c] hover:bg-white"
             >
-              <div className="font-semibold text-[#233c3f]">🎓 Institution</div>
+              <div className="font-semibold text-[#233c3f]"> Institution</div>
               <div className="truncate text-[10px] text-[#697670]">College Demo</div>
             </button>
             <button
@@ -143,7 +138,7 @@ export function LoginPage() {
               }
               className="rounded-lg border border-[#263b42]/15 bg-white/80 p-2 text-left text-xs transition hover:border-[#2f5e5c] hover:bg-white"
             >
-              <div className="font-semibold text-[#233c3f]">⚖️ AICTE Reviewer</div>
+              <div className="font-semibold text-[#233c3f]"> AICTE Reviewer</div>
               <div className="truncate text-[10px] text-[#697670]">Scrutiny Desk</div>
             </button>
           </div>

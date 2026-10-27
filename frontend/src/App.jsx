@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
 import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl, submitApplication } from './api'
@@ -127,7 +127,7 @@ function Overview() {
       {!apps && !error && <div className="queue-loading"><Loading label="Gathering applications"/></div>}
       {apps && <><div className="mb-6 grid grid-cols-3 border-y border-[#263b42]/15" aria-label="Application queue summary"><Metric label="In the queue" value={apps.length}/><Metric label="Needs attention" value={apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length} accent/><Metric label="Checks passed" value={counts.checks_passed || 0}/></div>
         <section aria-labelledby="queue-heading"><div className="mb-3"><h2 id="queue-heading" className="m-0 text-lg font-semibold tracking-tight text-[#334b49]">Applications</h2><p className="mt-1 text-xs leading-relaxed text-[#68736d] sm:text-[13px]">Select a record to review its documents and validation findings.</p></div>
-          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs · {app.status || 'draft'}</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '1px 5px', borderRadius: '3px', fontWeight: 600, background: app.status === 'submitted' ? 'rgba(216,166,108,0.2)' : 'rgba(38,59,66,0.08)', color: app.status === 'submitted' ? '#9a5d43' : '#68736d' }}>{app.status || 'draft'}</span></span><Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link></div>)}</div>}
+          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs · {app.status || 'draft'}</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '1px 5px', borderRadius: '3px', fontWeight: 600, background: app.status === 'submitted' ? 'rgba(216,166,108,0.2)' : 'rgba(38,59,66,0.08)', color: app.status === 'submitted' ? '#9a5d43' : '#68736d' }}>{app.status || 'draft'}</span></span>{isReviewer ? (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#9a5d43] underline underline-offset-4 hover:text-[#7d4833] sm:text-xs" aria-label={`Review ${app.institution_name}`} to={`/applications/${app.id}/report`}>Review <Icon name="arrow" size={16}/></Link>) : (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link>)}</div>)}</div>}
         </section></>}
     </div>
   </div>
@@ -279,7 +279,7 @@ function CreateApplication() {
 
 function ApplicationDocumentCentre() {
   const { id } = useParams()
-  const { isInstitution } = useAuth()
+  const { isReviewer, isInstitution } = useAuth()
   const fileInputRef = useRef(null)
   const uploadSectionRef = useRef(null)
   const documentTypeRef = useRef(null)
@@ -367,18 +367,10 @@ function ApplicationDocumentCentre() {
   const processingCount = documents.filter((doc) => ['uploaded', 'processing'].includes(doc.processing_status)).length
   const failedCount = documents.filter((doc) => doc.processing_status === 'processing_failed').length
   const processedCount = documents.filter((doc) => doc.processing_status === 'processed').length
-  const canContinue = documents.length > 0
   const isLocked = app?.status === 'submitted'
-  const auditMessage = !canContinue
-    ? 'Upload at least one document to open the audit workspace.'
-    : missingCount
-      ? `${missingCount} configured checklist item${missingCount === 1 ? '' : 's'} still have no file. The audit can still report missing types.`
-      : processingCount
-        ? `${processingCount} file${processingCount === 1 ? ' is' : 's are'} awaiting processing; its status will remain visible in the audit.`
-        : 'Review the returned statuses before continuing to preliminary validation.'
 
   return <div className="document-page document-workflow-page">
-    <PageHeader eyebrow="DOCUMENT CENTRE · APPLICATION WORKFLOW" title={<>Document<br /><em>workflow.</em></>} description="Review the configured requirements, add files, then inspect their reported processing states." />
+    <PageHeader eyebrow={isReviewer ? "SCRUTINY DESK · APPLICATION WORKFLOW" : "DOCUMENT CENTRE · APPLICATION WORKFLOW"} title={<>Document<br /><em>workflow.</em></>} description={isReviewer ? "Inspect uploaded files, review extracted document evidence, and conduct regulatory scrutiny." : "Review the configured requirements, add files, and submit your application for AICTE scrutiny."} />
 
     {isLocked && (
       <div style={{
@@ -395,9 +387,11 @@ function ApplicationDocumentCentre() {
       }}>
         <Icon name="shield" size={24} />
         <div>
-          <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>Application Submitted — Locked for Review</strong>
+          <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>Application Submitted — Under AICTE Scrutiny</strong>
           <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
-            This application has been formally submitted to the AICTE Review Committee. Document uploads and re-validation are locked while under scrutiny. Reviewers inspect documents and verify findings.
+            {isReviewer
+              ? 'This application has been formally submitted by the institution. Reviewers inspect documents and verify findings.'
+              : 'This application has been formally submitted to the AICTE Review Committee. Document uploads are locked while under scrutiny.'}
           </p>
         </div>
       </div>
@@ -408,7 +402,21 @@ function ApplicationDocumentCentre() {
       <div className="identity-summary"><span><b>{presentCount} / {types.length}</b><small>listed document types with a file</small></span><span><b>{processedCount}</b><small>processed</small></span><span><b>{processingCount}</b><small>awaiting processing</small></span><span><b>{failedCount}</b><small>processing failed</small></span></div>
     </section>
     {USE_MOCKS && <div className="demo-callout"><span className="mode-dot" /><span><b>Synthetic demonstration data.</b> The three configured document types are an MVP subset, not the complete EoA checklist.</span></div>}
-    <ol className="workflow-steps" aria-label="Document workflow steps"><li><span>01</span><b>Check requirements</b></li><li><span>02</span><b>Upload documents</b></li><li><span>03</span><b>Review file status</b></li><li><span>04</span><b>Continue to audit</b></li></ol>
+    {isReviewer ? (
+      <ol className="workflow-steps" aria-label="Reviewer scrutiny workflow steps">
+        <li><span>01</span><b>Check requirements</b></li>
+        <li><span>02</span><b>Submitted documents</b></li>
+        <li><span>03</span><b>Extracted evidence</b></li>
+        <li><span>04</span><b>Scrutiny review</b></li>
+      </ol>
+    ) : (
+      <ol className="workflow-steps" aria-label="Institution document workflow steps">
+        <li><span>01</span><b>Check requirements</b></li>
+        <li><span>02</span><b>Upload documents</b></li>
+        <li><span>03</span><b>Review file status</b></li>
+        <li><span>04</span><b>{isLocked ? 'Scrutiny report' : 'Submit to AICTE'}</b></li>
+      </ol>
+    )}
 
     <section className="workflow-section checklist-section" aria-labelledby="checklist-heading">
       <div className="workflow-section-head"><div><span className="workflow-step-number">01</span><div><div className="eyebrow">REQUIREMENTS · CONFIGURABLE</div><h2 id="checklist-heading">Required-document checklist</h2></div></div><span className="section-side-note">{missingCount ? `${missingCount} still need attention` : 'A file exists for every listed type'}</span></div>
@@ -416,50 +424,94 @@ function ApplicationDocumentCentre() {
         const doc = documents.find((entry) => entry.document_type === item.code)
         const state = doc?.processing_status || 'missing'
         const stateLabel = { missing: 'Missing · not received', uploaded: 'Uploaded · awaiting processing', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed' }[state] || state
-        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : isLocked ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
+        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked || isReviewer ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : (isLocked || isReviewer) ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
       })}</div>
       <p className="checklist-disclaimer">Presence and processing status are based on the application response. The listed types remain demo configuration until the team confirms an official source.</p>
     </section>
 
-    <section className="workflow-section upload-section" id="upload-section" ref={uploadSectionRef} aria-labelledby="upload-heading">
-      <div className="workflow-section-head"><div><span className="workflow-step-number">02</span><div><div className="eyebrow">ADD TO THIS APPLICATION</div><h2 id="upload-heading">Upload documents</h2></div></div><span className="section-side-note">PDF · JPG · PNG</span></div>
-      {isLocked ? (
-        <div style={{ padding: '32px 20px', background: 'rgba(38,59,66,0.03)', borderRadius: '6px', border: '1px dashed rgba(38,59,66,0.2)', textAlign: 'center' }}>
-          <p style={{ margin: 0, color: '#68736d', fontSize: '14px' }}>
-            Document uploads are locked because this application has been submitted to AICTE for review.
-          </p>
+    {!isReviewer && (
+      <section className="workflow-section upload-section" id="upload-section" ref={uploadSectionRef} aria-labelledby="upload-heading">
+        <div className="workflow-section-head"><div><span className="workflow-step-number">02</span><div><div className="eyebrow">ADD TO THIS APPLICATION</div><h2 id="upload-heading">Upload documents</h2></div></div><span className="section-side-note">PDF · JPG · PNG</span></div>
+        {isLocked ? (
+          <div style={{ padding: '32px 20px', background: 'rgba(38,59,66,0.03)', borderRadius: '6px', border: '1px dashed rgba(38,59,66,0.2)', textAlign: 'center' }}>
+            <p style={{ margin: 0, color: '#68736d', fontSize: '14px' }}>
+              Document uploads are locked because this application has been submitted to AICTE for review.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="workflow-upload-form"><div className="upload-form-top"><div><label htmlFor="doc-type" className="field-label">Document type <span>SELECT THE CHECKLIST ITEM</span></label><select ref={documentTypeRef} id="doc-type" value={type} onChange={(event) => setType(event.target.value)} required><option value="" disabled>Select a configured type</option>{types.map((item) => <option value={item.code} key={item.code}>{item.label} · {item.code}</option>)}</select>{type && <p className="selected-type-note">This file will be associated with <b>{types.find((item) => item.code === type)?.label || type}</b>.</p>}</div><div className="upload-contract-note"><Icon name="file" size={16} /><span>Accepted formats follow the API contract. File size and content are checked by the server.</span></div></div>
+            <label className={`dropzone ${dragging ? 'dropzone-over' : ''}`} htmlFor="file-input" onDragOver={(event) => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); acceptFile(event.dataTransfer.files?.[0]) }}><input ref={fileInputRef} id="file-input" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={(event) => acceptFile(event.target.files?.[0])} /><span className="upload-symbol"><Icon name="upload" size={23} /></span><b>{file ? file.name : 'Drag a document into this space'}</b><span>{file ? `${file.type || 'File'} · selected and ready` : 'PDF, JPG, or PNG — or choose a file below'}</span><small>PDF / JPG / PNG</small></label>
+            <div className="upload-actions"><button type="button" className="browse-button" onClick={() => fileInputRef.current?.click()}><Icon name="file" size={16} />{file ? 'Choose a different file' : 'Choose file'}<span>{file ? 'Replace selection' : 'From this device'}</span></button><button className="button button-copper upload-submit" type="submit" disabled={busy || !file || !type}>{busy ? <><span className="spinner spinner-light" />Uploading…</> : <>Upload selected file <Icon name="arrow" size={17} /></>}</button></div>
+            {file && <div className="selected-file-summary"><Icon name="file" size={17} /><span><b>{file.name}</b><small>{file.type || 'File type unavailable'} · {types.find((item) => item.code === type)?.label || 'Choose a document type'}</small></span><span className="selection-status">Ready to upload</span></div>}
+            {message && <div className={`inline-message ${message.startsWith('Upload received') ? 'message-success' : 'message-error'}`} role={message.startsWith('Upload received') ? 'status' : 'alert'}>{message}</div>}
+            <p className="upload-note">Dates and fields are extracted or reviewed later; they are not accepted as authoritative upload inputs.</p>
+          </form>
+        )}
+      </section>
+    )}
+
+    <section className="workflow-section uploaded-section" aria-labelledby="uploaded-heading"><div className="workflow-section-head"><div><span className="workflow-step-number">{isReviewer ? '02' : '03'}</span><div><div className="eyebrow">APPLICATION FILE</div><h2 id="uploaded-heading">Uploaded documents</h2></div></div><span className="section-side-note">{documents.length} {documents.length === 1 ? 'file' : 'files'} · {processedCount} processed</span></div>{documents.length === 0 ? <EmptyState title="No documents received" text="Files appear here after the upload request returns successfully." /> : <div className="uploaded-file-table"><div className="uploaded-file-header"><span>FILE NAME</span><span>DOCUMENT TYPE</span><span>PROCESSING STATUS</span><span>FILE TYPE</span></div>{documents.map((doc) => <DocumentItem key={doc.id} doc={doc} />)}</div>}
+      {isReviewer && documents.some((doc) => fieldsForDocument(doc).length) && (
+        <div className="fields-panel">
+          <div className="eyebrow">EXTRACTED FIELD INSPECTION</div>
+          <h3>Fields returned by processing</h3>
+          {documents.flatMap((doc) => fieldsForDocument(doc).map((field, index) => (
+            <FieldRow key={`${doc.id}-${index}`} field={{ ...field, source_document: field.source_document || doc.original_filename }} />
+          )))}
         </div>
-      ) : (
-        <form onSubmit={submit} className="workflow-upload-form"><div className="upload-form-top"><div><label htmlFor="doc-type" className="field-label">Document type <span>SELECT THE CHECKLIST ITEM</span></label><select ref={documentTypeRef} id="doc-type" value={type} onChange={(event) => setType(event.target.value)} required><option value="" disabled>Select a configured type</option>{types.map((item) => <option value={item.code} key={item.code}>{item.label} · {item.code}</option>)}</select>{type && <p className="selected-type-note">This file will be associated with <b>{types.find((item) => item.code === type)?.label || type}</b>.</p>}</div><div className="upload-contract-note"><Icon name="file" size={16} /><span>Accepted formats follow the API contract. File size and content are checked by the server.</span></div></div>
-          <label className={`dropzone ${dragging ? 'dropzone-over' : ''}`} htmlFor="file-input" onDragOver={(event) => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); acceptFile(event.dataTransfer.files?.[0]) }}><input ref={fileInputRef} id="file-input" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={(event) => acceptFile(event.target.files?.[0])} /><span className="upload-symbol"><Icon name="upload" size={23} /></span><b>{file ? file.name : 'Drag a document into this space'}</b><span>{file ? `${file.type || 'File'} · selected and ready` : 'PDF, JPG, or PNG — or choose a file below'}</span><small>PDF / JPG / PNG</small></label>
-          <div className="upload-actions"><button type="button" className="browse-button" onClick={() => fileInputRef.current?.click()}><Icon name="file" size={16} />{file ? 'Choose a different file' : 'Choose file'}<span>{file ? 'Replace selection' : 'From this device'}</span></button><button className="button button-copper upload-submit" type="submit" disabled={busy || !file || !type}>{busy ? <><span className="spinner spinner-light" />Uploading…</> : <>Upload selected file <Icon name="arrow" size={17} /></>}</button></div>
-          {file && <div className="selected-file-summary"><Icon name="file" size={17} /><span><b>{file.name}</b><small>{file.type || 'File type unavailable'} · {types.find((item) => item.code === type)?.label || 'Choose a document type'}</small></span><span className="selection-status">Ready to upload</span></div>}
-          {message && <div className={`inline-message ${message.startsWith('Upload received') ? 'message-success' : 'message-error'}`} role={message.startsWith('Upload received') ? 'status' : 'alert'}>{message}</div>}
-          <p className="upload-note">Dates and fields are extracted or reviewed later; they are not accepted as authoritative upload inputs.</p>
-        </form>
       )}
     </section>
 
-    <section className="workflow-section uploaded-section" aria-labelledby="uploaded-heading"><div className="workflow-section-head"><div><span className="workflow-step-number">03</span><div><div className="eyebrow">APPLICATION FILE</div><h2 id="uploaded-heading">Uploaded documents</h2></div></div><span className="section-side-note">{documents.length} {documents.length === 1 ? 'file' : 'files'} · {processedCount} processed</span></div>{documents.length === 0 ? <EmptyState title="No documents received" text="Files appear here after the upload request returns successfully." /> : <div className="uploaded-file-table"><div className="uploaded-file-header"><span>FILE NAME</span><span>DOCUMENT TYPE</span><span>PROCESSING STATUS</span><span>FILE TYPE</span></div>{documents.map((doc) => <DocumentItem key={doc.id} doc={doc} />)}</div>}
-      {documents.some((doc) => fieldsForDocument(doc).length) && <div className="fields-panel"><div className="eyebrow">EXTRACTED FIELD INSPECTION</div><h3>Fields returned by processing</h3>{documents.flatMap((doc) => fieldsForDocument(doc).map((field, index) => <FieldRow key={`${doc.id}-${index}`} field={{ ...field, source_document: field.source_document || doc.original_filename }} />))}</div>}
-    </section>
-
-    <section className="audit-gate" aria-labelledby="audit-gate-heading"><div className="workflow-step-number">04</div><div className="audit-gate-copy"><div className="eyebrow">NEXT · PRELIMINARY VALIDATION</div><h2 id="audit-gate-heading">Continue to the audit workspace</h2><p>{auditMessage}</p></div>
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        {canContinue ? <ButtonLink to={`/applications/${id}/audit`} icon="arrow">Continue to audit</ButtonLink> : <button type="button" className="button button-primary" disabled>Upload a document first <Icon name="arrow" size={17} /></button>}
-        {isInstitution && !isLocked && canContinue && (
-          <button
-            type="button"
-            className="button button-primary"
-            style={{ background: '#315e5b', borderColor: '#315e5b' }}
-            onClick={handleSubmitToAicte}
-            disabled={submitting}
-          >
-            {submitting ? 'Submitting…' : 'Submit to AICTE'}
-          </button>
-        )}
-      </div>
-    </section>
+    {isInstitution ? (
+      <section className="audit-gate" aria-labelledby="submission-gate-heading">
+        <div className="workflow-step-number">{isLocked ? '✓' : '04'}</div>
+        <div className="audit-gate-copy">
+          <div className="eyebrow">{isLocked ? 'APPLICATION STATUS · LOCKED' : 'NEXT · FORMAL SUBMISSION'}</div>
+          <h2 id="submission-gate-heading">{isLocked ? 'Application submitted to AICTE' : 'Submit application to AICTE'}</h2>
+          <p>
+            {isLocked
+              ? 'This application has been submitted to AICTE and is locked for scrutiny. You can view the generated compliance report.'
+              : missingCount > 0
+                ? `${missingCount} checklist item${missingCount === 1 ? '' : 's'} still pending. You may submit once ready.`
+                : 'All documents uploaded. Submit your application to lock and initiate AICTE scrutiny.'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {isLocked ? (
+            <ButtonLink to={`/applications/${id}/report`} icon="arrow">
+              View Scrutiny Report
+            </ButtonLink>
+          ) : (
+            <button
+              type="button"
+              className="button button-primary"
+              style={{ background: '#315e5b', borderColor: '#315e5b' }}
+              onClick={handleSubmitToAicte}
+              disabled={submitting || documents.length === 0}
+            >
+              {submitting ? 'Submitting…' : 'Submit to AICTE'} <Icon name="arrow" size={17} />
+            </button>
+          )}
+        </div>
+      </section>
+    ) : (
+      <section className="audit-gate" aria-labelledby="reviewer-gate-heading">
+        <div className="workflow-step-number">03</div>
+        <div className="audit-gate-copy">
+          <div className="eyebrow">SCRUTINY DESK · AUDIT WORKSPACE</div>
+          <h2 id="reviewer-gate-heading">Proceed to Scrutiny Findings & Review</h2>
+          <p>Examine automated rule checks, inspect document evidence snippets, and record auditor verification decisions.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <ButtonLink to={`/applications/${id}/report`} icon="arrow">
+            Open Scrutiny Findings
+          </ButtonLink>
+          <Link to={`/applications/${id}/audit`} className="quiet-link" style={{ marginLeft: '8px' }}>
+            <Icon name="audit" size={17} /> Cross-Document Audit Workspace
+          </Link>
+        </div>
+      </section>
+    )}
   </div>
 }
 function DocumentItem({ doc }) { return <article className="received-item uploaded-file-row" id={`uploaded-${doc.id}`}><span className="uploaded-file-name"><span className="file-mark"><Icon name="documents" size={20} /></span><b>{doc.original_filename || labelForDocument(doc.document_type)}</b></span><span className="uploaded-type-name">{labelForDocument(doc.document_type)}</span><Status value={doc.processing_status || 'uploaded'} /><span className="uploaded-mime">{doc.mime_type?.includes('pdf') ? 'PDF' : doc.mime_type?.split('/')[1]?.toUpperCase() || doc.mime_type || 'Not provided'}</span></article> }
@@ -478,14 +530,50 @@ function hasValidationRun(report) {
 }
 
 function AuditWorkspace() {
-  const { id } = useParams(); const [app, setApp] = useState(null); const [report, setReport] = useState(null); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  const load = () => { setLoading(true); getApplication(id).then((value) => { if (!value) throw new Error('Application could not be found.'); setApp(value); return getReport(id) }).then((value) => setReport(hasValidationRun(value) ? value : null)).catch((e) => setError(e.message)).finally(() => setLoading(false)) }
+  const { id } = useParams()
+  const { isReviewer, isInstitution } = useAuth()
+  const [app, setApp] = useState(null)
+  const [report, setReport] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    getApplication(id)
+      .then((value) => {
+        if (!value) throw new Error('Application could not be found.')
+        setApp(value)
+        return getReport(id)
+      })
+      .then((value) => setReport(hasValidationRun(value) ? value : null))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }
   useEffect(load, [id])
-  const start = async () => { setBusy(true); setError(''); setReport(null); try { const result = await runValidation(id); setReport(result) } catch (e) { setError(e.message) } finally { setBusy(false) } }
+
+  if (isInstitution) {
+    return <Navigate to={`/applications/${id}/report`} replace />
+  }
+
+  const start = async () => {
+    setBusy(true)
+    setError('')
+    setReport(null)
+    try {
+      const result = await runValidation(id)
+      setReport(result)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) return <Loading label="Preparing review workspace"/>
   if (error && !app) return <ErrorNotice message={error} onRetry={load}/>
   const docs = app?.documents || []
-  return <div className="audit-page"><PageHeader eyebrow="REVIEW WORKSPACE · 02" title={<>Compare the file<br/><em>with the checks.</em></>} description={<><b>{app?.institution_name}</b><span className="description-dot">·</span>{app?.academic_year}</>}/>
+  return <div className="audit-page"><PageHeader eyebrow={isReviewer ? "SCRUTINY DESK · CROSS-DOCUMENT AUDIT" : "REVIEW WORKSPACE · 02"} title={<>Compare the file<br/><em>with the checks.</em></>} description={<><b>{app?.institution_name}</b><span className="description-dot">·</span>{app?.academic_year}<span className="description-dot">·</span>{app?.application_category?.toUpperCase()} (EoA)</>}/>
     {USE_MOCKS && <div className="demo-callout"><span className="mode-dot"/><span><b>Demonstration mode.</b> Synthetic records and checklist; results are not a real validation or an authenticity determination.</span></div>}
     <div className={`audit-stage ${busy ? 'is-running' : ''} ${report ? 'is-complete' : ''}`}>
       <div className="audit-instructions"><div><span className="audit-step">01 <i>—</i> DOCUMENTS</span><h2>Submitted material</h2><p>{docs.length} {docs.length === 1 ? 'document' : 'documents'} associated with this record</p></div><div className="audit-center-caption"><span className="center-ring"><Icon name={busy ? 'clock' : report ? 'check' : 'audit'} size={21}/></span><small>{busy ? 'COMPARING' : report ? 'RESPONSE RECEIVED' : 'AWAITING REVIEW'}</small></div><div><span className="audit-step">02 <i>—</i> CONFIGURATION</span><h2>Review checks</h2><p>{getChecklist().length} configured demonstration requirements</p></div></div>
@@ -493,25 +581,43 @@ function AuditWorkspace() {
         <div className="connection-lanes" aria-hidden="true"><svg className="comparison-signature" viewBox="0 0 120 230" preserveAspectRatio="none"><path className="signature-underlay" d="M-10 48C19 46 15 88 35 91s17-58 36-54 12 79 31 83 12-42 31-39"/><path className="signature-main" d="M-10 48C19 46 15 88 35 91s17-58 36-54 12 79 31 83 12-42 31-39"/><path className="signature-flick" d="M70 37c-5 28-12 54-30 79m62 4 14 20"/></svg><span className="lane-line"/><span className="lane-line"/><span className="scan-pulse"/><span className="lane-caption">FIELD<br/>COMPARISON</span></div>
         <div className="audit-panel rules-panel"><div className="panel-head"><span className="panel-num">B</span><span><b>Configured checklist</b><small>Three-document MVP subset</small></span><span className="panel-count">{getChecklist().length.toString().padStart(2, '0')}</span></div><div className="panel-content">{getChecklist().map((item, index) => <div className={`audit-rule-line ${busy ? 'stagger' : ''}`} style={{ '--i': index }} key={item.code}><span className="rule-node">{String(index + 1).padStart(2,'0')}</span><span><b>{item.label}</b><small>{item.code}</small></span><span className="rule-state"><i className={busy ? 'rule-pulse' : ''}/>{report ? 'CONFIGURED' : 'READY'}</span></div>)}</div><div className="panel-foot">SOURCE <span>APH clauses in the checklist</span></div></div></div>
       {!report && (
-        app?.status === 'submitted' ? (
-          <div className="audit-action-row">
-            <div className="audit-caveat">
-              <Icon name="shield" size={17}/>
-              <span>This application has been submitted to AICTE. Preliminary re-validation is locked; review is conducted on recorded findings.</span>
+        <div className="audit-action-row">
+          <div className="audit-caveat">
+            <Icon name="shield" size={17}/>
+            <span>Automated scrutiny rules will evaluate submitted document fields against APH compliance requirements.</span>
+          </div>
+          <button type="button" className="button button-primary begin-audit" disabled={busy || docs.length === 0} onClick={start}>
+            {busy ? <><span className="spinner spinner-light"/>Evaluating documents…</> : <>Run Scrutiny Checks <Icon name="arrow" size={17}/></>}
+          </button>
+        </div>
+      )}
+      {docs.length === 0 && !report && <p className="audit-prerequisite">No documents available to validate.</p>}
+      {error && <ErrorNotice message={error} onRetry={start}/>}
+      {report && (
+        <div className="audit-result">
+          <div className="result-seal"><Icon name={report.overall_status === 'checks_passed' ? 'check' : 'report'} size={22}/></div>
+          <div className="result-copy">
+            <span className="eyebrow">SCRUTINY FINDINGS RECORDED</span>
+            <h3>Compliance checks complete.</h3>
+            <p>Preliminary findings are ready. Human auditor review is required to verify discrepancies or accept findings.</p>
+            <div className="result-finding-preview">
+              {report.summary && Object.entries(report.summary).filter(([, count]) => Number(count) > 0).map(([status, count]) => (
+                <span key={status}><b>{count}</b> {STATUS_LABELS[status] || status}</span>
+              ))}
+              {Array.isArray(report.findings) && report.findings.slice(0, 2).map((finding) => (
+                <span className="result-finding-title" key={finding.id || finding.rule_id}>{finding.title || finding.reason}</span>
+              ))}
             </div>
           </div>
-        ) : (
-          <div className="audit-action-row">
-            <div className="audit-caveat"><Icon name="shield" size={17}/><span>Running validation requests a preliminary report. A human reviewer remains responsible for the assessment.</span></div>
-            <button type="button" className="button button-primary begin-audit" disabled={busy || docs.length === 0} onClick={start}>
-              {busy ? <><span className="spinner spinner-light"/>Waiting for report…</> : <>Begin validation <Icon name="arrow" size={17}/></>}
+          <Status value={report.overall_status}/>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <ButtonLink to={`/applications/${id}/report`} icon="arrow">Open Scrutiny Findings & Review Desk</ButtonLink>
+            <button type="button" className="button button-secondary" disabled={busy} onClick={start}>
+              {busy ? 'Re-running…' : 'Re-run Checks'}
             </button>
           </div>
-        )
+        </div>
       )}
-      {docs.length === 0 && !report && <p className="audit-prerequisite">Add at least one document before starting validation.</p>}
-      {error && <ErrorNotice message={error} onRetry={start}/>}
-      {report && <div className="audit-result"><div className="result-seal"><Icon name={report.overall_status === 'checks_passed' ? 'check' : 'report'} size={22}/></div><div className="result-copy"><span className="eyebrow">REPORT RESPONSE RECEIVED</span><h3>Preliminary result returned.</h3><p>The result is ready for a reviewer to inspect. It is not an approval decision.</p><div className="result-finding-preview">{report.summary && Object.entries(report.summary).filter(([, count]) => Number(count) > 0).map(([status, count]) => <span key={status}><b>{count}</b> {STATUS_LABELS[status] || status}</span>)}{Array.isArray(report.findings) && report.findings.slice(0, 2).map((finding) => <span className="result-finding-title" key={finding.id || finding.rule_id}>{finding.title || finding.reason}</span>)}</div></div><Status value={report.overall_status}/><ButtonLink to={`/applications/${id}/report`} icon="arrow">Open validation report</ButtonLink></div>}
     </div>
   </div>
 }
@@ -699,8 +805,34 @@ function ValidationReport() {
   if (error) return <ErrorNotice message={error} onRetry={load} />
   if (!report) return (
     <div className="report-empty">
-      <PageHeader eyebrow="VALIDATION REPORT · 03" title={<>No report<br/><em>on record.</em></>} description={app?.institution_name} />
-      <EmptyState title="Validation has not been run" text="Start the audit workspace to request a report for this application." action={<ButtonLink to={`/applications/${id}/audit`} icon="arrow">Open audit workspace</ButtonLink>} />
+      <PageHeader eyebrow={isReviewer ? "SCRUTINY DESK · AUDITOR REVIEW" : "VALIDATION REPORT · 03"} title={<>No report<br/><em>on record.</em></>} description={app?.institution_name} />
+      <EmptyState
+        title="Scrutiny checks have not been run"
+        text={isReviewer ? "Run automated scrutiny checks to evaluate this submitted application against APH requirements." : "Your application has not been validated yet. Submit your application or upload documents first."}
+        action={
+          isReviewer ? (
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={async () => {
+                setLoading(true)
+                try {
+                  const res = await runValidation(id)
+                  setReport(res)
+                } catch (e) {
+                  setError(e.message)
+                } finally {
+                  setLoading(false)
+                }
+              }}
+            >
+              Run Scrutiny Checks <Icon name="arrow" size={17} />
+            </button>
+          ) : (
+            <ButtonLink to={`/applications/${id}/documents`} icon="arrow">Open Document Centre</ButtonLink>
+          )
+        }
+      />
     </div>
   )
 
@@ -716,8 +848,8 @@ function ValidationReport() {
   return (
     <div className="report-page">
       <PageHeader
-        eyebrow="VALIDATION REPORT · HUMAN REVIEW REQUIRED"
-        title={<>Review the<br/><em>evidence trail.</em></>}
+        eyebrow={isReviewer ? "SCRUTINY DESK · AUDITOR VERIFICATION" : "VALIDATION REPORT · SCRUTINY FINDINGS"}
+        title={isReviewer ? <>Scrutiny<br/><em>review desk.</em></> : <>Review the<br/><em>evidence trail.</em></>}
         description={<><b>{app?.institution_name}</b><span className="description-dot">·</span>{app?.academic_year}<span className="description-dot">·</span>{app?.application_category?.toUpperCase()} (EoA)</>}
         action={
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -740,11 +872,30 @@ function ValidationReport() {
                 <Icon name="plus" size={16} /> Create New Application from Report
               </button>
             )}
+            {isReviewer && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={async () => {
+                  setLoading(true)
+                  try {
+                    const res = await runValidation(id)
+                    setReport(res)
+                  } catch (e) {
+                    setError(e.message)
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+              >
+                Re-run Scrutiny Checks
+              </button>
+            )}
             <button type="button" className="button button-primary" onClick={handlePrint}>
               <Icon name="printer" size={16} /> Export Scrutiny Dossier (PDF)
             </button>
             <ButtonLink to={`/applications/${id}/documents`} variant="secondary" icon="documents">
-              Back to documents
+              Inspect documents
             </ButtonLink>
           </div>
         }
@@ -815,8 +966,18 @@ function ValidationReport() {
       </section>
 
       <div className="report-bottom-nav">
-        <Link to={`/applications/${id}/audit`} className="quiet-link"><Icon name="audit" size={17}/>Audit workspace</Link>
-        <Link to={`/applications/${id}/documents`} className="quiet-link">Document centre <Icon name="arrow" size={16}/></Link>
+        {isReviewer ? (
+          <>
+            <Link to={`/applications/${id}/audit`} className="quiet-link"><Icon name="audit" size={17}/>Cross-Document Audit</Link>
+            <Link to={`/applications/${id}/documents`} className="quiet-link"><Icon name="documents" size={17}/>Inspect Documents</Link>
+            <Link to="/" className="quiet-link">Scrutiny queue <Icon name="arrow" size={16}/></Link>
+          </>
+        ) : (
+          <>
+            <Link to={`/applications/${id}/documents`} className="quiet-link"><Icon name="documents" size={17}/>Document centre</Link>
+            <Link to="/" className="quiet-link">My applications <Icon name="arrow" size={16}/></Link>
+          </>
+        )}
       </div>
 
       {/* Official AICTE Scrutiny Dossier Print-Only Element */}

@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -109,6 +109,16 @@ class ApplicationService:
         app_obj.status = "submitted"
         await db.commit()
         await db.refresh(app_obj)
+
+        from app.models.finding import Finding
+        existing_findings_count = await db.scalar(
+            select(func.count()).select_from(Finding).where(Finding.application_id == app_obj.id)
+        )
+        if not existing_findings_count:
+            from app.services.validation_engine import validation_engine
+            await validation_engine.validate_application(db, app_obj.id)
+            await db.refresh(app_obj)
+
         return ApplicationResponse.model_validate(app_obj)
 
 

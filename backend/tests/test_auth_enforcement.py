@@ -278,6 +278,19 @@ async def test_reviewer_can_patch_finding_on_submitted_app(client: AsyncClient, 
     assert data["reviewed_by"] == "rev1@aicte.edu"
 
 
+@pytest.mark.asyncio
+async def test_reviewer_can_validate_submitted_app(client: AsyncClient, users_and_apps):
+    rev_token = users_and_apps["rev"]
+    res = await client.post(
+        "/api/applications/app-inst1-submitted/validate",
+        headers={"Authorization": f"Bearer {rev_token}"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["application_id"] == "app-inst1-submitted"
+    assert "findings" in data
+
+
 # ==========================================
 # 5. Unauthenticated / Invalid Token Tests
 # ==========================================

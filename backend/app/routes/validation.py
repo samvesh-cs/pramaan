@@ -25,11 +25,11 @@ router = APIRouter(prefix="/applications/{application_id}", tags=["Validation"])
 async def validate_application(
     application_id: str,
     application: Application = Depends(require_application_access),
-    current_user: User = Depends(require_role("INSTITUTION")),
+    current_user: User = Depends(require_role("INSTITUTION", "REVIEWER")),
     db: AsyncSession = Depends(get_db),
 ):
     """Run all validation rules for an application and return the compliance report."""
-    if application.status == "submitted":
+    if current_user.role == "INSTITUTION" and application.status == "submitted":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={

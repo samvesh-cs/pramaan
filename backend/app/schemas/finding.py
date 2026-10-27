@@ -23,6 +23,9 @@ class FindingCreate(BaseModel):
     document_name: Optional[str] = None
     evidence: Optional[dict[str, Any]] = None
     next_action: Optional[str] = None
+    clause_ref: Optional[Any] = None
+    severity: Optional[str] = "medium"
+    signal_type: Optional[str] = "rule"
 
 
 class FindingReviewUpdate(BaseModel):
@@ -49,6 +52,9 @@ class FindingResponse(BaseModel):
     document_name: Optional[str] = None
     evidence: Optional[dict[str, Any]] = None
     next_action: Optional[str] = None
+    clause_ref: Optional[Any] = None
+    severity: Optional[str] = "medium"
+    signal_type: Optional[str] = "rule"
     reviewer_decision: Optional[str] = None
     reviewer_notes: Optional[str] = None
     reviewed_by: Optional[str] = None

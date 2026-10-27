@@ -1,0 +1,107 @@
+version: "1.0"
+category: "eoa"
+description: "AICTE Approval Process Handbook (APH 2024-2027) Extension of Approval Declarative Rules"
+
+rules:
+  - rule_id: "DOC_PRESENCE_001"
+    title: "Mandatory Document Presence Check"
+    category: "eoa"
+    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+    severity: "critical"
+    signal_type: "rule"
+    condition:
+      operator: "exists"
+      field: "document_presence"
+    pass_title: "Mandatory Documents Uploaded"
+    pass_reason_template: "All statutory mandatory documents prescribed under APH Annexure-2 §2.1 are uploaded."
+    flag_title: "Missing Statutory Documents"
+    flag_reason_template: "One or more mandatory documents required under APH Annexure-2 §2.1 are missing: {missing_docs}."
+    next_action: "Upload all required statutory documents before submission."
+    is_active: true
+
+  - rule_id: "FIELD_001"
+    title: "Mandatory Field Completeness"
+    category: "eoa"
+    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+    severity: "high"
+    signal_type: "rule"
+    condition:
+      operator: "exists"
+      field: "required_fields"
+    pass_title: "Mandatory Certificate Fields Extracted"
+    pass_reason_template: "All required statutory fields ({extracted_count}/{total_count}) extracted successfully from {document_type}."
+    flag_title: "Mandatory Fields Missing in Document"
+    flag_reason_template: "Document {document_name} is missing mandatory fields required for scrutiny: {missing_fields}."
+    next_action: "Ensure the uploaded scan clearly shows certificate numbers and authority signatures."
+    is_active: true
+
+  - rule_id: "EXPIRY_001"
+    title: "Document Expiry & Validity Check"
+    category: "eoa"
+    document_type: "fire_safety_certificate"
+    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+    severity: "critical"
+    signal_type: "rule"
+    condition:
+      operator: "date_not_expired"
+      field: "valid_until"
+    pass_title: "Fire Safety Certificate Currently Valid"
+    pass_reason_template: "Certificate is valid until {valid_until}, satisfying APH 2024-2027 Clause 7.16 norms."
+    flag_title: "Fire Safety Certificate Expired"
+    flag_reason_template: "Certificate expired on {valid_until} and is not valid for academic session {academic_year} per APH Clause 7.16."
+    next_action: "Obtain and upload a renewed Fire Safety Certificate from the state fire authority."
+    is_active: true
+
+  - rule_id: "CONSISTENCY_001"
+    title: "Cross-Document Institution Name Consistency"
+    category: "eoa"
+    clause_id: "APH_2024_27_AFFIDAVIT_2"
+    severity: "critical"
+    signal_type: "rule"
+    condition:
+      operator: "consistent_across_documents"
+      field: "institution_name"
+    pass_title: "Institution Name Consistent Across Documents"
+    pass_reason_template: "All uploaded documents refer consistently to '{institution_name}'."
+    flag_title: "Institution Name Discrepancy Across Documents"
+    flag_reason_template: "Document {document_name} contains institution name '{doc_institution_name}' differing from application name '{app_institution_name}'."
+    next_action: "Verify institution name consistency across all uploaded certificates and Affidavit-2."
+    is_active: true
+
+  - rule_id: "TER_PAYMENT_001"
+    title: "TER Charges Payment Compliance"
+    category: "eoa"
+    document_type: "ter_payment_receipt"
+    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_II"
+    severity: "high"
+    signal_type: "rule"
+    condition:
+      operator: "greater_or_equal"
+      field: "amount"
+      target_value: 100000
+      unit: "INR"
+    pass_title: "TER Fee Payment Valid"
+    pass_reason_template: "Payment receipt confirms statutory TER charges of INR {amount} paid, meeting Table 2.1 schedule."
+    flag_title: "TER Charges Underpaid"
+    flag_reason_template: "Payment of INR {amount} is below the statutory requirement of INR {target_value} specified in Chapter II Table 2.1."
+    next_action: "Pay balance TER fee online on AICTE portal and upload updated pay-in receipt."
+    is_active: true
+
+  - rule_id: "STRUCTURAL_001"
+    title: "Building Age & Structural Stability Verification"
+    category: "eoa"
+    document_type: "building_completion_certificate"
+    clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV"
+    severity: "high"
+    signal_type: "rule"
+    condition:
+      operator: "date_lte_years"
+      field: "completion_date"
+      target_value: 30
+      unit: "years"
+    pass_title: "Structural Stability Requirement Satisfied"
+    pass_reason_template: "Building completed on {completion_date} (age {age_years} years <= 30 years); separate structural stability certificate not required."
+    flag_title: "Structural Stability Certificate Required (> 30 Years)"
+    flag_reason_template: "Building is {age_years} years old (completed {completion_date}). Annexure-2 §2.1(iv) mandates a Structural Stability Certificate from a registered Structural Engineer."
+    next_action: "Upload valid Structural Stability Certificate from a certified structural engineer."
+    is_active: true

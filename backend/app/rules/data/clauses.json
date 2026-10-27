@@ -1,0 +1,92 @@
+{
+  "APH_2024_27_ANNEX_2_CLAUSE_2_1_I": {
+    "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_I",
+    "chapter_or_annexure": "Annexure-2",
+    "clause_number": "2.1(i)",
+    "handbook_page": 81,
+    "pdf_page": 97,
+    "title": "Affidavit-2 Digital Signature Requirement",
+    "summary": "Affidavit-2 on e-stamp paper with digital signature of Chairman/Secretary of the Trust/Society/Company."
+  },
+  "APH_2024_27_ANNEX_2_CLAUSE_2_1_II": {
+    "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
+    "chapter_or_annexure": "Annexure-2",
+    "clause_number": "2.1(ii)",
+    "handbook_page": 81,
+    "pdf_page": 97,
+    "title": "Payment Receipt of TER Charges",
+    "summary": "Copy of pay-in slip / payment receipt in respect of Technical Education Regulatory (TER) charges paid as per Table 2.1."
+  },
+  "APH_2024_27_ANNEX_2_CLAUSE_2_1_III": {
+    "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_III",
+    "chapter_or_annexure": "Annexure-2",
+    "clause_number": "2.1(iii)",
+    "handbook_page": 81,
+    "pdf_page": 97,
+    "title": "Building Completion / Occupancy Certificate",
+    "summary": "Certificate from Competent Authority (Building License / Form D / Completion / Occupancy) as specified in Clause 7.17 and Annexure-14."
+  },
+  "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV": {
+    "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV",
+    "chapter_or_annexure": "Annexure-2",
+    "clause_number": "2.1(iv)",
+    "handbook_page": 81,
+    "pdf_page": 97,
+    "title": "Structural Stability for Buildings Older than 30 Years",
+    "summary": "Valid Structural Stability Certificate from registered Structural Engineer if the building is more than thirty years old."
+  },
+  "APH_2024_27_ANNEX_2_CLAUSE_2_1_V": {
+    "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
+    "chapter_or_annexure": "Annexure-2",
+    "clause_number": "2.1(v)",
+    "handbook_page": 81,
+    "pdf_page": 97,
+    "title": "Valid Fire and Life Safety Certificate",
+    "summary": "Valid Fire Safety Certificate issued by the Competent Authority of the respective State/UT Government as per Clause 7.16."
+  },
+  "APH_2024_27_CHAP_2_TABLE_2_1": {
+    "clause_id": "APH_2024_27_CHAP_2_TABLE_2_1",
+    "chapter_or_annexure": "Chapter II",
+    "clause_number": "Table 2.1",
+    "handbook_page": 13,
+    "pdf_page": 29,
+    "title": "TER Fee Schedule for Extension of Approval (EoA)",
+    "summary": "Statutory TER charges schedule payable online to AICTE based on institution category and program levels."
+  },
+  "APH_2024_27_CLAUSE_7_16": {
+    "clause_id": "APH_2024_27_CLAUSE_7_16",
+    "chapter_or_annexure": "Chapter VII",
+    "clause_number": "7.16",
+    "handbook_page": 70,
+    "pdf_page": 88,
+    "title": "Fire and Life Safety Norms",
+    "summary": "Mandates that institution buildings must possess a valid Fire and Life Safety Certificate from designated state fire authorities."
+  },
+  "APH_2024_27_CLAUSE_7_17": {
+    "clause_id": "APH_2024_27_CLAUSE_7_17",
+    "chapter_or_annexure": "Chapter VII",
+    "clause_number": "7.17",
+    "handbook_page": 70,
+    "pdf_page": 88,
+    "title": "Occupancy Certificate Norms",
+    "summary": "Mandates that building completion and occupancy certificates must be issued by the designated local planning or municipal authority."
+  },
+  "APH_2024_27_ANNEX_14": {
+    "clause_id": "APH_2024_27_ANNEX_14",
+    "chapter_or_annexure": "Annexure-14",
+    "clause_number": "Annexure-14",
+    "handbook_page": 163,
+    "pdf_page": 179,
+    "title": "State-Wise Designated Competent Authorities",
+    "summary": "Official designated authorities across 36 States/UTs to issue certificates regarding Land Use, Site Plan, Building Plan, and Completion/Occupancy."
+  },
+  "APH_2024_27_AFFIDAVIT_2": {
+    "clause_id": "APH_2024_27_AFFIDAVIT_2",
+    "chapter_or_annexure": "Annexures",
+    "clause_number": "Affidavit-2",
+    "handbook_page": 186,
+    "pdf_page": 202,
+    "title": "Format of Affidavit-2 by Chairman/Secretary",
+    "summary": "Standard format of Affidavit-2 on non-judicial stamp paper declaring compliance with AICTE norms and DSC authentication."
+  }
+}

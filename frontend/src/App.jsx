@@ -1205,6 +1205,8 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
   const reason = finding.reason?.trim()
   const nextAction = finding.next_action?.trim()
   const reviewerDecision = finding.reviewer_decision
+  const clauseRef = finding.clause_ref
+  const severity = finding.severity || 'medium'
 
   return (
     <article className={`finding finding-${status}`}>
@@ -1214,8 +1216,25 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
           <div>
             <span className="finding-kicker">What was found · {String(status).replaceAll('_', ' ')}</span>
             <h3>{finding.title || 'Finding title not provided by the validation service'}</h3>
+            {clauseRef && (
+              <div className="statutory-clause-pill" title={`${clauseRef.title} (${clauseRef.summary || ''})`}>
+                <span className="pill-prefix">APH Statutory Reference</span>
+                <span className="pill-citation">
+                  {clauseRef.chapter_or_annexure} §{clauseRef.clause_number} · Handbook p. {clauseRef.handbook_page} (PDF p. {clauseRef.pdf_page})
+                </span>
+                <span className="pill-title">{clauseRef.title}</span>
+              </div>
+            )}
           </div>
-          <Status value={status} />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span className={`severity-badge severity-${severity}`} aria-label={`Severity: ${severity}`}>
+              <span className="severity-icon" aria-hidden="true">
+                {severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'low' ? '🟢' : severity === 'info' ? 'ℹ️' : '🟡'}
+              </span>
+              <span className="severity-text">[{String(severity).toUpperCase()}]</span>
+            </span>
+            <Status value={status} />
+          </div>
         </header>
 
         {reviewerDecision && (

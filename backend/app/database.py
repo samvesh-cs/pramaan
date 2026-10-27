@@ -55,6 +55,9 @@ def _migrate_sqlite_columns(connection):
         ("reviewer_notes", "TEXT"),
         ("reviewed_by", "VARCHAR(100)"),
         ("reviewed_at", "DATETIME"),
+        ("clause_ref", "JSON"),
+        ("severity", "VARCHAR(20) DEFAULT 'medium'"),
+        ("signal_type", "VARCHAR(20) DEFAULT 'rule'"),
     ]
     for col_name, col_type in new_columns:
         if col_name not in existing_cols:

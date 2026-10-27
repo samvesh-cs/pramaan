@@ -18,6 +18,9 @@ class Finding(Base):
     document_name = Column(String(500), nullable=True)
     evidence = Column(JSON, nullable=True)  # {page_number, text, field, value, bbox}
     next_action = Column(Text, nullable=True)
+    clause_ref = Column(JSON, nullable=True)  # {clause_id, chapter_or_annexure, clause_number, handbook_page, pdf_page, title}
+    severity = Column(String(20), nullable=True, default="medium")  # critical | high | medium | low | info
+    signal_type = Column(String(20), nullable=True, default="rule")  # rule | tamper | issuer | duplicate
     reviewer_decision = Column(String(50), nullable=True)  # verified | confirmed_discrepancy | requested_resubmission | escalated
     reviewer_notes = Column(Text, nullable=True)
     reviewed_by = Column(String(100), nullable=True)

@@ -16,6 +16,7 @@ from app.rules.cross_document_check import InstitutionNameConsistencyRule
 from app.rules.duplicate_check import DuplicateDocumentRule
 from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
+from app.rules.legacy_adapter import wrap_legacy_rules
 from app.rules.presence_check import DocumentPresenceRule
 from app.rules.ter_payment_check import TerPaymentRule
 from app.schemas.application import OverallStatus
@@ -66,7 +67,7 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
 
 class ValidationEngine:
     def __init__(self):
-        self.rules: list[BaseRule] = [
+        raw_rules: list[BaseRule] = [
             DocumentPresenceRule(),
             FieldCompletenessRule(),
             ExpiryDateRule(),
@@ -75,6 +76,7 @@ class ValidationEngine:
             BuildingAgeStructuralStabilityRule(),
             DuplicateDocumentRule(),
         ]
+        self.rules: list[BaseRule] = wrap_legacy_rules(raw_rules)
 
     async def validate_application(
         self,
@@ -131,6 +133,10 @@ class ValidationEngine:
         for rule in self.rules:
             rule_findings = rule.evaluate(context)
             for rf in rule_findings:
+                clause_data = None
+                if getattr(rf, "clause_ref", None):
+                    clause_data = rf.clause_ref.model_dump() if hasattr(rf.clause_ref, "model_dump") else rf.clause_ref
+
                 finding_model = Finding(
                     id=generate_id("finding"),
                     application_id=application_id,
@@ -142,6 +148,9 @@ class ValidationEngine:
                     document_name=rf.document_name,
                     evidence=rf.evidence,
                     next_action=rf.next_action,
+                    clause_ref=clause_data,
+                    severity=getattr(rf, "severity", "medium"),
+                    signal_type=getattr(rf, "signal_type", "rule"),
                 )
                 db.add(finding_model)
                 generated_findings.append(finding_model)

@@ -10,7 +10,7 @@ from app.config import settings
 from app.models.application import Application
 from app.models.document import Document
 from app.models.extraction import ExtractionRun
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentResponse, DuplicateWarning
 from app.services.ocr_service import extraction_service
 from app.utils.file_validation import (
     FileValidationError,
@@ -132,7 +132,7 @@ class DocumentService:
         response = DocumentResponse.model_validate(doc_model)
         response.fields = extraction_result.get("fields", {})
         if duplicate_warnings:
-            response.duplicate_warnings = duplicate_warnings
+            response.duplicate_warnings = [DuplicateWarning.model_validate(w) for w in duplicate_warnings]
         return response
 
     async def list_documents(

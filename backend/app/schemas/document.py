@@ -28,4 +28,4 @@ class DocumentResponse(BaseModel):
     file_hash: str | None = None
     processing_status: DocumentProcessingStatus
     fields: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    duplicate_warnings: Optional[list[DuplicateWarning]] = None
+    duplicate_warnings: Optional[list[DuplicateWarning | dict[str, Any]]] = None

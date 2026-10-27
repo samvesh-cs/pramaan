@@ -141,4 +141,3 @@ def summary(application, documents, findings, *, created: bool) -> dict:
 
 if __name__ == "__main__":
     print(json.dumps(seed(), indent=2))
-

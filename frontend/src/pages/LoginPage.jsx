@@ -43,18 +43,20 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md rounded-2xl border border-[#263b42]/20 bg-[#fbf9f4] p-7 shadow-xl shadow-stone-900/5 sm:p-9">
-        <div className="mb-6 text-center">
-          <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#1c3035]">Sign in to Pramaan</h1>
-          <p className="mt-1 text-xs text-[#5d6a64]">
+    <main className="auth-page">
+      <div className="auth-panel">
+        <div className="auth-heading">
+          <div className="auth-brand-mark" aria-hidden="true">P</div>
+          <div className="eyebrow">SIH 2026 · PS 26261</div>
+          <h1>Sign in to Pramaan</h1>
+          <p>
             Document Scrutiny and Compliance Verification Workspace
           </p>
         </div>
 
         {errorMessage && (
           <div
-            className="mb-5 rounded-lg border border-red-200 bg-red-50/80 p-3 text-xs text-red-800"
+            className="auth-error"
             role="alert"
           >
             <strong>Authentication failed: </strong>
@@ -62,9 +64,9 @@ export function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="auth-form">
           <div>
-            <label className="block text-xs font-semibold text-[#324948]" htmlFor="login-email">
+            <label htmlFor="login-email">
               Institutional or Reviewer Email
             </label>
             <input
@@ -72,7 +74,7 @@ export function LoginPage() {
               type="email"
               required
               autoComplete="email"
-              className="mt-1 block w-full rounded-lg border border-[#263b42]/20 bg-white px-3 py-2 text-sm text-[#1f3338] placeholder-stone-400 focus:border-[#2f5e5c] focus:outline-none focus:ring-1 focus:ring-[#2f5e5c]"
+              className="auth-input"
               placeholder="e.g. principal@college.edu.in"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -80,7 +82,7 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#324948]" htmlFor="login-password">
+            <label htmlFor="login-password">
               Password
             </label>
             <input
@@ -88,7 +90,7 @@ export function LoginPage() {
               type="password"
               required
               autoComplete="current-password"
-              className="mt-1 block w-full rounded-lg border border-[#263b42]/20 bg-white px-3 py-2 text-sm text-[#1f3338] placeholder-stone-400 focus:border-[#2f5e5c] focus:outline-none focus:ring-1 focus:ring-[#2f5e5c]"
+              className="auth-input"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -98,7 +100,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[#274548] py-2.5 text-sm font-semibold text-red-500 transition hover:bg-[#1f373a] disabled:opacity-60"
+            className="auth-submit"
           >
             {isSubmitting ? (
               <>
@@ -110,8 +112,8 @@ export function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 border-t border-[#263b42]/10 pt-5">
-          <div className="text-center text-[11px] font-semibold uppercase tracking-wider text-[#79847e]">
+        <div className="auth-demo">
+          <div className="auth-demo-label">
             Quick Demo Credentials
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -123,7 +125,7 @@ export function LoginPage() {
                   'College@Pramaan2026'
                 )
               }
-              className="rounded-lg border border-[#263b42]/15 bg-white/80 p-2 text-left text-xs transition hover:border-[#2f5e5c] hover:bg-white"
+              className="auth-demo-button"
             >
               <div className="font-semibold text-[#233c3f]"> Institution</div>
               <div className="truncate text-[10px] text-[#697670]">College Demo</div>
@@ -136,7 +138,7 @@ export function LoginPage() {
                   'Reviewer@AICTE2026'
                 )
               }
-              className="rounded-lg border border-[#263b42]/15 bg-white/80 p-2 text-left text-xs transition hover:border-[#2f5e5c] hover:bg-white"
+              className="auth-demo-button"
             >
               <div className="font-semibold text-[#233c3f]"> AICTE Reviewer</div>
               <div className="truncate text-[10px] text-[#697670]">Scrutiny Desk</div>
@@ -144,16 +146,16 @@ export function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-6 text-center text-xs text-[#5f6d67]">
+        <div className="auth-register-link">
           <span>New institutional applicant? </span>
           <Link
             to="/register"
-            className="font-semibold text-[#274548] underline underline-offset-2 hover:text-[#192d30]"
+            className="auth-link"
           >
             Register your institution
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

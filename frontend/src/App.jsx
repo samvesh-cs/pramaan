@@ -41,7 +41,6 @@ function Shell({ children }) {
   const { user, logout, isReviewer } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 800px)').matches)
-  const mainAreaRef = useRef(null)
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 800px)')
     const updateViewport = () => { setIsMobile(mediaQuery.matches); setMenuOpen(false) }
@@ -55,31 +54,6 @@ function Shell({ children }) {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [isMobile, menuOpen])
-  useEffect(() => {
-    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    if (!finePointer.matches || reducedMotion.matches) return undefined
-    const main = mainAreaRef.current
-    let frame = 0
-    let latestX = 0
-    let latestY = 0
-    const updateLight = (event) => {
-      latestX = event.clientX
-      latestY = event.clientY
-      if (frame) return
-      frame = window.requestAnimationFrame(() => {
-        const bounds = main.getBoundingClientRect()
-        main.style.setProperty('--pointer-x', `${latestX - bounds.left}px`)
-        main.style.setProperty('--pointer-y', `${latestY - bounds.top + main.scrollTop}px`)
-        frame = 0
-      })
-    }
-    main.addEventListener('pointermove', updateLight, { passive: true })
-    return () => {
-      main.removeEventListener('pointermove', updateLight)
-      if (frame) window.cancelAnimationFrame(frame)
-    }
-  }, [])
   const primary = isReviewer
     ? [['/', 'overview', 'Scrutiny Queue']]
     : [['/', 'overview', 'My Applications'], ['/documents', 'upload', 'Documents'], ['/applications/new', 'plus', 'New application']]
@@ -101,7 +75,7 @@ function Shell({ children }) {
         </div>
       </div>
     </aside>
-    <main className="main-area" ref={mainAreaRef}>
+    <main className="main-area">
       <header className="topbar">
         <button type="button" className="icon-button mobile-menu" aria-controls="primary-navigation" aria-expanded={sidebarExpanded} aria-label={sidebarExpanded ? 'Collapse navigation sidebar' : 'Expand navigation sidebar'} onClick={() => setMenuOpen((open) => !open)}><Icon name="menu"/></button>
         <div className="topbar-page-title" aria-live="polite">{pageTitle}</div>
@@ -121,9 +95,16 @@ function Shell({ children }) {
 function Overview() {
   const { isReviewer, isInstitution } = useAuth()
   const [apps, setApps] = useState(null); const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [attentionOnly, setAttentionOnly] = useState(false)
   const load = () => { setError(''); listApplications().then(setApps).catch((e) => setError(e.message)) }
   useEffect(load, [])
   const counts = useMemo(() => (apps || []).reduce((sum, app) => { sum[app.overall_status] = (sum[app.overall_status] || 0) + 1; return sum }, {}), [apps])
+  const filteredApps = useMemo(() => (apps || []).filter((app) => {
+    const matchesQuery = `${app.institution_name || ''} ${app.id || ''} ${app.academic_year || ''}`.toLowerCase().includes(query.trim().toLowerCase())
+    const needsAttention = ['missing_documents', 'discrepancies_found', 'unresolved_checks', 'processing_incomplete'].includes(app.overall_status)
+    return matchesQuery && (!attentionOnly || needsAttention)
+  }), [apps, query, attentionOnly])
   return <div className="mx-auto w-full max-w-6xl">
     <header className="mb-7 mt-2 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
       <div>
@@ -141,8 +122,8 @@ function Overview() {
       {error && <ErrorNotice message={error} onRetry={load}/>}
       {!apps && !error && <div className="queue-loading"><Loading label="Gathering applications"/></div>}
       {apps && <><div className="mb-6 grid grid-cols-3 border-y border-[#263b42]/15" aria-label="Application queue summary"><Metric label="In the queue" value={apps.length}/><Metric label="Needs attention" value={apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length} accent/><Metric label="Checks passed" value={counts.checks_passed || 0}/></div>
-        <section aria-labelledby="queue-heading"><div className="mb-3"><h2 id="queue-heading" className="m-0 text-lg font-semibold tracking-tight text-[#334b49]">Applications</h2><p className="mt-1 text-xs leading-relaxed text-[#68736d] sm:text-[13px]">Select a record to review its documents and validation findings.</p></div>
-          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs · {STATUS_LABELS[app.status] || app.status || 'Draft'}</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><Status value={app.status || 'draft'}/></span>{isReviewer ? (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#9a5d43] underline underline-offset-4 hover:text-[#7d4833] sm:text-xs" aria-label={`Review ${app.institution_name}`} to={`/applications/${app.id}/report`}>Review <Icon name="arrow" size={16}/></Link>) : (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link>)}</div>)}</div>}
+        <section aria-labelledby="queue-heading"><div className="queue-section-head"><div><h2 id="queue-heading" className="m-0 text-lg font-semibold tracking-tight text-[#334b49]">Applications</h2><p className="mt-1 text-xs leading-relaxed text-[#68736d] sm:text-[13px]">Select a record to review its documents and validation findings.</p></div><label className="queue-search"><span className="sr-only">Search applications</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search institution or reference" /></label></div>
+          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <><div className="queue-filters"><button type="button" className={!attentionOnly ? 'is-active' : ''} onClick={() => setAttentionOnly(false)}>All <span>{apps.length}</span></button><button type="button" className={attentionOnly ? 'is-active' : ''} onClick={() => setAttentionOnly(true)}>Needs attention <span>{apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length}</span></button></div><div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{filteredApps.map((app) => <div className="application-queue-row grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.id}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><Status value={app.status || 'draft'}/></span>{isReviewer ? (<Link className="queue-row-action" aria-label={`Review ${app.institution_name}`} to={`/applications/${app.id}/report`}>Review <Icon name="arrow" size={16}/></Link>) : (<Link className="queue-row-action" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link>)}</div>)}{filteredApps.length === 0 && <EmptyState title="No matching applications" text="Adjust the search or choose a different status filter."/>}</div></>}
         </section></>}
     </div>
   </div>
@@ -675,6 +656,34 @@ function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error 
   const [details, setDetails] = useState('')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const modalRef = useRef(null)
+  const previousFocusRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  const savingRef = useRef(saving)
+  onCloseRef.current = onClose
+  savingRef.current = saving
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+    previousFocusRef.current = document.activeElement
+    const modal = modalRef.current
+    const focusable = () => [...modal.querySelectorAll('button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')]
+    modal.focus()
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape' && !savingRef.current) { event.preventDefault(); onCloseRef.current(); return }
+      if (event.key !== 'Tab') return
+      const items = focusable()
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === modal)) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    modal.addEventListener('keydown', onKeyDown)
+    return () => {
+      modal.removeEventListener('keydown', onKeyDown)
+      previousFocusRef.current?.focus?.()
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (finding) {
@@ -705,17 +714,17 @@ function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error 
 
   return (
     <div className="auditor-modal-backdrop" onClick={() => !saving && onClose()}>
-      <div className="auditor-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={modalRef} className="auditor-modal" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" aria-describedby="review-modal-description" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="auditor-modal-head">
           <div>
             <span className="eyebrow">HUMAN REVIEW · {reviewerStateLabel(finding)}</span>
-            <h3>{action.title}</h3>
+            <h3 id="review-modal-title">{action.title}</h3>
           </div>
           <button type="button" className="icon-button" onClick={onClose} disabled={saving} aria-label="Close"><Icon name="close" size={18}/></button>
         </div>
         <form onSubmit={handleSubmit} className="auditor-modal-body">
           <p className="finding-target-title"><b>Target finding:</b> {finding.title}</p>
-          <p className="review-action-description">{action.description}</p>
+          <p id="review-modal-description" className="review-action-description">{action.description}</p>
           <div className="modal-field">
             <label htmlFor="review-action-details">{action.fieldLabel}</label>
             <textarea
@@ -860,6 +869,7 @@ function ValidationReport() {
   const [savingFindingId, setSavingFindingId] = useState(null)
   const [reviewFeedback, setReviewFeedback] = useState('')
   const [reviewError, setReviewError] = useState('')
+  const [showAllFindings, setShowAllFindings] = useState(!isReviewer)
 
   const load = () => {
     setLoading(true)
@@ -994,6 +1004,9 @@ function ValidationReport() {
   const findings = Array.isArray(report.findings) ? report.findings : []
   const pendingFindings = pendingReviewerFindings(findings)
   const pendingReviewerCount = pendingFindings.length
+  const displayedFindings = (showAllFindings ? findings : pendingFindings)
+    .slice()
+    .sort((left, right) => Number(requiresReviewerDecision(right)) - Number(requiresReviewerDecision(left)))
   const hasRecordedDecisions = findings.some((finding) => finding.reviewer_decision || finding.reviewed_at)
   const summaryStatuses = CHECK_STATUSES.filter((status) => Number.isFinite(summary[status]))
   const reportedMissingTypes = Array.isArray(report.missing_document_types) ? report.missing_document_types : []
@@ -1099,24 +1112,47 @@ function ValidationReport() {
         </section>
       )}
 
-      <section className="findings-section">
+      {isReviewer && app?.status === 'submitted' && (
+        <section className="review-finalization" aria-labelledby="finalize-review-heading">
+          <div>
+            <div className="eyebrow">REVIEWER ACTION</div>
+            <h2 id="finalize-review-heading">Finalize scrutiny</h2>
+            <p>{pendingReviewerCount
+              ? `${pendingReviewerCount} finding${pendingReviewerCount === 1 ? '' : 's'} in an open review state still need action.`
+              : 'All findings that require reviewer action have a recorded decision. Finalizing closes scrutiny; resubmission and escalation outcomes remain distinct from compliance.'}</p>
+            {pendingReviewerCount > 0 && (
+              <ul className="review-pending-list">
+                {pendingFindings.slice(0, 3).map((finding) => <li key={finding.id}>{finding.title || finding.rule_id}{finding.document_name ? ` · ${finding.document_name}` : ''}</li>)}
+                {pendingReviewerCount > 3 && <li>And {pendingReviewerCount - 3} more</li>}
+              </ul>
+            )}
+          </div>
+          <button type="button" className="button button-primary" disabled={finalizing || pendingReviewerCount > 0 || findings.length === 0} onClick={handleFinalizeReview}>
+            {finalizing ? 'Finalizing review…' : 'Finalize scrutiny'} <Icon name="check" size={17}/>
+          </button>
+          {finalizeError && <div className="submission-feedback is-error" role="alert">{finalizeError}</div>}
+        </section>
+      )}
+
+      <section className="findings-section" id="finding-register">
         <div className="section-title-row">
           <div>
             <div className="eyebrow">FINDING REGISTER</div>
-            <h2>Items for reviewer attention</h2>
+            <h2>{isReviewer && !showAllFindings ? 'Findings needing a decision' : 'Validation findings'}</h2>
           </div>
-          <span className="data-note">{findings.length} {findings.length === 1 ? 'finding' : 'findings'}</span>
+          <span className="data-note">{isReviewer ? `${pendingReviewerCount} open · ${findings.length} total` : `${findings.length} ${findings.length === 1 ? 'finding' : 'findings'}`}</span>
         </div>
+        {isReviewer && <div className="finding-filters" role="group" aria-label="Filter validation findings"><button type="button" aria-pressed={!showAllFindings} className={!showAllFindings ? 'is-active' : ''} onClick={() => setShowAllFindings(false)}>Needs decision <span>{pendingReviewerCount}</span></button><button type="button" aria-pressed={showAllFindings} className={showAllFindings ? 'is-active' : ''} onClick={() => setShowAllFindings(true)}>All results <span>{findings.length}</span></button></div>}
         {reviewFeedback && <div className="review-feedback is-success" role="status">{reviewFeedback}</div>}
         {findings.length === 0 ? (
           <EmptyState title="No findings provided" text="The service returned no findings for this report." />
         ) : (
           <div className="finding-list">
-            {findings.map((finding, index) => (
+            {displayedFindings.map((finding, index) => (
               <Finding
                 key={finding.id || `${finding.rule_id}-${index}`}
                 finding={finding}
-                index={index}
+                index={findings.indexOf(finding)}
                 onReview={handleOpenReview}
                 onInspectDoc={handleInspectDoc}
                 isReviewer={isReviewer && app?.status !== 'review_completed'}
@@ -1128,27 +1164,6 @@ function ValidationReport() {
         )}
       </section>
 
-      {isReviewer && app?.status === 'submitted' && (
-        <section className="review-finalization" aria-labelledby="finalize-review-heading">
-          <div>
-            <div className="eyebrow">REVIEWER ACTION</div>
-            <h2 id="finalize-review-heading">Finalize scrutiny</h2>
-            <p>{pendingReviewerCount
-              ? `${pendingReviewerCount} finding${pendingReviewerCount === 1 ? '' : 's'} in an open review state still need action.`
-              : 'All findings that require reviewer action have a recorded decision. Finalizing closes scrutiny; resubmission and escalation outcomes remain distinct from compliance.'}</p>
-            {pendingReviewerCount > 0 && (
-              <ul className="review-pending-list">
-                {pendingFindings.slice(0, 3).map((finding) => <li key={finding.id}>{finding.title || finding.rule_id}</li>)}
-                {pendingReviewerCount > 3 && <li>And {pendingReviewerCount - 3} more</li>}
-              </ul>
-            )}
-          </div>
-          <button type="button" className="button button-primary" disabled={finalizing || pendingReviewerCount > 0 || findings.length === 0} onClick={handleFinalizeReview}>
-            {finalizing ? 'Finalizing review…' : 'Finalize scrutiny'} <Icon name="check" size={17}/>
-          </button>
-          {finalizeError && <div className="submission-feedback is-error" role="alert">{finalizeError}</div>}
-        </section>
-      )}
       {isReviewer && app?.status === 'review_completed' && (
         <div className="review-complete-note" role="status"><Icon name="check" size={17}/> Scrutiny finalized. The institution can now view this report.</div>
       )}
@@ -1356,6 +1371,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
           </div>
         )}
 
+        <details open={decisionRequired && !reviewerDecision} className="finding-details-disclosure"><summary>View check details, evidence and recommended action</summary>
         <section className="finding-explanation" aria-label="Finding explanation">
           <div className="finding-detail checked-detail">
             <h4>What was checked</h4>
@@ -1456,6 +1472,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
             </button>
           )}
         </div>
+        </details>
       </div>
     </article>
   )

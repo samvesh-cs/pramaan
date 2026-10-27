@@ -15,8 +15,13 @@ async def lifespan(app: FastAPI):
     settings.upload_path.mkdir(parents=True, exist_ok=True)
     try:
         await init_db()
+        from scripts.seed_reviewer import seed_reviewer
+        from scripts.seed_demo_institution import seed_demo_institution
+
+        await seed_reviewer()
+        await seed_demo_institution()
     except Exception as e:
-        print(f"[WARN] Database initialization warning (ensure DB server is reachable): {e}")
+        print(f"[WARN] Database initialization / seed warning (ensure DB server is reachable): {e}")
     yield
     # Shutdown logic if needed
 

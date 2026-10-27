@@ -22,7 +22,17 @@ async def seed_demo_institution():
     async with AsyncSessionLocal() as session:
         existing = await session.scalar(select(User).where(User.email == email))
         if existing:
-            print(f"[SEED] Demo institution account already exists: {email} (id: {existing.id})")
+            existing.password_hash = hash_password(password)
+            existing.is_active = True
+            inst = await session.scalar(select(Institution).where(Institution.user_id == existing.id))
+            if not inst:
+                inst = Institution(
+                    user_id=existing.id,
+                    display_name=inst_name,
+                )
+                session.add(inst)
+            await session.commit()
+            print(f"[SEED] Demo institution account verified and updated: {email} (id: {existing.id})")
             return existing
 
         user = User(

@@ -20,7 +20,10 @@ async def seed_reviewer():
     async with AsyncSessionLocal() as session:
         existing = await session.scalar(select(User).where(User.email == email))
         if existing:
-            print(f"[SEED] Reviewer account already exists: {email} (id: {existing.id})")
+            existing.password_hash = hash_password(password)
+            existing.is_active = True
+            await session.commit()
+            print(f"[SEED] Reviewer account verified and updated: {email} (id: {existing.id})")
             return existing
 
         user = User(

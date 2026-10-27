@@ -10,7 +10,7 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sih_prototype"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./sih_prototype.db"
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE_MB: int = 10
     MAX_PAGES: int = 20

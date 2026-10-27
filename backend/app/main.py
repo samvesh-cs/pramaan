@@ -26,8 +26,8 @@ app = FastAPI(
     description="AI-powered preliminary institutional application validation and document compliance verification for AICTE EoA.",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
 )
 
 # CORS Middleware

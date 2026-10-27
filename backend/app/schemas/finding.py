@@ -1,7 +1,9 @@
+from datetime import datetime
 from typing import Any, Literal, Optional
 from pydantic import BaseModel, ConfigDict
 
 CheckStatus = Literal["pass", "flagged", "missing", "unresolved", "not_applicable"]
+ReviewerDecision = Literal["verified", "confirmed_discrepancy", "requested_resubmission", "escalated"]
 
 
 class EvidenceSchema(BaseModel):
@@ -23,6 +25,12 @@ class FindingCreate(BaseModel):
     next_action: Optional[str] = None
 
 
+class FindingReviewUpdate(BaseModel):
+    reviewer_decision: ReviewerDecision
+    reviewer_notes: Optional[str] = None
+    reviewed_by: Optional[str] = "AICTE Scrutiny Committee Auditor"
+
+
 class FindingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,3 +43,7 @@ class FindingResponse(BaseModel):
     document_name: Optional[str] = None
     evidence: Optional[dict[str, Any]] = None
     next_action: Optional[str] = None
+    reviewer_decision: Optional[str] = None
+    reviewer_notes: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None

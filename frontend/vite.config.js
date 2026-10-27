@@ -4,5 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    preserveSymlinks: true,
+  },
   server: { host: '127.0.0.1' },
 })

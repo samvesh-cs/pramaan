@@ -206,6 +206,17 @@ def build_missing_field() -> ExtractedField:
     )
 
 
+def clean_amount(val_str: str) -> Optional[float]:
+    """Clean currency string to a float number."""
+    cleaned = re.sub(r"[^\d.]", "", val_str)
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
 def extract_regex_field(
     pages: List[PageResult],
     full_text: str,
@@ -213,6 +224,7 @@ def extract_regex_field(
     is_date: bool = False,
     is_institution: bool = False,
     is_signatory: bool = False,
+    is_amount: bool = False,
 ) -> ExtractedField:
     """Helper to extract a field using regex patterns against document text."""
     for pattern in patterns:
@@ -234,6 +246,12 @@ def extract_regex_field(
                 if not norm_val:
                     # Could not parse date format reliably
                     return build_missing_field()
+            elif is_amount:
+                amount_num = clean_amount(raw_val)
+                if amount_num is None:
+                    return build_missing_field()
+                val = amount_num
+                norm_val = amount_num
             else:
                 val = raw_val
                 norm_val = raw_val.lower().strip()
@@ -392,6 +410,69 @@ def extract_affidavit_2_fields(pages: List[PageResult], full_text: str) -> Dict[
     return fields
 
 
+def extract_ter_payment_fields(pages: List[PageResult], full_text: str) -> Dict[str, ExtractedField]:
+    """Extractor for ter_payment_receipt per Table 2.1."""
+    fields: Dict[str, ExtractedField] = {}
+
+    inst_patterns = [
+        r"(?:Name\s*of\s*(?:the\s*)?(?:Institution|College|Institute)|Institution\s*Name|College\s*Name)[:\s]+([^\n\r]+)",
+        r"(?:Institution\s*\/|College\s*\/|Paid\s*by)[:\s]+([^\n\r]+)",
+        r"(?:Premises\s*of|Issued\s+to|In\s+respect\s+of)[:\s]+([^\n\r]+)",
+    ]
+    fields["institution_name"] = extract_regex_field(pages, full_text, inst_patterns, is_institution=True)
+
+    receipt_patterns = [
+        r"(?:Receipt|Transaction|Reference|Challan|Ref|UTR|Payment)\s*(?:No|Number|\#)?[:\s]+([A-Za-z0-9\-\/]+)",
+        r"(?:Order\s*ID|Txn\s*ID)[:\s]+([A-Za-z0-9\-\/]+)",
+    ]
+    fields["receipt_number"] = extract_regex_field(pages, full_text, receipt_patterns)
+
+    date_patterns = [
+        r"(?:Transaction|Payment|Receipt|Deposit|Dated|Date)\s*(?:Date|of\s*Payment)?[:\s]+([0-9]{1,2}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{2,4}|[0-9]{4}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{1,2})",
+        r"(?:Date)[:\s]+([0-9]{1,2}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{2,4}|[0-9]{4}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{1,2})",
+    ]
+    fields["transaction_date"] = extract_regex_field(pages, full_text, date_patterns, is_date=True)
+
+    amount_patterns = [
+        r"(?:Amount|Total\s*Paid|Fee\s*Amount|Paid\s*Amount|TER\s*Fee|Net\s*Amount)[:\s]*(?:(?:INR|Rs\.?|₹)\s*)?([0-9,]+(?:\.[0-9]{2})?)",
+        r"(?:(?:INR|Rs\.?|₹)\s*)([0-9,]+(?:\.[0-9]{2})?)",
+    ]
+    fields["amount_inr"] = extract_regex_field(pages, full_text, amount_patterns, is_amount=True)
+
+    return fields
+
+
+def extract_structural_stability_fields(pages: List[PageResult], full_text: str) -> Dict[str, ExtractedField]:
+    """Extractor for structural_stability_certificate per Annexure-2 §2.1(iv)."""
+    fields: Dict[str, ExtractedField] = {}
+
+    inst_patterns = [
+        r"(?:Name\s*of\s*(?:the\s*)?(?:Institution|College|Institute|Building)|Institution\s*Name|College\s*Name)[:\s]+([^\n\r]+)",
+        r"(?:Premises\s*of|Certified\s+that\s+(?:the\s+)?premises\s+of|In\s+respect\s+of)[:\s]+([^\n\r]+)",
+    ]
+    fields["institution_name"] = extract_regex_field(pages, full_text, inst_patterns, is_institution=True)
+
+    cert_patterns = [
+        r"(?:Certificate|Stability\s*Certificate|Report|Reference|Ref)\s*(?:No|Number|\#)?[:\s]+([A-Za-z0-9\-\/\.\_]+)",
+        r"(?:No\.)[:\s]+([A-Za-z0-9\-\/\.\_]+)",
+    ]
+    fields["certificate_number"] = extract_regex_field(pages, full_text, cert_patterns)
+
+    eng_patterns = [
+        r"(?:Chartered\s*Engineer|Structural\s*Engineer|License|Registration|Regd?\.?)\s*(?:No|Number|\#)?[:\s]+([A-Za-z0-9\-\/\.\_]+)",
+        r"(?:MIE|FIE|Engineer\s*Reg\.?\s*No\.?)[:\s]+([A-Za-z0-9\-\/\.\_]+)",
+    ]
+    fields["engineer_license_number"] = extract_regex_field(pages, full_text, eng_patterns)
+
+    date_patterns = [
+        r"(?:Date\s*of\s*(?:Issue|Inspection|Certificate)|Issue\s*Date|Inspection\s*Date|Issued\s*on|Dated)[:\s]+([0-9]{1,2}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{2,4}|[0-9]{4}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{1,2})",
+        r"(?:Date)[:\s]+([0-9]{1,2}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{2,4}|[0-9]{4}[\/\-\.][0-9]{1,2}[\/\-\.][0-9]{1,2})",
+    ]
+    fields["issue_date"] = extract_regex_field(pages, full_text, date_patterns, is_date=True)
+
+    return fields
+
+
 def extract_fields(document_type: Optional[str], pages: List[PageResult]) -> Dict[str, ExtractedField]:
     """Extract required fields strictly based on document_type.
 
@@ -406,6 +487,10 @@ def extract_fields(document_type: Optional[str], pages: List[PageResult]) -> Dic
         return extract_building_completion_fields(pages, full_text)
     elif doc_type == "affidavit_2":
         return extract_affidavit_2_fields(pages, full_text)
+    elif doc_type == "ter_payment_receipt":
+        return extract_ter_payment_fields(pages, full_text)
+    elif doc_type == "structural_stability_certificate":
+        return extract_structural_stability_fields(pages, full_text)
     else:
         # Fallback for generic or other document types
         logger.info("Extracting with generic fallback for document_type='%s'", doc_type)

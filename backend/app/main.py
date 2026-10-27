@@ -31,13 +31,36 @@ app = FastAPI(
 )
 
 # CORS Middleware
+cors_origins = settings.cors_origin_list
+for default_origin in [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+]:
+    if default_origin not in cors_origins:
+        cors_origins.append(default_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _with_cors(request: Request, response: JSONResponse) -> JSONResponse:
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 
 # Exception Handlers conforming strictly to API_CONTRACT.md §8
@@ -45,11 +68,12 @@ app.add_middleware(
 async def http_exception_handler(request: Request, exc: HTTPException):
     # If detail is already formatted with code and message
     if isinstance(exc.detail, dict) and "code" in exc.detail:
-        return JSONResponse(
+        resp = JSONResponse(
             status_code=exc.status_code,
             content={"error": exc.detail},
         )
-    return JSONResponse(
+        return _with_cors(request, resp)
+    resp = JSONResponse(
         status_code=exc.status_code,
         content={
             "error": {
@@ -59,11 +83,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             }
         },
     )
+    return _with_cors(request, resp)
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
+    resp = JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT if hasattr(status, "HTTP_422_UNPROCESSABLE_CONTENT") else 422,
         content={
             "error": {
@@ -73,6 +98,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             }
         },
     )
+    return _with_cors(request, resp)
 
 
 @app.exception_handler(Exception)
@@ -80,16 +106,17 @@ async def general_exception_handler(request: Request, exc: Exception):
     # Log exception internally but return clean message to client (no stack traces)
     if settings.DEBUG:
         print(f"[INTERNAL_ERROR]: {exc}")
-    return JSONResponse(
+    resp = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": {
                 "code": "INTERNAL_ERROR",
                 "message": "An internal server error occurred while processing the request.",
-                "details": None,
+                "details": str(exc) if settings.DEBUG else None,
             }
         },
     )
+    return _with_cors(request, resp)
 
 
 # Health check

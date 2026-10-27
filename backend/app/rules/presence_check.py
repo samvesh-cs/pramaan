@@ -7,6 +7,7 @@ PRESENCE_RULE_MAP = {
     "fire_safety_certificate": ("PRESENCE_001", "Fire Safety Certificate Presence Check"),
     "building_completion_certificate": ("PRESENCE_002", "Building Completion / Occupancy Certificate Presence Check"),
     "affidavit_2": ("PRESENCE_003", "Affidavit-2 Presence Check"),
+    "ter_payment_receipt": ("PRESENCE_004", "TER Payment Receipt Presence Check"),
 }
 
 
@@ -21,6 +22,10 @@ class DocumentPresenceRule(BaseRule):
         docs_by_type = {doc.document_type: doc for doc in uploaded_docs}
 
         for doc_type, info in EOA_DOCUMENT_CHECKLIST.items():
+            # Skip conditional requirements from generic presence check; handled by dedicated conditional rules
+            if info.get("applicability") == "required_if_applicable":
+                continue
+
             rule_id, title = PRESENCE_RULE_MAP.get(doc_type, (f"PRESENCE_{doc_type.upper()}", f"{info['display_name']} Presence"))
             doc = docs_by_type.get(doc_type)
 

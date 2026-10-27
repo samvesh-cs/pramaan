@@ -147,5 +147,34 @@ class DocumentService:
         docs = docs_res.scalars().all()
         return [DocumentResponse.model_validate(d) for d in docs]
 
+    async def get_document_file(
+        self,
+        db: AsyncSession,
+        application_id: str,
+        document_id: str,
+    ) -> tuple[Path, str, str]:
+        """Retrieve stored document file path, mime type, and original filename."""
+        stmt = select(Document).where(
+            Document.id == document_id,
+            Document.application_id == application_id,
+        )
+        res = await db.execute(stmt)
+        doc = res.scalar_one_or_none()
+
+        if not doc:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "DOCUMENT_NOT_FOUND", "message": f"Document '{document_id}' not found.", "details": None},
+            )
+
+        file_path = settings.upload_path / doc.stored_filename
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "FILE_NOT_FOUND", "message": "Document file is missing from storage.", "details": None},
+            )
+
+        return file_path, doc.mime_type, doc.original_filename
+
 
 document_service = DocumentService()

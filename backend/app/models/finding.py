@@ -18,6 +18,10 @@ class Finding(Base):
     document_name = Column(String(500), nullable=True)
     evidence = Column(JSON, nullable=True)  # {page_number, text, field, value, bbox}
     next_action = Column(Text, nullable=True)
+    reviewer_decision = Column(String(50), nullable=True)  # verified | confirmed_discrepancy | requested_resubmission | escalated
+    reviewer_notes = Column(Text, nullable=True)
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships

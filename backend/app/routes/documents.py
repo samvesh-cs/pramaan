@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -40,3 +41,26 @@ async def list_documents(
 ):
     """Retrieve all uploaded documents for the application."""
     return await document_service.list_documents(db, application_id)
+
+
+@router.get(
+    "/{document_id}/file",
+    summary="Stream document file for in-app preview",
+)
+async def get_document_file(
+    application_id: str,
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve uploaded document file (PDF, PNG, JPG) with inline content-disposition."""
+    file_path, mime_type, filename = await document_service.get_document_file(
+        db=db,
+        application_id=application_id,
+        document_id=document_id,
+    )
+    return FileResponse(
+        path=file_path,
+        media_type=mime_type,
+        filename=filename,
+        content_disposition_type="inline",
+    )

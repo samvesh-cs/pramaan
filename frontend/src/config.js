@@ -9,6 +9,8 @@ export const DOCUMENT_TYPES = [
   { code: 'fire_safety_certificate', label: 'Fire Safety Certificate', reference: 'APH 2024-2027, Annexure-2, §2.1(v)' },
   { code: 'building_completion_certificate', label: 'Occupancy / Completion Certificate', reference: 'APH 2024-2027, Annexure-2, §2.1(iii), Clause 7.17' },
   { code: 'affidavit_2', label: 'Affidavit-2', reference: 'APH 2024-2027, Annexure-2, §2.1(i)' },
+  { code: 'ter_payment_receipt', label: 'TER Payment Receipt', reference: 'APH 2024-2027, Annexure-2, §2.1(ii) & Table 2.1' },
+  { code: 'structural_stability_certificate', label: 'Structural Stability Certificate (>30 Yrs)', reference: 'APH 2024-2027, Annexure-2, §2.1(iv)' },
 ]
 
 export const CHECK_STATUSES = ['pass', 'flagged', 'missing', 'unresolved', 'not_applicable']
@@ -17,4 +19,5 @@ export const STATUS_LABELS = {
   unresolved_checks: 'Unresolved checks', processing_incomplete: 'Processing incomplete', checks_passed: 'Checks passed',
   uploaded: 'Uploaded', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed',
   pass: 'Passed', flagged: 'Flagged for review', missing: 'Missing', unresolved: 'Unresolved', not_applicable: 'Not applicable',
+  verified: 'Verified by Auditor', confirmed_discrepancy: 'Confirmed Discrepancy', requested_resubmission: 'Resubmission Requested', escalated: 'Escalated to Committee',
 }

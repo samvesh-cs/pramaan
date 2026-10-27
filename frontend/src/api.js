@@ -83,4 +83,33 @@ export async function getReport(applicationId) {
   return request(`/applications/${encodeURIComponent(applicationId)}/report`)
 }
 
+export async function reviewFinding(applicationId, findingId, payload) {
+  if (USE_MOCKS) {
+    await pause(300)
+    const reports = mockReports()
+    const report = reports[applicationId]
+    if (report && report.findings) {
+      const finding = report.findings.find((f) => f.id === findingId)
+      if (finding) {
+        finding.reviewer_decision = payload.reviewer_decision
+        finding.reviewer_notes = payload.reviewer_notes
+        finding.reviewed_by = payload.reviewed_by
+        finding.reviewed_at = new Date().toISOString()
+      }
+      writeStore(REPORT_KEY, reports)
+    }
+    return { ...payload, id: findingId, reviewed_at: new Date().toISOString() }
+  }
+  return request(`/applications/${encodeURIComponent(applicationId)}/findings/${encodeURIComponent(findingId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getDocumentFileUrl(applicationId, documentId) {
+  return `${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(documentId)}/file`
+}
+
 export function getChecklist() { return DOCUMENT_TYPES }
+

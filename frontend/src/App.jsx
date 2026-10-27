@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
-import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument } from './api'
+import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl } from './api'
 
 const iconPaths = {
   overview: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></>,
@@ -21,6 +21,7 @@ const iconPaths = {
   menu: <><path d="M4 7h16M4 12h16M4 17h16"/></>,
   shield: <><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></>,
   file: <><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></>,
+  printer: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
 }
 
 function Icon({ name, size = 20 }) { return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{iconPaths[name] || iconPaths.documents}</svg> }
@@ -269,29 +270,399 @@ function AuditWorkspace() {
   </div>
 }
 
+function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verified', onSave }) {
+  if (!isOpen || !finding) return null
+  const [decision, setDecision] = useState(finding.reviewer_decision || initialDecision)
+  const [notes, setNotes] = useState(finding.reviewer_notes || '')
+  const [reviewerName, setReviewerName] = useState(finding.reviewed_by || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await onSave(finding.id, {
+        reviewer_decision: decision,
+        reviewer_notes: notes.trim() || 'Auditor verified against physical records and regulatory handbook.',
+        reviewed_by: reviewerName.trim() || 'AICTE Scrutiny Auditor',
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="auditor-modal-backdrop" onClick={onClose}>
+      <div className="auditor-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="auditor-modal-head">
+          <div>
+            <span className="eyebrow">HUMAN-IN-THE-LOOP SCRUTINY DESK</span>
+            <h3>Reviewer Verification Decision</h3>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={18}/></button>
+        </div>
+        <form onSubmit={handleSubmit} className="auditor-modal-body">
+          <p className="finding-target-title"><b>Target finding:</b> {finding.title}</p>
+          <div className="modal-field">
+            <label>Auditor Decision</label>
+            <select value={decision} onChange={(e) => setDecision(e.target.value)}>
+              <option value="verified">Mark Verified (Accept Discrepancy / Rule Satisfied)</option>
+              <option value="confirmed_discrepancy">Confirm Discrepancy (Enforce Flag)</option>
+              <option value="requested_resubmission">Request Document Resubmission</option>
+              <option value="escalated">Escalate to Appellate Committee</option>
+            </select>
+          </div>
+          <div className="modal-field">
+            <label>Reviewer Identity</label>
+            <input type="text" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} required />
+          </div>
+          <div className="modal-field">
+            <label>Auditor Justification / Assessment Notes</label>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Provide regulatory justification or portal verification reference (e.g. Verified via state fire portal records)."
+              required
+            />
+          </div>
+          <div className="auditor-modal-actions">
+            <button type="button" className="button button-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+            <button type="submit" className="button button-primary" disabled={saving}>
+              {saving ? 'Saving Decision…' : 'Record Decision & Recalculate'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
+  if (!isOpen || !docInfo) return null
+  const { documentId, documentName, pageNumber, bbox, evidenceText } = docInfo
+  const fileUrl = getDocumentFileUrl(applicationId, documentId)
+
+  return (
+    <div className="viewer-drawer-backdrop" onClick={onClose}>
+      <div className="viewer-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="viewer-header">
+          <div>
+            <span className="eyebrow">DOCUMENT EVIDENCE VIEWER</span>
+            <h3>{documentName || 'Document Preview'}</h3>
+            <div className="viewer-meta">
+              <span>Page {pageNumber || 1}</span>
+              {bbox && (
+                <span className="bbox-pill">
+                  BBox: [{bbox.map((v) => (typeof v === 'number' ? v.toFixed(1) : v)).join(', ')}]
+                </span>
+              )}
+            </div>
+          </div>
+          <button type="button" className="icon-button close-drawer" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </button>
+        </div>
+
+        {evidenceText && (
+          <div className="viewer-evidence-snippet">
+            <span className="snippet-label">TARGET EVIDENCE SNIPPET</span>
+            <blockquote>{evidenceText}</blockquote>
+          </div>
+        )}
+
+        <div className="viewer-frame-container">
+          <iframe
+            src={`${fileUrl}#page=${pageNumber || 1}`}
+            title="Document Viewer"
+            className="viewer-iframe"
+          />
+        </div>
+
+        <div className="viewer-footer">
+          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="quiet-link">
+            Open in new tab <Icon name="arrow" size={14} />
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ValidationReport() {
-  const { id } = useParams(); const [app, setApp] = useState(null); const [report, setReport] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  const load = () => { setLoading(true); setError(''); Promise.all([getApplication(id), getReport(id)]).then(([a, r]) => { if (!a) throw new Error('Application could not be found.'); setApp(a); setReport(hasValidationRun(r) ? r : null) }).catch((e) => setError(e.message)).finally(() => setLoading(false)) }
+  const { id } = useParams()
+  const [app, setApp] = useState(null)
+  const [report, setReport] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [modalFinding, setModalFinding] = useState(null)
+  const [modalInitialDecision, setModalInitialDecision] = useState('verified')
+  const [drawerDoc, setDrawerDoc] = useState(null)
+
+  const load = () => {
+    setLoading(true)
+    setError('')
+    Promise.all([getApplication(id), getReport(id)])
+      .then(([a, r]) => {
+        if (!a) throw new Error('Application could not be found.')
+        setApp(a)
+        setReport(hasValidationRun(r) ? r : null)
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }
   useEffect(load, [id])
-  if (loading) return <Loading label="Retrieving report"/>
-  if (error) return <ErrorNotice message={error} onRetry={load}/>
-  if (!report) return <div className="report-empty"><PageHeader eyebrow="VALIDATION REPORT · 03" title={<>No report<br/><em>on record.</em></>} description={app?.institution_name}/><EmptyState title="Validation has not been run" text="Start the audit workspace to request a report for this application." action={<ButtonLink to={`/applications/${id}/audit`} icon="arrow">Open audit workspace</ButtonLink>}/></div>
-  const summary = report.summary || {}; const findings = Array.isArray(report.findings) ? report.findings : []
+
+  const handleOpenReview = (finding, decisionType) => {
+    setModalInitialDecision(decisionType)
+    setModalFinding(finding)
+  }
+
+  const handleSaveReview = async (findingId, reviewPayload) => {
+    try {
+      await reviewFinding(id, findingId, reviewPayload)
+      load()
+    } catch (err) {
+      alert(`Could not save reviewer decision: ${err.message}`)
+    }
+  }
+
+  const handleInspectDoc = (docInfo) => {
+    setDrawerDoc(docInfo)
+  }
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  if (loading) return <Loading label="Retrieving report" />
+  if (error) return <ErrorNotice message={error} onRetry={load} />
+  if (!report) return (
+    <div className="report-empty">
+      <PageHeader eyebrow="VALIDATION REPORT · 03" title={<>No report<br/><em>on record.</em></>} description={app?.institution_name} />
+      <EmptyState title="Validation has not been run" text="Start the audit workspace to request a report for this application." action={<ButtonLink to={`/applications/${id}/audit`} icon="arrow">Open audit workspace</ButtonLink>} />
+    </div>
+  )
+
+  const summary = report.summary || {}
+  const findings = Array.isArray(report.findings) ? report.findings : []
   const summaryStatuses = CHECK_STATUSES.filter((status) => Number.isFinite(summary[status]))
   const reportedMissingTypes = Array.isArray(report.missing_document_types) ? report.missing_document_types : []
   const missingTypesCoveredByFindings = reportedMissingTypes.every((code) => {
     const label = labelForDocument(code).toLowerCase()
     return findings.some((finding) => finding.status === 'missing' && [finding.title, finding.reason].some((value) => value?.toLowerCase().includes(label)))
   })
-  return <div className="report-page"><PageHeader eyebrow="VALIDATION REPORT · HUMAN REVIEW REQUIRED" title={<>Review the<br/><em>evidence trail.</em></>} description={<><b>{app?.institution_name}</b><span className="description-dot">·</span>{app?.academic_year}<span className="description-dot">·</span>{app?.application_category}</>} action={<ButtonLink to={`/applications/${id}/documents`} variant="secondary" icon="documents">Back to documents</ButtonLink>}/>
-    {USE_MOCKS && <div className="demo-callout"><span className="mode-dot"/><span><b>Synthetic demonstration report.</b> This report is not based on an actual application and does not prove authenticity or determine AICTE approval.</span></div>}
-    <section className="report-overview"><div className="report-status-block"><span className="eyebrow">OVERALL VALIDATION STATUS</span><Status value={report.overall_status}/><p>Preliminary checks only <i>·</i> Reviewer assessment required</p></div><div className="report-meta"><span>APPLICATION REFERENCE</span><b>{app?.id}</b><span>REPORT GENERATED</span><b>{report.generated_at ? new Date(report.generated_at).toLocaleString('en-IN') : 'Not provided by service'}</b></div></section>
-    {summaryStatuses.length > 0 && <section className="report-summary"><div className="summary-heading"><div className="eyebrow">CHECK SUMMARY</div><h2>What the checks returned</h2></div><div className="summary-counts">{summaryStatuses.map((status) => <div className={`summary-count count-${status}`} key={status}><span>{STATUS_LABELS[status]}</span><b>{summary[status]}</b></div>)}</div></section>}
-    {reportedMissingTypes.length > 0 && !missingTypesCoveredByFindings && <section className="reported-missing" aria-label="Missing document types"><h2>Missing document types reported</h2><p>These checklist items were returned separately from the finding details.</p><ul>{reportedMissingTypes.map((code) => <li key={code}>{labelForDocument(code)}</li>)}</ul></section>}
-    <section className="findings-section"><div className="section-title-row"><div><div className="eyebrow">FINDING REGISTER</div><h2>Items for reviewer attention</h2></div><span className="data-note">{findings.length} {findings.length === 1 ? 'finding' : 'findings'}</span></div>{findings.length === 0 ? <EmptyState title="No findings provided" text="The service returned no findings for this report."/> : <div className="finding-list">{findings.map((finding, index) => <Finding key={finding.id || `${finding.rule_id}-${index}`} finding={finding} index={index}/>)}</div>}</section>
-    <div className="report-bottom-nav"><Link to={`/applications/${id}/audit`} className="quiet-link"><Icon name="audit" size={17}/>Audit workspace</Link><Link to={`/applications/${id}/documents`} className="quiet-link">Document centre <Icon name="arrow" size={16}/></Link></div>
-  </div>
+
+  return (
+    <div className="report-page">
+      <PageHeader
+        eyebrow="VALIDATION REPORT · HUMAN REVIEW REQUIRED"
+        title={<>Review the<br/><em>evidence trail.</em></>}
+        description={<><b>{app?.institution_name}</b><span className="description-dot">·</span>{app?.academic_year}<span className="description-dot">·</span>{app?.application_category?.toUpperCase()} (EoA)</>}
+        action={
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" className="button button-primary" onClick={handlePrint}>
+              <Icon name="printer" size={16} /> Export Scrutiny Dossier (PDF)
+            </button>
+            <ButtonLink to={`/applications/${id}/documents`} variant="secondary" icon="documents">
+              Back to documents
+            </ButtonLink>
+          </div>
+        }
+      />
+      {USE_MOCKS && <div className="demo-callout"><span className="mode-dot"/><span><b>Synthetic demonstration report.</b> This report is not based on an actual application and does not prove authenticity or determine AICTE approval.</span></div>}
+      
+      <section className="report-overview">
+        <div className="report-status-block">
+          <span className="eyebrow">OVERALL VALIDATION STATUS</span>
+          <Status value={report.overall_status} />
+          <p>Preliminary checks only <i>·</i> Reviewer assessment required</p>
+        </div>
+        <div className="report-meta">
+          <span>APPLICATION REFERENCE</span><b>{app?.id}</b>
+          <span>REPORT GENERATED</span><b>{report.generated_at ? new Date(report.generated_at).toLocaleString('en-IN') : 'Not provided by service'}</b>
+        </div>
+      </section>
+
+      {summaryStatuses.length > 0 && (
+        <section className="report-summary">
+          <div className="summary-heading">
+            <div className="eyebrow">CHECK SUMMARY</div>
+            <h2>What the checks returned</h2>
+          </div>
+          <div className="summary-counts">
+            {summaryStatuses.map((status) => (
+              <div className={`summary-count count-${status}`} key={status}>
+                <span>{STATUS_LABELS[status]}</span>
+                <b>{summary[status]}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {reportedMissingTypes.length > 0 && !missingTypesCoveredByFindings && (
+        <section className="reported-missing" aria-label="Missing document types">
+          <h2>Missing document types reported</h2>
+          <p>These checklist items were returned separately from the finding details.</p>
+          <ul>{reportedMissingTypes.map((code) => <li key={code}>{labelForDocument(code)}</li>)}</ul>
+        </section>
+      )}
+
+      <section className="findings-section">
+        <div className="section-title-row">
+          <div>
+            <div className="eyebrow">FINDING REGISTER</div>
+            <h2>Items for reviewer attention</h2>
+          </div>
+          <span className="data-note">{findings.length} {findings.length === 1 ? 'finding' : 'findings'}</span>
+        </div>
+        {findings.length === 0 ? (
+          <EmptyState title="No findings provided" text="The service returned no findings for this report." />
+        ) : (
+          <div className="finding-list">
+            {findings.map((finding, index) => (
+              <Finding
+                key={finding.id || `${finding.rule_id}-${index}`}
+                finding={finding}
+                index={index}
+                onReview={handleOpenReview}
+                onInspectDoc={handleInspectDoc}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="report-bottom-nav">
+        <Link to={`/applications/${id}/audit`} className="quiet-link"><Icon name="audit" size={17}/>Audit workspace</Link>
+        <Link to={`/applications/${id}/documents`} className="quiet-link">Document centre <Icon name="arrow" size={16}/></Link>
+      </div>
+
+      {/* Official AICTE Scrutiny Dossier Print-Only Element */}
+      <div className="official-print-dossier" aria-hidden="true">
+        <div className="dossier-print-header">
+          <div className="dossier-emblem-text">GOVERNMENT OF INDIA · MINISTRY OF EDUCATION</div>
+          <div className="dossier-council-title">ALL INDIA COUNCIL FOR TECHNICAL EDUCATION</div>
+          <div className="dossier-subtitle">Nelson Mandela Marg, Vasant Kunj, New Delhi – 110070 | Ph: 011-29581000 | Website: aicte-india.org</div>
+          <div className="dossier-doc-title">
+            OFFICIAL PRELIMINARY SCRUTINY COMMITTEE DOSSIER · EXTENSION OF APPROVAL ({app?.academic_year || '2026-27'})
+          </div>
+        </div>
+
+        <table className="dossier-table">
+          <tbody>
+            <tr>
+              <th style={{ width: '25%' }}>Application ID</th>
+              <td style={{ width: '25%' }}><code>{app?.id}</code></td>
+              <th style={{ width: '25%' }}>Application Category</th>
+              <td style={{ width: '25%' }}>{app?.application_category?.toUpperCase()} (EoA)</td>
+            </tr>
+            <tr>
+              <th>Institution Name</th>
+              <td colSpan={3}><b>{app?.institution_name}</b></td>
+            </tr>
+            <tr>
+              <th>Scrutiny Date</th>
+              <td>{report?.generated_at ? new Date(report.generated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date().toLocaleDateString('en-IN')}</td>
+              <th>Preliminary Scrutiny Status</th>
+              <td><b>{STATUS_LABELS[report?.overall_status] || report?.overall_status}</b></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>1. Mandatory AICTE Checklist Compliance Matrix (APH 2024–2027)</h4>
+        <table className="dossier-table">
+          <thead>
+            <tr>
+              <th>Document Type</th>
+              <th>Official Reference Clause</th>
+              <th>Applicability</th>
+              <th>Submission Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {getChecklist().map((item) => {
+              const isUploaded = (app?.documents || []).some((d) => d.document_type === item.code)
+              return (
+                <tr key={item.code}>
+                  <td><b>{item.label}</b></td>
+                  <td>{item.reference}</td>
+                  <td>{item.code === 'structural_stability_certificate' ? 'Conditional (>30 Yrs)' : 'Mandatory'}</td>
+                  <td>{isUploaded ? '✓ SUBMITTED' : (report?.missing_document_types || []).includes(item.code) ? '✗ MISSING' : 'EXEMPT / NOT APPLICABLE'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        <h4>2. Scrutiny Findings Register & Human Auditor Verification Decisions</h4>
+        <table className="dossier-table">
+          <thead>
+            <tr>
+              <th>Rule ID</th>
+              <th>Finding Title & Explanation</th>
+              <th>Automated Rule Status</th>
+              <th>Auditor Determination & Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {findings.map((f, i) => (
+              <tr key={f.id || i}>
+                <td><code>{f.rule_id}</code></td>
+                <td><b>{f.title}</b><br/><small>{f.reason}</small></td>
+                <td>{STATUS_LABELS[f.status] || f.status}</td>
+                <td>
+                  {f.reviewer_decision ? (
+                    <div>
+                      <b>{STATUS_LABELS[f.reviewer_decision] || f.reviewer_decision}</b><br/>
+                      <em>"{f.reviewer_notes}"</em><br/>
+                      <small>— {f.reviewed_by} ({f.reviewed_at ? new Date(f.reviewed_at).toLocaleDateString('en-IN') : ''})</small>
+                    </div>
+                  ) : (
+                    <span>Pending Scrutiny Desk Verification</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="dossier-signatures">
+          <div className="signature-block">
+            <b>Member 1 (Technical Expert)</b><br/>
+            <small>AICTE Scrutiny Committee</small>
+          </div>
+          <div className="signature-block">
+            <b>Member 2 (Directorate Nominee)</b><br/>
+            <small>State Technical Education Directorate</small>
+          </div>
+          <div className="signature-block">
+            <b>Convener / Regional Officer</b><br/>
+            <small>AICTE Regional Office</small>
+          </div>
+        </div>
+      </div>
+
+      <AuditorReviewModal
+        isOpen={!!modalFinding}
+        onClose={() => setModalFinding(null)}
+        finding={modalFinding}
+        initialDecision={modalInitialDecision}
+        onSave={handleSaveReview}
+      />
+
+      <DocumentViewerDrawer
+        isOpen={!!drawerDoc}
+        onClose={() => setDrawerDoc(null)}
+        applicationId={id}
+        docInfo={drawerDoc}
+      />
+    </div>
+  )
 }
+
 const findingContext = {
   pass: 'This configured check returned a pass within its own scope. It does not establish document authenticity or decide application approval.',
   flagged: 'A potential discrepancy needs reviewer attention. A flag is not proof of fraud or an approval decision.',
@@ -302,33 +673,149 @@ const findingContext = {
 
 function displayFieldName(value) { return value?.replaceAll('_', ' ') }
 
-function Finding({ finding, index }) {
+function Finding({ finding, index, onReview, onInspectDoc }) {
   const evidence = finding.evidence
   const status = finding.status || 'unresolved'
   const source = finding.document_name || (finding.document_id ? `Document ID ${finding.document_id}` : 'Application-level finding; no document was specified')
   const page = evidence?.page_number != null ? ` · Page ${evidence.page_number}` : ''
   const reason = finding.reason?.trim()
   const nextAction = finding.next_action?.trim()
+  const reviewerDecision = finding.reviewer_decision
 
-  return <article className={`finding finding-${status}`}>
-    <div className="finding-index">{String(index + 1).padStart(2, '0')}</div>
-    <div className="finding-main">
-      <header className="finding-title-row"><div><span className="finding-kicker">What was found · {String(status).replaceAll('_', ' ')}</span><h3>{finding.title || 'Finding title not provided by the validation service'}</h3></div><Status value={status}/></header>
-      <section className="finding-explanation" aria-label="Finding explanation">
-        <div className="finding-detail checked-detail"><h4>What was checked</h4><p>{finding.rule_id ? <>Configured check <code>{finding.rule_id}</code>. The validation service did not provide a plain-language check description.</> : 'The validation service did not provide a check reference or description.'}</p></div>
-        <div className="finding-detail impact-detail"><h4>Why it matters</h4><p>{findingContext[status] || 'Review the returned reason and evidence before deciding how to proceed.'}</p></div>
-        <div className="finding-detail reason-detail"><h4>Why this result was returned</h4><p>{reason || 'Reason not provided by the validation service.'}</p></div>
-      </section>
-      <section className="finding-evidence" aria-label="Evidence">
-        <div className="finding-evidence-heading"><h4>What the document shows</h4><span>{source}{page}</span></div>
-        {evidence ? <>
-          {(evidence.field || evidence.value != null) && <div className="evidence-value"><span>{displayFieldName(evidence.field) || 'Extracted value'}</span><b>{evidence.value != null ? String(evidence.value) : 'Value unavailable'}</b></div>}
-          {evidence.text ? <blockquote>{evidence.text}</blockquote> : <p className="evidence-unavailable">Supporting text snippet unavailable.</p>}
-        </> : <p className="evidence-unavailable">Evidence unavailable. The validation service returned no supporting evidence for this finding.</p>}
-      </section>
-      <section className="finding-next-action"><h4>Recommended next action</h4><p>{nextAction || 'Recommended next action was not provided by the validation service.'}</p></section>
-    </div>
-  </article>
+  return (
+    <article className={`finding finding-${status}`}>
+      <div className="finding-index">{String(index + 1).padStart(2, '0')}</div>
+      <div className="finding-main">
+        <header className="finding-title-row">
+          <div>
+            <span className="finding-kicker">What was found · {String(status).replaceAll('_', ' ')}</span>
+            <h3>{finding.title || 'Finding title not provided by the validation service'}</h3>
+          </div>
+          <Status value={status} />
+        </header>
+
+        {reviewerDecision && (
+          <div className={`auditor-badge-card is-${reviewerDecision}`}>
+            <div className="auditor-badge-head">
+              <span className="auditor-decision-tag">
+                ✓ {STATUS_LABELS[reviewerDecision] || reviewerDecision}
+              </span>
+              {finding.reviewed_at && (
+                <span className="auditor-date">
+                  {new Date(finding.reviewed_at).toLocaleString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              )}
+            </div>
+            {finding.reviewed_by && (
+              <p className="auditor-reviewer-id">Reviewed by: {finding.reviewed_by}</p>
+            )}
+            {finding.reviewer_notes && (
+              <p className="auditor-notes">"{finding.reviewer_notes}"</p>
+            )}
+          </div>
+        )}
+
+        <section className="finding-explanation" aria-label="Finding explanation">
+          <div className="finding-detail checked-detail">
+            <h4>What was checked</h4>
+            <p>
+              {finding.rule_id ? (
+                <>Configured check <code>{finding.rule_id}</code>.</>
+              ) : (
+                'The validation service did not provide a check reference or description.'
+              )}
+            </p>
+          </div>
+          <div className="finding-detail impact-detail">
+            <h4>Why it matters</h4>
+            <p>{findingContext[status] || 'Review the returned reason and evidence before deciding how to proceed.'}</p>
+          </div>
+          <div className="finding-detail reason-detail">
+            <h4>Why this result was returned</h4>
+            <p>{reason || 'Reason not provided by the validation service.'}</p>
+          </div>
+        </section>
+
+        <section className="finding-evidence" aria-label="Evidence">
+          <div className="finding-evidence-heading">
+            <h4>What the document shows</h4>
+            <span>{source}{page}</span>
+          </div>
+          {evidence ? (
+            <>
+              {(evidence.field || evidence.value != null) && (
+                <div className="evidence-value">
+                  <span>{displayFieldName(evidence.field) || 'Extracted value'}</span>
+                  <b>{evidence.value != null ? String(evidence.value) : 'Value unavailable'}</b>
+                </div>
+              )}
+              {evidence.raw_text || evidence.text ? (
+                <blockquote>{evidence.raw_text || evidence.text}</blockquote>
+              ) : (
+                <p className="evidence-unavailable">Supporting text snippet unavailable.</p>
+              )}
+            </>
+          ) : (
+            <p className="evidence-unavailable">
+              Evidence unavailable. The validation service returned no supporting evidence for this finding.
+            </p>
+          )}
+        </section>
+
+        <section className="finding-next-action">
+          <h4>Recommended next action</h4>
+          <p>{nextAction || 'Recommended next action was not provided by the validation service.'}</p>
+        </section>
+
+        <div className="auditor-action-bar">
+          <button
+            type="button"
+            className="button-auditor button-auditor-verify"
+            onClick={() => onReview(finding, 'verified')}
+          >
+            <Icon name="check" size={14} /> Mark Verified
+          </button>
+          <button
+            type="button"
+            className="button-auditor button-auditor-resubmit"
+            onClick={() => onReview(finding, 'requested_resubmission')}
+          >
+            <Icon name="alert" size={14} /> Request Resubmission
+          </button>
+          <button
+            type="button"
+            className="button-auditor button-auditor-escalate"
+            onClick={() => onReview(finding, 'escalated')}
+          >
+            <Icon name="shield" size={14} /> Escalate
+          </button>
+
+          {finding.document_id && (
+            <button
+              type="button"
+              className="button-auditor button-inspect-doc"
+              onClick={() =>
+                onInspectDoc({
+                  documentId: finding.document_id,
+                  documentName: finding.document_name,
+                  pageNumber: evidence?.page_number || 1,
+                  bbox: evidence?.bbox || null,
+                  evidenceText: evidence?.raw_text || evidence?.text || null,
+                })
+              }
+            >
+              <Icon name="documents" size={14} /> View in Document
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  )
 }
 
 function NotFound() { return <div className="not-found"><span className="eyebrow">404 · PAGE NOT FOUND</span><h1>This page isn’t<br/><em>in the file.</em></h1><ButtonLink to="/" icon="arrow">Return to overview</ButtonLink></div> }

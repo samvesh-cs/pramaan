@@ -10,12 +10,14 @@ from app.models.document import Document
 from app.models.extraction import ExtractionRun
 from app.models.finding import Finding
 from app.rules.base import BaseRule
+from app.rules.building_age_check import BuildingAgeStructuralStabilityRule
 from app.rules.cross_document_check import InstitutionNameConsistencyRule
 from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
 from app.rules.presence_check import DocumentPresenceRule
+from app.rules.ter_payment_check import TerPaymentRule
 from app.schemas.application import OverallStatus
-from app.schemas.finding import FindingResponse
+from app.schemas.finding import FindingResponse, FindingReviewUpdate
 from app.schemas.report import ReportResponse
 from app.utils.id_generator import generate_id
 
@@ -23,23 +25,39 @@ from app.utils.id_generator import generate_id
 def calculate_overall_status(findings: list[Finding | Any], documents: list[Document]) -> OverallStatus:
     """
     Calculate application overall status based on standard priority:
-    processing_incomplete > missing_documents > discrepancies_found > unresolved_checks > checks_passed
+    processing_incomplete > missing_documents > discrepancies_found > unresolved_checks > checks_passed / ready_for_review
+    Accounts for human reviewer verification overrides per D-002, D-011, and APH 2024-2027 Scrutiny Desk.
     """
     # 1. Any document not processed?
     if not documents or any(d.processing_status != "processed" for d in documents):
         return "processing_incomplete"
 
-    statuses = [f.status for f in findings]
+    effective_statuses: list[str] = []
+    has_reviewer_override = False
+
+    for f in findings:
+        decision = getattr(f, "reviewer_decision", None)
+        status = f.status
+
+        if decision == "verified":
+            effective_statuses.append("pass")
+            has_reviewer_override = True
+        elif decision == "confirmed_discrepancy":
+            effective_statuses.append("flagged")
+        elif decision == "requested_resubmission":
+            effective_statuses.append("missing")
+        else:
+            effective_statuses.append(status)
 
     # 2. Priority checks
-    if "missing" in statuses:
+    if "missing" in effective_statuses:
         return "missing_documents"
-    if "flagged" in statuses:
+    if "flagged" in effective_statuses:
         return "discrepancies_found"
-    if "unresolved" in statuses:
+    if "unresolved" in effective_statuses:
         return "unresolved_checks"
-    if findings and all(s in ("pass", "not_applicable") for s in statuses):
-        return "checks_passed"
+    if findings and all(s in ("pass", "not_applicable") for s in effective_statuses):
+        return "ready_for_review" if has_reviewer_override else "checks_passed"
 
     return "processing_incomplete"
 
@@ -51,6 +69,8 @@ class ValidationEngine:
             FieldCompletenessRule(),
             ExpiryDateRule(),
             InstitutionNameConsistencyRule(),
+            TerPaymentRule(),
+            BuildingAgeStructuralStabilityRule(),
         ]
 
     async def validate_application(
@@ -154,6 +174,51 @@ class ValidationEngine:
 
         return self._build_report(application_id, application.overall_status, findings, documents)
 
+    async def review_finding(
+        self,
+        db: AsyncSession,
+        application_id: str,
+        finding_id: str,
+        review_data: FindingReviewUpdate,
+    ) -> FindingResponse:
+        """Record auditor verification decision and justification notes, recalculating overall status."""
+        stmt = select(Finding).where(Finding.id == finding_id, Finding.application_id == application_id)
+        res = await db.execute(stmt)
+        finding = res.scalar_one_or_none()
+
+        if not finding:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "FINDING_NOT_FOUND", "message": f"Finding '{finding_id}' not found for application '{application_id}'.", "details": None},
+            )
+
+        finding.reviewer_decision = review_data.reviewer_decision
+        finding.reviewer_notes = review_data.reviewer_notes
+        finding.reviewed_by = review_data.reviewed_by
+        finding.reviewed_at = datetime.now(timezone.utc)
+        await db.flush()
+
+        # Recalculate application overall status
+        app_stmt = select(Application).where(Application.id == application_id)
+        app_res = await db.execute(app_stmt)
+        application = app_res.scalar_one_or_none()
+
+        if application:
+            docs_stmt = select(Document).where(Document.application_id == application_id)
+            docs_res = await db.execute(docs_stmt)
+            documents = list(docs_res.scalars().all())
+
+            findings_stmt = select(Finding).where(Finding.application_id == application_id)
+            findings_res = await db.execute(findings_stmt)
+            all_findings = list(findings_res.scalars().all())
+
+            new_status = calculate_overall_status(all_findings, documents)
+            application.overall_status = new_status
+
+        await db.commit()
+        await db.refresh(finding)
+        return FindingResponse.model_validate(finding)
+
     def _build_report(
         self,
         application_id: str,
@@ -171,9 +236,14 @@ class ValidationEngine:
 
         uploaded_types = {d.document_type for d in documents}
         missing_doc_types = [
-            doc_type for doc_type in EOA_DOCUMENT_CHECKLIST.keys()
-            if doc_type not in uploaded_types
+            doc_type for doc_type, info in EOA_DOCUMENT_CHECKLIST.items()
+            if info.get("applicability") == "required" and doc_type not in uploaded_types
         ]
+        # Also include conditional documents if flagged as missing in findings
+        for f in findings:
+            if f.rule_id == "STRUCTURAL_STABILITY_001" and f.status == "missing":
+                if "structural_stability_certificate" not in missing_doc_types:
+                    missing_doc_types.append("structural_stability_certificate")
 
         finding_responses = [FindingResponse.model_validate(f) for f in findings]
 

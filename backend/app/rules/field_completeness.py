@@ -7,6 +7,8 @@ FIELD_RULE_MAP = {
     "fire_safety_certificate": ("FIELD_001", "Fire Safety Certificate Field Completeness"),
     "building_completion_certificate": ("FIELD_002", "Building Certificate Field Completeness"),
     "affidavit_2": ("FIELD_003", "Affidavit-2 Field Completeness"),
+    "ter_payment_receipt": ("FIELD_004", "TER Payment Receipt Field Completeness"),
+    "structural_stability_certificate": ("FIELD_005", "Structural Stability Certificate Field Completeness"),
 }
 
 

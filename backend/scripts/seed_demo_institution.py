@@ -8,18 +8,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import select
 from app.auth.password import hash_password
 from app.config import settings
-from app.database import AsyncSessionLocal, init_db
+import app.database as db_module
 from app.models.institution import Institution
 from app.models.user import User
 
 
 async def seed_demo_institution():
-    await init_db()
+    await db_module.init_db()
     email = settings.DEMO_INSTITUTION_EMAIL.strip().lower()
     password = settings.DEMO_INSTITUTION_PASSWORD
     inst_name = "Government Engineering College, Delhi (Demo)"
 
-    async with AsyncSessionLocal() as session:
+    async with db_module.AsyncSessionLocal() as session:
         existing = await session.scalar(select(User).where(User.email == email))
         if existing:
             existing.password_hash = hash_password(password)

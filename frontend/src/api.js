@@ -21,7 +21,12 @@ export const getAccessToken = () => inMemoryAccessToken
 const errorMessage = async (response) => {
   try {
     const payload = await response.json()
-    return payload?.error?.message || `Request failed (${response.status}).`
+    const detail = payload?.error?.details || payload?.detail
+    const msg = payload?.error?.message || payload?.message
+    if (detail && typeof detail === 'string') {
+      return `${msg || 'Error'}: ${detail}`
+    }
+    return msg || `Request failed (${response.status}).`
   } catch {
     return `Request failed (${response.status}).`
   }

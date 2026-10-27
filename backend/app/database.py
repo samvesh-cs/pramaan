@@ -72,6 +72,11 @@ def _migrate_sqlite_columns(connection):
     if "file_hash" not in doc_cols:
         cursor.execute("ALTER TABLE documents ADD COLUMN file_hash VARCHAR(64)")
 
+    cursor.execute("PRAGMA table_info(users)")
+    user_cols = {row[1] for row in cursor.fetchall()}
+    if user_cols and "last_login_at" not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN last_login_at DATETIME")
+
 
 async def init_db() -> None:
     global engine, AsyncSessionLocal, effective_db_url

@@ -22,7 +22,7 @@
       ],
       "expected_status": "checks_passed",
       "expected_summary": {
-        "pass": 6,
+        "pass": 10,
         "flagged": 0,
         "missing": 0,
         "unresolved": 0

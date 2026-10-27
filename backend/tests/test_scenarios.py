@@ -51,8 +51,10 @@ async def test_scenario_1_all_valid(client: AsyncClient):
     report = v.json()
 
     assert report["overall_status"] == "checks_passed"
-    assert report["summary"]["flagged"] == 0
-    assert report["summary"]["missing"] == 0
+    manifest = json.loads((SAMPLE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    scenario = next(item for item in manifest["scenarios"] if item["id"] == "scenario_1_valid")
+    for status, expected_count in scenario["expected_summary"].items():
+        assert report["summary"][status] == expected_count
     assert len(report["missing_document_types"]) == 0
 
 

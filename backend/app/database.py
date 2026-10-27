@@ -53,4 +53,12 @@ async def init_db() -> None:
                     if col_name not in existing_cols:
                         cursor.execute(f"ALTER TABLE findings ADD COLUMN {col_name} {col_type}")
 
+                cursor.execute("PRAGMA table_info(applications)")
+                app_cols = {row[1] for row in cursor.fetchall()}
+                if "owner_id" not in app_cols:
+                    cursor.execute("ALTER TABLE applications ADD COLUMN owner_id VARCHAR(36)")
+                if "status" not in app_cols:
+                    cursor.execute("ALTER TABLE applications ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'draft'")
+
             await conn.run_sync(migrate_sqlite_columns)
+

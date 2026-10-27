@@ -1,5 +1,5 @@
 import { API_BASE_URL, DOCUMENT_TYPES, USE_MOCKS } from './config'
-import { seedApplications, seedReports } from './demoData'
+import { labelForDocument, seedApplications, seedReports } from './demoData'
 
 const STORAGE_KEY = 'pramaan-demo-applications-v1'
 const REPORT_KEY = 'pramaan-demo-reports-v1'
@@ -175,6 +175,11 @@ export async function submitApplication(applicationId) {
     const apps = mockApplications()
     const app = apps.find((a) => a.id === applicationId)
     if (app) {
+      const requiredTypes = DOCUMENT_TYPES.filter((doc) => doc.applicability === 'required').map((doc) => doc.code)
+      const presentTypes = new Set((app.documents || []).map((doc) => doc.document_type))
+      const missing = requiredTypes.filter((type) => !presentTypes.has(type))
+      if (missing.length) throw new Error(`Upload all required document types before submission: ${missing.map((type) => labelForDocument(type)).join(', ')}.`)
+      if (app.status && app.status !== 'draft') throw new Error('This application has already been submitted and is locked for review.')
       app.status = 'submitted'
       writeStore(STORAGE_KEY, apps)
     }
@@ -184,6 +189,25 @@ export async function submitApplication(applicationId) {
   return request(`/applications/${encodeURIComponent(applicationId)}/submit`, {
     method: 'POST',
   })
+}
+
+export async function finalizeApplicationReview(applicationId) {
+  if (USE_MOCKS) {
+    await pause(350)
+    const apps = mockApplications()
+    const app = apps.find((item) => item.id === applicationId)
+    if (!app || app.status !== 'submitted') throw new Error('Only an application pending review can be finalized.')
+    const report = mockReports()[applicationId]
+    const findings = report?.findings || []
+    if (!findings.length) throw new Error('Run scrutiny checks before finalizing this review.')
+    const pending = findings.filter((finding) => !finding.reviewer_decision || !finding.reviewed_at).length
+    if (pending) throw new Error(`Review all ${pending} remaining finding${pending === 1 ? '' : 's'} before finalizing.`)
+    app.status = 'review_completed'
+    writeStore(STORAGE_KEY, apps)
+    return app
+  }
+
+  return request(`/applications/${encodeURIComponent(applicationId)}/finalize-review`, { method: 'POST' })
 }
 
 const mockApplications = () => readStore(STORAGE_KEY, seedApplications)

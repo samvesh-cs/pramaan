@@ -39,6 +39,14 @@ Use one of:
 
 Priority when multiple conditions exist: `processing_incomplete` > `missing_documents` > `discrepancies_found` > `unresolved_checks` > `checks_passed`. `ready_for_review` is reserved for a complete application awaiting human review; do not use it as an approval status. The team may simplify the visible status labels, but keep the backend semantics consistent.
 
+### Application lifecycle status
+The `status` property tracks submission and human review separately from `overall_status`:
+- `draft` — editable by the owning institution.
+- `submitted` — submitted by the institution and pending reviewer scrutiny; edits are locked.
+- `review_completed` — a reviewer finalized scrutiny; the completed report is available to the owning institution and reviewer decisions are read-only.
+
+Submitting an application does not complete scrutiny. It does not generate or expose a final report. The current required checklist entries must be present before submission; entries marked `required_if_applicable` do not block submission by default.
+
 ## 3. Application schema
 ### Create application
 `POST /api/applications`
@@ -56,6 +64,7 @@ Response: `201 Created`
 ```json
 {
   "id": "app_001",
+  "status": "draft",
   "institution_name": "Synthetic ABC Engineering College",
   "application_category": "eoa",
   "academic_year": "2026-27",
@@ -73,6 +82,7 @@ Response:
 ```json
 {
   "id": "app_001",
+  "status": "draft",
   "institution_name": "Synthetic ABC Engineering College",
   "application_category": "eoa",
   "academic_year": "2026-27",
@@ -86,6 +96,12 @@ Response:
 `GET /api/applications`
 
 Response: `200 OK`, an array of the application response objects above, ordered newest first. This additive endpoint supports the reviewer queue used by the frontend.
+
+### Submit application for review
+`POST /api/applications/{application_id}/submit` is institution-only. It returns `409 REQUIRED_DOCUMENTS_MISSING` with `details.missing_document_types` when a required checklist type has no uploaded file. On success the application status becomes `submitted`; reviewer scrutiny remains pending. Repeated submissions return `409 APPLICATION_ALREADY_SUBMITTED`.
+
+### Finalize reviewer scrutiny
+`POST /api/applications/{application_id}/finalize-review` is reviewer-only. The application must be `submitted`, scrutiny checks must have produced findings, and every finding must have a reviewer decision. On success the lifecycle status becomes `review_completed`.
 
 ## 4. Upload document
 `POST /api/applications/{application_id}/documents`
@@ -223,6 +239,8 @@ Rules:
 
 ## 7. Report response
 `GET /api/applications/{application_id}/report`
+
+Reviewers may retrieve the reviewer workspace while an application is `submitted` and after finalization. The owning institution receives `409 SCRUTINY_PENDING` until the lifecycle status is `review_completed`. Once finalized, reviewer changes and validation reruns are rejected with `409 REVIEW_FINALIZED`.
 
 Response:
 ```json

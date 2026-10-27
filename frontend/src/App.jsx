@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
-import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl, fetchDocumentBlob, submitApplication } from './api'
+import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, finalizeApplicationReview, getDocumentFileUrl, fetchDocumentBlob, submitApplication } from './api'
 import { useAuth } from './auth/useAuth'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -27,7 +27,6 @@ const iconPaths = {
   file: <><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></>,
   printer: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
 }
-
 function Icon({ name, size = 20 }) { return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{iconPaths[name] || iconPaths.documents}</svg> }
 function Status({ value }) { return <span className={`status status-${value || 'unknown'}`}><i />{STATUS_LABELS[value] || value?.replaceAll('_', ' ') || 'Not available'}</span> }
 function PageHeader({ eyebrow, title, description, action }) { return <div className="page-header"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{description && <p className="page-description">{description}</p>}</div>{action}</div> }
@@ -41,8 +40,7 @@ function Shell({ children }) {
   const { user, logout, isReviewer } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 800px)').matches)
-  const previousPath = useRef(location.pathname)
-  const [transitionPath, setTransitionPath] = useState(null)
+  const mainAreaRef = useRef(null)
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 800px)')
     const updateViewport = () => { setIsMobile(mediaQuery.matches); setMenuOpen(false) }
@@ -57,20 +55,36 @@ function Shell({ children }) {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [isMobile, menuOpen])
   useEffect(() => {
-    if (previousPath.current === location.pathname) return undefined
-    previousPath.current = location.pathname
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
-    setTransitionPath(location.pathname)
-    const timeout = window.setTimeout(() => setTransitionPath((activePath) => activePath === location.pathname ? null : activePath), 720)
-    return () => window.clearTimeout(timeout)
-  }, [location.pathname])
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (!finePointer.matches || reducedMotion.matches) return undefined
+    const main = mainAreaRef.current
+    let frame = 0
+    let latestX = 0
+    let latestY = 0
+    const updateLight = (event) => {
+      latestX = event.clientX
+      latestY = event.clientY
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        const bounds = main.getBoundingClientRect()
+        main.style.setProperty('--pointer-x', `${latestX - bounds.left}px`)
+        main.style.setProperty('--pointer-y', `${latestY - bounds.top + main.scrollTop}px`)
+        frame = 0
+      })
+    }
+    main.addEventListener('pointermove', updateLight, { passive: true })
+    return () => {
+      main.removeEventListener('pointermove', updateLight)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [])
   const primary = isReviewer
     ? [['/', 'overview', 'Scrutiny Queue']]
     : [['/', 'overview', 'My Applications'], ['/documents', 'upload', 'Documents'], ['/applications/new', 'plus', 'New application']]
   const pageTitle = location.pathname === '/' ? (isReviewer ? 'Scrutiny Queue' : 'My Applications') : location.pathname === '/documents' ? 'Documents' : location.pathname.includes('/report') ? 'Validation report' : location.pathname.includes('/audit') ? 'Audit workspace' : location.pathname.includes('/documents') ? 'Document centre' : 'New application'
   const sidebarExpanded = isMobile ? menuOpen : !menuOpen
   return <div className={`app-shell ${!isMobile && menuOpen ? 'sidebar-collapsed' : ''}`}>
-    {transitionPath === location.pathname && <div key={transitionPath} className="holo-transition is-active" aria-hidden="true"><span className="holo-veil"/><span className="holo-grid"/><span className="holo-document-outline"><i className="holo-corner corner-tl"/><i className="holo-corner corner-tr"/><i className="holo-corner corner-bl"/><i className="holo-corner corner-br"/></span><span className="holo-scan-line"/><span className="holo-fragment fragment-a"/><span className="holo-fragment fragment-b"/><span className="holo-fragment fragment-c"/></div>}
     <button type="button" className={`sidebar-backdrop ${isMobile && menuOpen ? 'visible' : ''}`} aria-label="Close navigation" tabIndex={isMobile && menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />
     <aside id="primary-navigation" className={`sidebar ${isMobile && menuOpen ? 'sidebar-open' : ''}`} aria-label="Primary navigation" aria-hidden={isMobile && !menuOpen} inert={isMobile && !menuOpen}>
       <Link to="/" className="brand" aria-label="Pramaan home"><span className="brand-mark"><svg aria-hidden="true" viewBox="0 0 32 32" fill="none"><path d="M12 5H7v22h5M20 5h5v22h-5" stroke="#e6e1d7" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter"/><path d="M12.5 12.5h7M12.5 16h5" stroke="#e6e1d7" strokeWidth="1.6" strokeLinecap="round"/><path d="m18 21 2 2 4-5" stroke="#d8a66c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span><span className="brand-copy"><b>pramaan</b><small>REVIEW WORKSPACE</small></span></Link>
@@ -86,7 +100,7 @@ function Shell({ children }) {
         </div>
       </div>
     </aside>
-    <main className="main-area"><div className="ambient-contours" aria-hidden="true"><svg viewBox="0 0 600 600" fill="none"><path d="M608 31C494 4 331 34 274 115c-38 54-13 115 43 135 76 28 196-25 198-94 2-59-78-89-144-65-82 30-114 123-86 204 28 80 121 126 220 101 75-19 122-75 99-131-21-50-98-63-155-33-70 37-82 118-42 183 40 66 116 103 193 91"/><path d="M603 66c-94-20-228 5-277 67-33 43-15 91 32 109 63 24 163-20 164-76 1-48-64-73-120-52-69 26-95 103-72 170 23 66 102 103 185 83 63-16 101-62 82-108-18-42-82-53-130-28-57 30-67 96-35 150 34 56 96 87 160 77"/><path d="M600 103c-75-15-177 1-216 49-27 33-15 69 23 84 49 18 128-16 129-59 1-37-51-56-95-39-55 21-75 82-58 135 18 52 81 81 148 65 50-12 80-49 65-84-14-33-65-41-103-22-45 24-53 75-27 117 26 44 76 68 127 60"/><path d="M596 144c-55-9-128 0-158 34-21 23-13 48 15 59 37 13 96-12 97-43 1-27-38-41-70-28-40 15-55 60-42 99 13 38 60 58 108 47 36-8 57-36 46-62-10-23-47-29-74-15-32 17-37 53-19 83 19 32 55 49 92 43"/></svg></div>
+    <main className="main-area" ref={mainAreaRef}>
       <header className="topbar">
         <button type="button" className="icon-button mobile-menu" aria-controls="primary-navigation" aria-expanded={sidebarExpanded} aria-label={sidebarExpanded ? 'Collapse navigation sidebar' : 'Expand navigation sidebar'} onClick={() => setMenuOpen((open) => !open)}><Icon name="menu"/></button>
         <div className="topbar-page-title" aria-live="polite">{pageTitle}</div>
@@ -97,7 +111,7 @@ function Shell({ children }) {
           </span>
         </div>
       </header>
-      <div className={`page-stage ${transitionPath === location.pathname ? 'route-entering' : ''}`} key={location.pathname}>{children}</div>
+      <div className="page-stage" key={location.pathname}>{children}</div>
       <footer className="footer"><span>SIH 2026 · PS 26261</span><span>Preliminary review only <i>·</i> Human judgment required</span></footer>
     </main>
   </div>
@@ -127,7 +141,7 @@ function Overview() {
       {!apps && !error && <div className="queue-loading"><Loading label="Gathering applications"/></div>}
       {apps && <><div className="mb-6 grid grid-cols-3 border-y border-[#263b42]/15" aria-label="Application queue summary"><Metric label="In the queue" value={apps.length}/><Metric label="Needs attention" value={apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length} accent/><Metric label="Checks passed" value={counts.checks_passed || 0}/></div>
         <section aria-labelledby="queue-heading"><div className="mb-3"><h2 id="queue-heading" className="m-0 text-lg font-semibold tracking-tight text-[#334b49]">Applications</h2><p className="mt-1 text-xs leading-relaxed text-[#68736d] sm:text-[13px]">Select a record to review its documents and validation findings.</p></div>
-          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs · {app.status || 'draft'}</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '1px 5px', borderRadius: '3px', fontWeight: 600, background: app.status === 'submitted' ? 'rgba(216,166,108,0.2)' : 'rgba(38,59,66,0.08)', color: app.status === 'submitted' ? '#9a5d43' : '#68736d' }}>{app.status || 'draft'}</span></span>{isReviewer ? (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#9a5d43] underline underline-offset-4 hover:text-[#7d4833] sm:text-xs" aria-label={`Review ${app.institution_name}`} to={`/applications/${app.id}/report`}>Review <Icon name="arrow" size={16}/></Link>) : (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link>)}</div>)}</div>}
+          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs · {STATUS_LABELS[app.status] || app.status || 'Draft'}</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><Status value={app.status || 'draft'}/></span>{isReviewer ? (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#9a5d43] underline underline-offset-4 hover:text-[#7d4833] sm:text-xs" aria-label={`Review ${app.institution_name}`} to={`/applications/${app.id}/report`}>Review <Icon name="arrow" size={16}/></Link>) : (<Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link>)}</div>)}</div>}
         </section></>}
     </div>
   </div>
@@ -291,6 +305,7 @@ function ApplicationDocumentCentre() {
   const [busy, setBusy] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
+  const [submissionNotice, setSubmissionNotice] = useState(null)
   const [dragging, setDragging] = useState(false)
 
   const [drawerDoc, setDrawerDoc] = useState(null)
@@ -347,17 +362,18 @@ function ApplicationDocumentCentre() {
   }
 
   const handleSubmitToAicte = async () => {
-    if (!window.confirm('Are you sure you want to submit this application to AICTE? Once submitted, the application will be locked for review and no further documents can be uploaded.')) {
+    if (submitting) return
+    if (!window.confirm('Submit this application to AICTE? The application will be locked while it waits for reviewer scrutiny.')) {
       return
     }
     setSubmitting(true)
-    setMessage('')
+    setSubmissionNotice(null)
     try {
       const updated = await submitApplication(id)
-      setApp((current) => ({ ...current, status: 'submitted', ...(updated || {}) }))
-      setMessage('Application submitted successfully to AICTE. It is now locked for scrutiny.')
+      setApp((current) => ({ ...current, ...(updated || {}), status: updated?.status || 'submitted' }))
+      setSubmissionNotice({ tone: 'success', text: 'Application submitted. It is now waiting for an AICTE reviewer. The scrutiny report will appear here after the reviewer finalizes the review.' })
     } catch (err) {
-      setMessage(err.message)
+      setSubmissionNotice({ tone: 'error', text: err.message })
     } finally {
       setSubmitting(false)
     }
@@ -369,42 +385,34 @@ function ApplicationDocumentCentre() {
   const types = getChecklist()
   const present = new Set(documents.map((doc) => doc.document_type))
   const presentCount = types.filter((item) => present.has(item.code)).length
-  const missingCount = types.filter((item) => !present.has(item.code)).length
   const processingCount = documents.filter((doc) => ['uploaded', 'processing'].includes(doc.processing_status)).length
   const failedCount = documents.filter((doc) => doc.processing_status === 'processing_failed').length
   const processedCount = documents.filter((doc) => doc.processing_status === 'processed').length
-  const isLocked = app?.status === 'submitted'
+  const requiredTypes = types.filter((item) => item.applicability === 'required')
+  const missingRequiredTypes = requiredTypes.filter((item) => !present.has(item.code))
+  const isLocked = ['submitted', 'review_completed'].includes(app?.status)
+  const reviewCompleted = app?.status === 'review_completed'
+  const pendingReview = app?.status === 'submitted'
 
   return <div className="document-page document-workflow-page">
     <PageHeader eyebrow={isReviewer ? "SCRUTINY DESK · APPLICATION WORKFLOW" : "DOCUMENT CENTRE · APPLICATION WORKFLOW"} title={<>Document<br /><em>workflow.</em></>} description={isReviewer ? "Inspect uploaded files, review extracted document evidence, and conduct regulatory scrutiny." : "Review the configured requirements, add files, and submit your application for AICTE scrutiny."} />
 
     {isLocked && (
-      <div style={{
-        background: '#fdf6ed',
-        border: '1px solid #e0c69f',
-        borderLeft: '4px solid #d8a66c',
-        padding: '16px 20px',
-        borderRadius: '4px',
-        marginBottom: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        color: '#6e4b29'
-      }}>
-        <Icon name="shield" size={24} />
+      <div className={`application-state-banner ${reviewCompleted ? 'is-complete' : 'is-pending'}`} role="status">
+        <Icon name={reviewCompleted ? 'check' : 'clock'} size={22} />
         <div>
-          <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>Application Submitted — Under AICTE Scrutiny</strong>
-          <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
-            {isReviewer
-              ? 'This application has been formally submitted by the institution. Reviewers inspect documents and verify findings.'
-              : 'This application has been formally submitted to the AICTE Review Committee. Document uploads are locked while under scrutiny.'}
-          </p>
+          <strong>{reviewCompleted ? 'Scrutiny review completed' : 'Submitted · awaiting reviewer'}</strong>
+          <p>{reviewCompleted
+            ? 'A reviewer finalized this scrutiny. The completed review report is now available.'
+            : isReviewer
+              ? 'The institution submitted this application. Review its documents and findings, then finalize the scrutiny.'
+              : 'Your application is locked while an AICTE reviewer completes scrutiny. The final report will be available here after the reviewer finalizes the review.'}</p>
         </div>
       </div>
     )}
 
     <section className="application-identity" aria-labelledby="application-identity-title">
-      <div className="identity-heading"><div><div className="eyebrow">APPLICATION IDENTIFICATION</div><h2 id="application-identity-title">{app.institution_name || 'Institution name not provided'}</h2><div className="identity-meta"><span>{APPLICATION_CATEGORIES.find((category) => category.code === app.application_category)?.label || app.application_category || 'Category not provided'}</span><i>·</i><span>Academic year {app.academic_year || 'not provided'}</span><i>·</i><span>Reference {app.id}</span></div></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Status value={app.overall_status} /><span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 8px', borderRadius: '3px', fontWeight: 600, background: isLocked ? 'rgba(216,166,108,0.2)' : 'rgba(38,59,66,0.08)', color: isLocked ? '#9a5d43' : '#68736d' }}>{app.status || 'draft'}</span></div></div>
+      <div className="identity-heading"><div><div className="eyebrow">APPLICATION IDENTIFICATION</div><h2 id="application-identity-title">{app.institution_name || 'Institution name not provided'}</h2><div className="identity-meta"><span>{APPLICATION_CATEGORIES.find((category) => category.code === app.application_category)?.label || app.application_category || 'Category not provided'}</span><i>·</i><span>Academic year {app.academic_year || 'not provided'}</span><i>·</i><span>Reference {app.id}</span></div></div><div className="identity-statuses"><Status value={app.overall_status} /><Status value={app.status || 'draft'} /></div></div>
       <div className="identity-summary"><span><b>{presentCount} / {types.length}</b><small>listed document types with a file</small></span><span><b>{processedCount}</b><small>processed</small></span><span><b>{processingCount}</b><small>awaiting processing</small></span><span><b>{failedCount}</b><small>processing failed</small></span></div>
     </section>
     {USE_MOCKS && <div className="demo-callout"><span className="mode-dot" /><span><b>Synthetic demonstration data.</b> The three configured document types are an MVP subset, not the complete EoA checklist.</span></div>}
@@ -420,19 +428,20 @@ function ApplicationDocumentCentre() {
         <li><span>01</span><b>Check requirements</b></li>
         <li><span>02</span><b>Upload documents</b></li>
         <li><span>03</span><b>Review file status</b></li>
-        <li><span>04</span><b>{isLocked ? 'Scrutiny report' : 'Submit to AICTE'}</b></li>
+        <li><span>04</span><b>{reviewCompleted ? 'Review complete' : pendingReview ? 'Awaiting review' : 'Submit to AICTE'}</b></li>
       </ol>
     )}
 
     <section className="workflow-section checklist-section" aria-labelledby="checklist-heading">
-      <div className="workflow-section-head"><div><span className="workflow-step-number">01</span><div><div className="eyebrow">REQUIREMENTS · CONFIGURABLE</div><h2 id="checklist-heading">Required-document checklist</h2></div></div><span className="section-side-note">{missingCount ? `${missingCount} still need attention` : 'A file exists for every listed type'}</span></div>
+      <div className="workflow-section-head"><div><span className="workflow-step-number">01</span><div><div className="eyebrow">REQUIREMENTS · CONFIGURABLE</div><h2 id="checklist-heading">Required-document checklist</h2></div></div><span className="section-side-note">{missingRequiredTypes.length ? `${missingRequiredTypes.length} required item${missingRequiredTypes.length === 1 ? '' : 's'} missing` : 'Required files are present'}</span></div>
       <div className="workflow-checklist" role="list">{types.map((item, index) => {
         const doc = documents.find((entry) => entry.document_type === item.code)
-        const state = doc?.processing_status || 'missing'
-        const stateLabel = { missing: 'Missing · not received', uploaded: 'Uploaded · awaiting processing', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed' }[state] || state
-        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked || isReviewer ? <button type="button" className="workflow-row-action" onClick={() => inspectDoc(doc)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => inspectDoc(doc)}>Review file <Icon name="arrow" size={14} /></button> : (isLocked || isReviewer) ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
+        const state = doc?.processing_status || (item.applicability === 'required' ? 'missing' : 'unresolved')
+        const stateLabel = { missing: 'Required · not received', unresolved: 'Conditional · applicability to confirm', uploaded: 'Uploaded · awaiting processing', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed' }[state] || state
+        const applicabilityLabel = item.applicability === 'required' ? 'Required' : 'Required if applicable'
+        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{applicabilityLabel} · {item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked || isReviewer ? <button type="button" className="workflow-row-action" onClick={() => inspectDoc(doc)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => inspectDoc(doc)}>Review file <Icon name="arrow" size={14} /></button> : (isLocked || isReviewer) ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
       })}</div>
-      <p className="checklist-disclaimer">Presence and processing status are based on the application response. The listed types remain demo configuration until the team confirms an official source.</p>
+      <p className="checklist-disclaimer">Three types are required for submission. TER receipts and structural-stability certificates remain conditional and do not block submission unless applicable.</p>
     </section>
 
     {!isReviewer && (
@@ -469,36 +478,42 @@ function ApplicationDocumentCentre() {
     </section>
 
     {isInstitution ? (
-      <section className="audit-gate" aria-labelledby="submission-gate-heading">
-        <div className="workflow-step-number">{isLocked ? '✓' : '04'}</div>
+      <section className={`audit-gate submission-gate ${pendingReview ? 'is-pending' : ''} ${reviewCompleted ? 'is-complete' : ''}`} aria-labelledby="submission-gate-heading">
+        <div className="workflow-step-number">{reviewCompleted ? '✓' : '04'}</div>
         <div className="audit-gate-copy">
-          <div className="eyebrow">{isLocked ? 'APPLICATION STATUS · LOCKED' : 'NEXT · FORMAL SUBMISSION'}</div>
-          <h2 id="submission-gate-heading">{isLocked ? 'Application submitted to AICTE' : 'Submit application to AICTE'}</h2>
+          <div className="eyebrow">{reviewCompleted ? 'REVIEW COMPLETE' : pendingReview ? 'SUBMITTED · PENDING REVIEW' : 'NEXT · FORMAL SUBMISSION'}</div>
+          <h2 id="submission-gate-heading">{reviewCompleted ? 'Scrutiny review completed' : pendingReview ? 'Application submitted' : 'Submit application to AICTE'}</h2>
           <p>
-            {isLocked
-              ? 'This application has been submitted to AICTE and is locked for scrutiny. You can view the generated compliance report.'
-              : missingCount > 0
-                ? `${missingCount} checklist item${missingCount === 1 ? '' : 's'} still pending. You may submit once ready.`
-                : 'All documents uploaded. Submit your application to lock and initiate AICTE scrutiny.'}
+            {reviewCompleted
+              ? 'The reviewer finalized scrutiny. View the completed review report for findings and next steps.'
+              : pendingReview
+                ? 'The application is locked while it waits for reviewer scrutiny. The reviewer has not finalized a report yet.'
+                : missingRequiredTypes.length > 0
+                  ? `Upload the ${missingRequiredTypes.map((item) => item.label).join(', ')} before submitting.`
+                  : 'Required document types are present. Submit to lock the application and place it in the reviewer queue.'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {isLocked ? (
+        <div className="submission-actions">
+          {reviewCompleted ? (
             <ButtonLink to={`/applications/${id}/report`} icon="arrow">
-              View Scrutiny Report
+              View completed report
             </ButtonLink>
+          ) : pendingReview ? (
+            <span className="awaiting-review-label"><Icon name="clock" size={16} /> Awaiting reviewer</span>
           ) : (
             <button
               type="button"
               className="button button-primary"
-              style={{ background: '#315e5b', borderColor: '#315e5b' }}
               onClick={handleSubmitToAicte}
-              disabled={submitting || documents.length === 0}
+              disabled={submitting || missingRequiredTypes.length > 0}
+              aria-describedby={missingRequiredTypes.length > 0 ? 'submission-requirements' : undefined}
             >
-              {submitting ? 'Submitting…' : 'Submit to AICTE'} <Icon name="arrow" size={17} />
+              {submitting ? <><span className="spinner spinner-light"/>Submitting…</> : <>Submit to AICTE <Icon name="arrow" size={17}/></>}
             </button>
           )}
         </div>
+        {missingRequiredTypes.length > 0 && !isLocked && <p id="submission-requirements" className="submission-requirement-note">Submission is unavailable until all three required document types have a file.</p>}
+        {submissionNotice && <div className={`submission-feedback is-${submissionNotice.tone}`} role={submissionNotice.tone === 'error' ? 'alert' : 'status'}>{submissionNotice.text}</div>}
       </section>
     ) : (
       <section className="audit-gate" aria-labelledby="reviewer-gate-heading">
@@ -584,7 +599,7 @@ function AuditWorkspace() {
   }
   useEffect(load, [id])
 
-  if (isInstitution) {
+  if (isInstitution || (isReviewer && app?.status === 'review_completed')) {
     return <Navigate to={`/applications/${id}/report`} replace />
   }
 
@@ -676,12 +691,12 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
     e.preventDefault()
     setSaving(true)
     try {
-      await onSave(finding.id, {
+      const saved = await onSave(finding.id, {
         reviewer_decision: decision,
         reviewer_notes: notes.trim() || 'Auditor verified against physical records and regulatory handbook.',
         reviewed_by: reviewerName.trim() || 'AICTE Scrutiny Auditor',
       })
-      onClose()
+      if (saved !== false) onClose()
     } finally {
       setSaving(false)
     }
@@ -848,20 +863,27 @@ function ValidationReport() {
   const [modalFinding, setModalFinding] = useState(null)
   const [modalInitialDecision, setModalInitialDecision] = useState('verified')
   const [drawerDoc, setDrawerDoc] = useState(null)
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeError, setFinalizeError] = useState('')
 
   const load = () => {
     setLoading(true)
     setError('')
-    Promise.all([getApplication(id), getReport(id)])
-      .then(([a, r]) => {
+    getApplication(id)
+      .then(async (a) => {
         if (!a) throw new Error('Application could not be found.')
         setApp(a)
+        if (isInstitution && a.status !== 'review_completed') {
+          setReport(null)
+          return
+        }
+        const r = await getReport(id)
         setReport(hasValidationRun(r) ? r : null)
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }
-  useEffect(load, [id])
+  useEffect(load, [id, isInstitution])
 
   const handleOpenReview = (finding, decisionType) => {
     setModalInitialDecision(decisionType)
@@ -872,8 +894,26 @@ function ValidationReport() {
     try {
       await reviewFinding(id, findingId, reviewPayload)
       load()
+      return true
     } catch (err) {
-      alert(`Could not save reviewer decision: ${err.message}`)
+      setError(`Could not save reviewer decision: ${err.message}`)
+      return false
+    }
+  }
+
+  const handleFinalizeReview = async () => {
+    if (finalizing) return
+    if (!window.confirm('Finalize this scrutiny review? The completed report will become available to the institution, and review decisions will become read-only.')) return
+    if (!window.confirm('Finalize this scrutiny review? The completed report will become available to the institution, and review decisions will become read-only.')) return
+    setFinalizing(true)
+    setFinalizeError('')
+    try {
+      const updated = await finalizeApplicationReview(id)
+      setApp((current) => ({ ...current, ...(updated || {}), status: updated?.status || 'review_completed' }))
+    } catch (err) {
+      setFinalizeError(err.message)
+    } finally {
+      setFinalizing(false)
     }
   }
 
@@ -887,12 +927,20 @@ function ValidationReport() {
 
   if (loading) return <Loading label="Retrieving report" />
   if (error) return <ErrorNotice message={error} onRetry={load} />
+  if (isInstitution && app?.status !== 'review_completed') {
+    const awaitingReview = app?.status === 'submitted'
+    return <div className="report-empty awaiting-review-page">
+      <PageHeader eyebrow={awaitingReview ? 'APPLICATION · PENDING REVIEW' : 'APPLICATION · DRAFT'} title={awaitingReview ? <>Awaiting reviewer<br/>scrutiny.</> : <>The report follows<br/>review.</>} description={app?.institution_name} />
+      <div className="application-state-banner is-pending" role="status"><Icon name="clock" size={22}/><div><strong>{awaitingReview ? 'Your application is in the reviewer queue' : 'This application has not been submitted'}</strong><p>{awaitingReview ? 'The reviewer has not finalized scrutiny yet. The completed report will appear here when the review is finished.' : 'Submit the required documents first. A final scrutiny report is available only after reviewer review is complete.'}</p></div></div>
+      <ButtonLink to={`/applications/${id}/documents`} variant="secondary" icon="documents">Open document centre</ButtonLink>
+    </div>
+  }
   if (!report) return (
     <div className="report-empty">
       <PageHeader eyebrow={isReviewer ? "SCRUTINY DESK · AUDITOR REVIEW" : "VALIDATION REPORT · 03"} title={<>No report<br/><em>on record.</em></>} description={app?.institution_name} />
       <EmptyState
         title="Scrutiny checks have not been run"
-        text={isReviewer ? "Run automated scrutiny checks to evaluate this submitted application against APH requirements." : "Your application has not been validated yet. Submit your application or upload documents first."}
+        text="Run automated scrutiny checks to evaluate this submitted application against APH requirements."
         action={
           isReviewer ? (
             <button
@@ -922,6 +970,7 @@ function ValidationReport() {
 
   const summary = report.summary || {}
   const findings = Array.isArray(report.findings) ? report.findings : []
+  const pendingReviewerCount = findings.filter((finding) => !finding.reviewer_decision || !finding.reviewed_at).length
   const summaryStatuses = CHECK_STATUSES.filter((status) => Number.isFinite(summary[status]))
   const reportedMissingTypes = Array.isArray(report.missing_document_types) ? report.missing_document_types : []
   const missingTypesCoveredByFindings = reportedMissingTypes.every((code) => {
@@ -956,7 +1005,7 @@ function ValidationReport() {
                 <Icon name="plus" size={16} /> Create New Application from Report
               </button>
             )}
-            {isReviewer && (
+            {isReviewer && app?.status !== 'review_completed' && (
               <button
                 type="button"
                 className="button button-secondary"
@@ -1042,12 +1091,31 @@ function ValidationReport() {
                 index={index}
                 onReview={handleOpenReview}
                 onInspectDoc={handleInspectDoc}
-                isReviewer={isReviewer}
+                isReviewer={isReviewer && app?.status !== 'review_completed'}
               />
             ))}
           </div>
         )}
       </section>
+
+      {isReviewer && app?.status === 'submitted' && (
+        <section className="review-finalization" aria-labelledby="finalize-review-heading">
+          <div>
+            <div className="eyebrow">REVIEWER ACTION</div>
+            <h2 id="finalize-review-heading">Finalize scrutiny</h2>
+            <p>{pendingReviewerCount
+              ? `${pendingReviewerCount} finding${pendingReviewerCount === 1 ? '' : 's'} still need a recorded reviewer decision.`
+              : 'All findings have reviewer decisions. Finalizing makes this report available to the institution and locks further review changes.'}</p>
+          </div>
+          <button type="button" className="button button-primary" disabled={finalizing || pendingReviewerCount > 0 || findings.length === 0} onClick={handleFinalizeReview}>
+            {finalizing ? 'Finalizing review…' : 'Finalize scrutiny'} <Icon name="check" size={17}/>
+          </button>
+          {finalizeError && <div className="submission-feedback is-error" role="alert">{finalizeError}</div>}
+        </section>
+      )}
+      {isReviewer && app?.status === 'review_completed' && (
+        <div className="review-complete-note" role="status"><Icon name="check" size={17}/> Scrutiny finalized. The institution can now view this report.</div>
+      )}
 
       <div className="report-bottom-nav">
         {isReviewer ? (
@@ -1297,7 +1365,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
         </section>
 
         <div className="auditor-action-bar">
-          {isReviewer && (
+            {isReviewer && (
             <>
               <button
                 type="button"
@@ -1351,7 +1419,6 @@ function NotFound() { return <div className="not-found"><span className="eyebrow
 export default function App() {
   return (
     <>
-      <CustomCursor />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -1390,58 +1457,4 @@ export default function App() {
       </Routes>
     </>
   )
-}
-
-function CustomCursor() {
-  const cursorRef = useRef(null)
-  useEffect(() => {
-    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    if (!finePointer.matches || reducedMotion.matches) return undefined
-    let visible = false
-    let previousPointer = null
-    const element = cursorRef.current
-    const onMove = (event) => {
-      if (event.pointerType !== 'mouse') return
-      const target = event.target instanceof Element ? event.target : null
-      const native = target?.closest('input, textarea, select, [contenteditable="true"], .dropzone, .browse-button, p, h1, h2, h3, h4, blockquote, code, td, th, li')
-      const selectingText = window.getSelection()?.type === 'Range'
-      const useNativeCursor = !!native || selectingText
-      const interactive = target?.closest('a, button, .application-row, .received-item, .checklist-item, .workflow-check-row, .finding, .finding-evidence')
-      element.style.transform = `translate3d(${event.clientX - 2}px, ${event.clientY - 1}px, 0)`
-      if (previousPointer) {
-        const dx = Math.max(-10, Math.min(10, previousPointer.x - event.clientX))
-        const dy = Math.max(-10, Math.min(10, previousPointer.y - event.clientY))
-        const angle = Math.atan2(event.clientY - previousPointer.y, event.clientX - previousPointer.x) * (180 / Math.PI)
-        element.style.setProperty('--cursor-echo-x', `${dx}px`)
-        element.style.setProperty('--cursor-echo-y', `${dy}px`)
-        element.style.setProperty('--cursor-bearing', `${angle}deg`)
-      }
-      previousPointer = { x: event.clientX, y: event.clientY }
-      if (useNativeCursor) { element.classList.remove('cursor-visible'); visible = false }
-      else if (!visible) { element.classList.add('cursor-visible'); visible = true }
-      element.classList.toggle('cursor-interactive', !!interactive && !useNativeCursor)
-      element.classList.toggle('cursor-nav', !!target?.closest('.nav-item') && !useNativeCursor)
-      element.classList.toggle('cursor-action', !!target?.closest('button, .button') && !useNativeCursor)
-      element.classList.toggle('cursor-row', !!target?.closest('.application-row, .document-entry-row') && !useNativeCursor)
-      element.classList.toggle('cursor-document', !!target?.closest('.received-item, .checklist-item, .workflow-check-row, .finding, .finding-evidence') && !useNativeCursor)
-    }
-    const onDown = (event) => {
-      const target = event.target instanceof Element ? event.target : null
-      const native = target?.closest('input, textarea, select, [contenteditable="true"], .dropzone, .browse-button, p, h1, h2, h3, h4, blockquote, code, td, th, li')
-      if (event.pointerType === 'mouse' && !native && target?.closest('a, button, .application-row, .document-entry-row, .received-item, .checklist-item, .workflow-check-row')) element.classList.add('cursor-pressed')
-    }
-    const onUp = () => element.classList.remove('cursor-pressed')
-    const hide = () => { element.classList.remove('cursor-visible', 'cursor-interactive', 'cursor-nav', 'cursor-action', 'cursor-row', 'cursor-document', 'cursor-pressed'); visible = false }
-    const reveal = () => { if (visible) element.classList.add('cursor-visible') }
-    window.addEventListener('pointermove', onMove, { passive: true })
-    window.addEventListener('pointerdown', onDown)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-    window.addEventListener('pointerleave', hide)
-    window.addEventListener('pointerenter', reveal)
-    window.addEventListener('blur', hide)
-    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerdown', onDown); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); window.removeEventListener('pointerleave', hide); window.removeEventListener('pointerenter', reveal); window.removeEventListener('blur', hide) }
-  }, [])
-  return <div className="custom-cursor" ref={cursorRef} aria-hidden="true"><svg className="cursor-echo" viewBox="0 0 48 48"><path d="M4 3 8 34 17 26 24 43 30 40 23 23 41 22 4 3Z"/></svg><svg className="cursor-glyph" viewBox="0 0 48 48"><path className="cursor-shadow" d="M4 3 8 34 17 26 24 43 30 40 23 23 41 22 4 3Z"/><path className="cursor-shape" d="M3 2 7 32 16 24 23 41 28 38 21 21 39 20 3 2Z"/><path className="cursor-leading-edge" d="M3 2 39 20 21 21"/><path className="cursor-tail" d="M15 36c-3 4-7 7-12 9"/><path className="cursor-scan-mark" d="M28 8h8m-4-4v8"/></svg></div>
 }

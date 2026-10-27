@@ -28,7 +28,8 @@ class FindingCreate(BaseModel):
 class FindingReviewUpdate(BaseModel):
     reviewer_decision: ReviewerDecision
     reviewer_notes: Optional[str] = None
-    reviewed_by: Optional[str] = "AICTE Scrutiny Committee Auditor"
+    reviewed_by: Optional[str] = None
+
 
 
 class FindingResponse(BaseModel):

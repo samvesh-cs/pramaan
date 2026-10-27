@@ -16,9 +16,9 @@ def create_pdf(text_lines: list[str]) -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_document_file_streaming(client: AsyncClient):
+async def test_document_file_streaming(institution_client: AsyncClient):
     """Feature 2: Test GET /api/applications/{app_id}/documents/{doc_id}/file."""
-    app_res = await client.post(
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Test College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -26,7 +26,7 @@ async def test_document_file_streaming(client: AsyncClient):
 
     pdf_bytes = create_pdf(["AICTE EoA Fire Safety Certificate", "Institution Name: Test College"])
     files = {"file": ("fire_safety.pdf", pdf_bytes, "application/pdf")}
-    upload_res = await client.post(
+    upload_res = await institution_client.post(
         f"/api/applications/{app_id}/documents",
         files=files,
         data={"document_type": "fire_safety_certificate"},
@@ -35,7 +35,7 @@ async def test_document_file_streaming(client: AsyncClient):
     doc_id = upload_res.json()["id"]
 
     # Stream file
-    stream_res = await client.get(f"/api/applications/{app_id}/documents/{doc_id}/file")
+    stream_res = await institution_client.get(f"/api/applications/{app_id}/documents/{doc_id}/file")
     assert stream_res.status_code == 200
     assert stream_res.headers["content-type"] == "application/pdf"
     assert "inline" in stream_res.headers.get("content-disposition", "")
@@ -43,23 +43,34 @@ async def test_document_file_streaming(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_auditor_review_finding_and_status_recalculation(client: AsyncClient):
+async def test_auditor_review_finding_and_status_recalculation(institution_client: AsyncClient):
     """Feature 1: Test PATCH /api/applications/{app_id}/findings/{finding_id}."""
-    app_res = await client.post(
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Review College", "application_category": "eoa", "academic_year": "2026-27"},
     )
     app_id = app_res.json()["id"]
 
     # Validate empty app -> produces missing findings
-    val_res = await client.post(f"/api/applications/{app_id}/validate")
+    val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
     report = val_res.json()
     assert report["overall_status"] == "processing_incomplete"
     finding_id = report["findings"][0]["id"]
 
+    # Institution submits application so reviewer can review it
+    submit_res = await institution_client.post(f"/api/applications/{app_id}/submit")
+    assert submit_res.status_code == 200
+
+    # Switch session override to Reviewer
+    from app.auth.dependencies import get_current_user
+    from app.main import app
+    from tests.conftest import FakeUser
+
+    app.dependency_overrides[get_current_user] = lambda: FakeUser("REVIEWER", "rev-test-1", email="reviewer@aicte.edu")
+
     # Auditor marks finding as verified with justification note
-    patch_res = await client.patch(
+    patch_res = await institution_client.patch(
         f"/api/applications/{app_id}/findings/{finding_id}",
         json={
             "reviewer_decision": "verified",
@@ -76,10 +87,10 @@ async def test_auditor_review_finding_and_status_recalculation(client: AsyncClie
 
 
 @pytest.mark.asyncio
-async def test_ter_payment_check_underpaid_and_paid(client: AsyncClient):
+async def test_ter_payment_check_underpaid_and_paid(institution_client: AsyncClient):
     """Feature 3A: Test TER_PAYMENT_001 with underpaid amount vs valid amount."""
     # 1. Underpaid TER payment (₹25,000 paid for private institution which needs ₹1,00,000)
-    app_res = await client.post(
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Apex Engineering Academy", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -92,14 +103,14 @@ async def test_ter_payment_check_underpaid_and_paid(client: AsyncClient):
         "Transaction Date: 15/01/2026",
         "Total Paid Amount: INR 25,000",
     ])
-    up_res = await client.post(
+    up_res = await institution_client.post(
         f"/api/applications/{app_id}/documents",
         files={"file": ("ter_receipt_underpaid.pdf", underpaid_pdf, "application/pdf")},
         data={"document_type": "ter_payment_receipt"},
     )
     assert up_res.status_code == 201
 
-    val_res = await client.post(f"/api/applications/{app_id}/validate")
+    val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
     report = val_res.json()
     ter_findings = [f for f in report["findings"] if f["rule_id"] == "TER_PAYMENT_001"]
@@ -108,7 +119,7 @@ async def test_ter_payment_check_underpaid_and_paid(client: AsyncClient):
     assert "Deficit" in ter_findings[0]["title"]
 
     # 2. Paid in full TER payment (₹1,00,000 paid)
-    app2_res = await client.post(
+    app2_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Apex Engineering Academy", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -121,13 +132,13 @@ async def test_ter_payment_check_underpaid_and_paid(client: AsyncClient):
         "Transaction Date: 15/01/2026",
         "Total Paid Amount: INR 1,00,000",
     ])
-    await client.post(
+    await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("ter_receipt_full.pdf", full_paid_pdf, "application/pdf")},
         data={"document_type": "ter_payment_receipt"},
     )
 
-    val2_res = await client.post(f"/api/applications/{app2_id}/validate")
+    val2_res = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val2_res.status_code == 200
     report2 = val2_res.json()
     ter2_findings = [f for f in report2["findings"] if f["rule_id"] == "TER_PAYMENT_001"]
@@ -136,10 +147,10 @@ async def test_ter_payment_check_underpaid_and_paid(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_building_age_structural_stability_rule(client: AsyncClient):
+async def test_building_age_structural_stability_rule(institution_client: AsyncClient):
     """Feature 3B: Test STRUCTURAL_STABILITY_001 under 30 yrs (not_applicable) vs over 30 yrs (missing -> pass)."""
     # 1. New Building (Issued 2018 -> age < 30 years -> not_applicable)
-    app_res = await client.post(
+    app_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Apex Institute", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -152,13 +163,13 @@ async def test_building_age_structural_stability_rule(client: AsyncClient):
         "Issue Date: 12/06/2018",
         "Issuing Authority: Municipal Corporation",
     ])
-    await client.post(
+    await institution_client.post(
         f"/api/applications/{app_id}/documents",
         files={"file": ("new_building.pdf", new_building_pdf, "application/pdf")},
         data={"document_type": "building_completion_certificate"},
     )
 
-    val_res = await client.post(f"/api/applications/{app_id}/validate")
+    val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
     report = val_res.json()
     stability_findings = [f for f in report["findings"] if f["rule_id"] == "STRUCTURAL_STABILITY_001"]
@@ -166,7 +177,7 @@ async def test_building_age_structural_stability_rule(client: AsyncClient):
     assert stability_findings[0]["status"] == "not_applicable"
 
     # 2. Old Building (Issued 1985 -> age > 30 years -> missing structural certificate)
-    app2_res = await client.post(
+    app2_res = await institution_client.post(
         "/api/applications",
         json={"institution_name": "Heritage Engineering College", "application_category": "eoa", "academic_year": "2026-27"},
     )
@@ -179,13 +190,13 @@ async def test_building_age_structural_stability_rule(client: AsyncClient):
         "Issue Date: 10/04/1985",
         "Issuing Authority: Town Planning Department",
     ])
-    await client.post(
+    await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("old_building.pdf", old_building_pdf, "application/pdf")},
         data={"document_type": "building_completion_certificate"},
     )
 
-    val2_res = await client.post(f"/api/applications/{app2_id}/validate")
+    val2_res = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val2_res.status_code == 200
     report2 = val2_res.json()
     stability2_findings = [f for f in report2["findings"] if f["rule_id"] == "STRUCTURAL_STABILITY_001"]
@@ -201,15 +212,16 @@ async def test_building_age_structural_stability_rule(client: AsyncClient):
         "Chartered Engineer Registration Number: CE-STR-99881",
         "Date of Inspection: 05/01/2026",
     ])
-    await client.post(
+    await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("structural_cert.pdf", structural_pdf, "application/pdf")},
         data={"document_type": "structural_stability_certificate"},
     )
 
-    val3_res = await client.post(f"/api/applications/{app2_id}/validate")
+    val3_res = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val3_res.status_code == 200
     report3 = val3_res.json()
     stability3_findings = [f for f in report3["findings"] if f["rule_id"] == "STRUCTURAL_STABILITY_001"]
     assert len(stability3_findings) == 1
     assert stability3_findings[0]["status"] == "pass"
+

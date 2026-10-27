@@ -96,7 +96,11 @@ async def require_application_access(
     if not app_record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Application {application_id} not found",
+            detail={
+                "code": "APPLICATION_NOT_FOUND",
+                "message": f"Application '{application_id}' not found.",
+                "details": None,
+            },
         )
 
     if current_user.role == "INSTITUTION":
@@ -104,14 +108,22 @@ async def require_application_access(
         if app_record.owner_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Application {application_id} not found",
+                detail={
+                    "code": "APPLICATION_NOT_FOUND",
+                    "message": f"Application '{application_id}' not found.",
+                    "details": None,
+                },
             )
     elif current_user.role == "REVIEWER":
         # Reviewer can only access submitted applications
         if app_record.status != "submitted":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Application {application_id} not found or not submitted",
+                detail={
+                    "code": "APPLICATION_NOT_FOUND",
+                    "message": f"Application '{application_id}' not found or not submitted.",
+                    "details": None,
+                },
             )
 
     return app_record

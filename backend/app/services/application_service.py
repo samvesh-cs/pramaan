@@ -18,10 +18,13 @@ class ApplicationService:
         self,
         db: AsyncSession,
         data: ApplicationCreate,
+        owner_id: str | None = None,
     ) -> ApplicationResponse:
         app_id = generate_id("app")
         app_obj = Application(
             id=app_id,
+            owner_id=owner_id,
+            status="draft",
             institution_name=data.institution_name,
             application_category=data.application_category,
             academic_year=data.academic_year,
@@ -70,11 +73,44 @@ class ApplicationService:
     async def list_applications(
         self,
         db: AsyncSession,
+        owner_id: str | None = None,
+        status_filter: str | None = None,
     ) -> list[ApplicationResponse]:
-        stmt = select(Application).order_by(Application.created_at.desc())
+        stmt = select(Application)
+        if owner_id:
+            stmt = stmt.where(Application.owner_id == owner_id)
+        if status_filter:
+            stmt = stmt.where(Application.status == status_filter)
+
+        stmt = stmt.order_by(Application.created_at.desc())
         res = await db.execute(stmt)
         apps = res.scalars().all()
         return [ApplicationResponse.model_validate(a) for a in apps]
 
+    async def submit_application(
+        self,
+        db: AsyncSession,
+        application_id: str,
+        owner_id: str,
+    ) -> ApplicationResponse:
+        app_obj = await db.scalar(select(Application).where(Application.id == application_id))
+        if not app_obj:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "APPLICATION_NOT_FOUND", "message": f"Application '{application_id}' not found.", "details": None},
+            )
+
+        if app_obj.owner_id != owner_id:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "APPLICATION_NOT_FOUND", "message": f"Application '{application_id}' not found.", "details": None},
+            )
+
+        app_obj.status = "submitted"
+        await db.commit()
+        await db.refresh(app_obj)
+        return ApplicationResponse.model_validate(app_obj)
+
 
 application_service = ApplicationService()
+

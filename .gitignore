@@ -13,13 +13,27 @@ build/
 *.egg
 .eggs/
 
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
 # Virtual environments
 venv/
 .venv/
 env/
+
+# Environment variables and secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# Python environment
 
 # ----- Node / Frontend -----
 node_modules/
@@ -49,7 +63,6 @@ desktop.ini
 *.sqlite3
 
 # ----- Uploads (user uploaded documents) -----
-backend/uploads/
 uploads/
 
 # ----- Model caches (PaddleOCR etc.) -----
@@ -62,9 +75,7 @@ inference/
 *.pdiparams
 
 # ----- Secrets / Credentials -----
-.env
-.env.*
-!.env.example
+!.env.*.example
 secrets/
 *.pem
 *.key
@@ -73,19 +84,8 @@ secrets/
 *.log
 logs/
 
-# ----- Test / Coverage -----
-htmlcov/
-.coverage
-.coverage.*
-.pytest_cache/
-.tox/
-.nox/
-
 # ----- OS files -----
-.DS_Store
-Thumbs.db
 ehthumbs.db
-Desktop.ini
 $RECYCLE.BIN/
 
 # ----- Sensitive Documents -----

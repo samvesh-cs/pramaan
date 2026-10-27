@@ -162,7 +162,7 @@ def generate_all():
                     {"type": "affidavit_2", "file": "valid_affidavit_2.pdf"},
                 ],
                 "expected_status": "checks_passed",
-                "expected_summary": {"pass": 6, "flagged": 0, "missing": 0, "unresolved": 0},
+                "expected_summary": {"pass": 10, "flagged": 0, "missing": 0, "unresolved": 0},
             },
             {
                 "id": "scenario_2_missing_doc",

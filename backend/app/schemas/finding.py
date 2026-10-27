@@ -31,6 +31,11 @@ class FindingReviewUpdate(BaseModel):
     reviewed_by: Optional[str] = "AICTE Scrutiny Committee Auditor"
 
 
+class AcknowledgeDuplicateRequest(BaseModel):
+    reviewer_notes: str
+    reviewed_by: Optional[str] = "AICTE Scrutiny Committee Auditor"
+
+
 class FindingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

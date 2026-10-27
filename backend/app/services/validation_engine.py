@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
@@ -12,6 +13,7 @@ from app.models.finding import Finding
 from app.rules.base import BaseRule
 from app.rules.building_age_check import BuildingAgeStructuralStabilityRule
 from app.rules.cross_document_check import InstitutionNameConsistencyRule
+from app.rules.duplicate_check import DuplicateDocumentRule
 from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
 from app.rules.presence_check import DocumentPresenceRule
@@ -71,6 +73,7 @@ class ValidationEngine:
             InstitutionNameConsistencyRule(),
             TerPaymentRule(),
             BuildingAgeStructuralStabilityRule(),
+            DuplicateDocumentRule(),
         ]
 
     async def validate_application(
@@ -108,6 +111,11 @@ class ValidationEngine:
             if latest_ext:
                 extractions_by_doc_id[doc.id] = latest_ext
 
+        # Fetch all documents in system for cross-institution & cross-app duplicate checks
+        all_docs_stmt = select(Document).options(selectinload(Document.application))
+        all_docs_res = await db.execute(all_docs_stmt)
+        all_system_documents = list(all_docs_res.scalars().all())
+
         # 4. Clear prior findings for this application
         await db.execute(delete(Finding).where(Finding.application_id == application_id))
 
@@ -116,6 +124,7 @@ class ValidationEngine:
             "application": application,
             "documents": documents,
             "extractions": extractions_by_doc_id,
+            "all_system_documents": all_system_documents,
         }
 
         generated_findings: list[Finding] = []
@@ -219,6 +228,66 @@ class ValidationEngine:
         await db.refresh(finding)
         return FindingResponse.model_validate(finding)
 
+    async def acknowledge_duplicate(
+        self,
+        db: AsyncSession,
+        application_id: str,
+        finding_id: str,
+        reviewer_notes: str,
+        reviewed_by: str = "AICTE Scrutiny Committee Auditor",
+    ) -> dict[str, Any]:
+        """
+        Acknowledge a duplicate warning after reviewer review.
+        After acknowledgment, the report can be generated and will still show the duplicate note.
+        """
+        stmt = select(Finding).where(Finding.id == finding_id, Finding.application_id == application_id)
+        res = await db.execute(stmt)
+        finding = res.scalar_one_or_none()
+
+        if not finding:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "FINDING_NOT_FOUND", "message": f"Finding '{finding_id}' not found for application '{application_id}'.", "details": None},
+            )
+
+        if finding.rule_id not in ("DUPLICATE_DOC_001", "DUPLICATE_DOC_001"):
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_FINDING_TYPE", "message": f"Finding '{finding_id}' is not a duplicate check.", "details": None},
+            )
+
+        # Record the acknowledgment
+        finding.reviewer_decision = "verified"
+        finding.reviewer_notes = reviewer_notes
+        finding.reviewed_by = reviewed_by
+        finding.reviewed_at = datetime.now(timezone.utc)
+        await db.flush()
+
+        # Recalculate application overall status
+        app_stmt = select(Application).where(Application.id == application_id)
+        app_res = await db.execute(app_stmt)
+        application = app_res.scalar_one_or_none()
+
+        if application:
+            docs_stmt = select(Document).where(Document.application_id == application_id)
+            docs_res = await db.execute(docs_stmt)
+            documents = list(docs_res.scalars().all())
+
+            findings_stmt = select(Finding).where(Finding.application_id == application_id)
+            findings_res = await db.execute(findings_stmt)
+            all_findings = list(findings_res.scalars().all())
+
+            new_status = calculate_overall_status(all_findings, documents)
+            application.overall_status = new_status
+
+        await db.commit()
+        await db.refresh(finding)
+        return {
+            "acknowledged": True,
+            "finding_id": finding_id,
+            "message": "Duplicate warning acknowledged by reviewer. Report can now be generated. The report will still show the duplicate note.",
+        }
+
     def _build_report(
         self,
         application_id: str,
@@ -226,6 +295,69 @@ class ValidationEngine:
         findings: list[Finding],
         documents: list[Document],
     ) -> ReportResponse:
+        # Check for unresolved duplicate warnings that block report generation
+        unresolved_duplicates = [
+            f for f in findings
+            if f.rule_id.startswith("DUPLICATE_") and f.status in ("flagged", "unresolved")
+            and not f.reviewer_decision
+        ]
+
+        if unresolved_duplicates:
+            # Collect duplicate details for the 409 response
+            duplicate_details = []
+            for f in unresolved_duplicates:
+                evidence = f.evidence or {}
+                duplicate_type = evidence.get("type", "unknown")
+                msg = getattr(f, "reason", "")
+                if duplicate_type == "same_file_in_application":
+                    duplicate_details.append({
+                        "type": "same_file_in_application",
+                        "message": msg,
+                        "evidence": evidence,
+                        "document_id": f.document_id,
+                        "action": "Delete or replace the duplicate document.",
+                    })
+                elif duplicate_type == "cross_institution_duplicate_file":
+                    duplicate_details.append({
+                        "type": "same_file_other_application",
+                        "message": msg,
+                        "evidence": evidence,
+                        "document_id": f.document_id,
+                        "related_application": evidence.get("matched_application_id"),
+                        "related_document": evidence.get("matched_document_id"),
+                        "action": "Delete or replace the duplicate document, or acknowledge after review.",
+                    })
+                elif duplicate_type == "cross_institution_duplicate_certificate_number":
+                    duplicate_details.append({
+                        "type": "same_certificate_number",
+                        "message": msg,
+                        "evidence": evidence,
+                        "document_id": f.document_id,
+                        "related_application": evidence.get("matched_application_id"),
+                        "related_document": evidence.get("matched_document_id"),
+                        "action": "Acknowledge after reviewer review, or delete/replace the document.",
+                    })
+                else:
+                    duplicate_details.append({
+                        "type": duplicate_type,
+                        "message": msg,
+                        "evidence": evidence,
+                        "document_id": f.document_id,
+                        "action": "Review and resolve the duplicate.",
+                    })
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "DUPLICATES_UNRESOLVED",
+                    "message": "Validation report cannot be generated until all duplicate warnings are resolved.",
+                    "details": {
+                        "unresolved_duplicates": duplicate_details,
+                        "instruction": "Resolve each duplicate by either deleting/replacing the document or providing an authorized reviewer acknowledgment.",
+                    },
+                },
+            )
+
         summary_counts = {
             "pass": sum(1 for f in findings if f.status == "pass"),
             "flagged": sum(1 for f in findings if f.status == "flagged"),

@@ -25,7 +25,6 @@ const iconPaths = {
 
 function Icon({ name, size = 20 }) { return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{iconPaths[name] || iconPaths.documents}</svg> }
 function Status({ value }) { return <span className={`status status-${value || 'unknown'}`}><i />{STATUS_LABELS[value] || value?.replaceAll('_', ' ') || 'Not available'}</span> }
-function ModeLabel() { return <span className={`mode-pill ${USE_MOCKS ? 'is-demo' : 'is-live'}`}><span className="mode-dot" />{USE_MOCKS ? 'DEMO DATA' : 'API MODE'}</span> }
 function PageHeader({ eyebrow, title, description, action }) { return <div className="page-header"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{description && <p className="page-description">{description}</p>}</div>{action}</div> }
 function ButtonLink({ to, children, variant = 'primary', icon }) { return <Link className={`button button-${variant}`} to={to}>{children}{icon && <Icon name={icon} size={17} />}</Link> }
 function EmptyState({ title, text, action }) { return <div className="empty-state"><span className="empty-mark"><Icon name="documents" size={23} /></span><h3>{title}</h3><p>{text}</p>{action}</div> }
@@ -35,9 +34,22 @@ function ErrorNotice({ message, onRetry }) { return <div className="error-notice
 function Shell({ children }) {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 800px)').matches)
   const previousPath = useRef(location.pathname)
   const [transitionPath, setTransitionPath] = useState(null)
-  useEffect(() => setMenuOpen(false), [location.pathname])
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 800px)')
+    const updateViewport = () => { setIsMobile(mediaQuery.matches); setMenuOpen(false) }
+    mediaQuery.addEventListener('change', updateViewport)
+    return () => mediaQuery.removeEventListener('change', updateViewport)
+  }, [])
+  useEffect(() => { if (isMobile) setMenuOpen(false) }, [location.pathname, isMobile])
+  useEffect(() => {
+    if (!isMobile || !menuOpen) return undefined
+    const closeOnEscape = (event) => { if (event.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [isMobile, menuOpen])
   useEffect(() => {
     if (previousPath.current === location.pathname) return undefined
     previousPath.current = location.pathname
@@ -47,23 +59,17 @@ function Shell({ children }) {
     return () => window.clearTimeout(timeout)
   }, [location.pathname])
   const primary = [['/', 'overview', 'Overview'], ['/documents', 'upload', 'Documents'], ['/applications/new', 'plus', 'New application']]
-  const currentApp = location.pathname.match(/\/applications\/([^/]+)/)?.[1]
-  const appLinks = currentApp && currentApp !== 'new' ? [
-    [`/applications/${currentApp}/documents`, 'documents', 'Documents'],
-    [`/applications/${currentApp}/audit`, 'audit', 'Audit workspace'],
-    [`/applications/${currentApp}/report`, 'report', 'Validation report'],
-  ] : []
-  return <div className="app-shell">
+  const pageTitle = location.pathname === '/' ? 'Overview' : location.pathname === '/documents' ? 'Documents' : location.pathname.includes('/report') ? 'Validation report' : location.pathname.includes('/audit') ? 'Audit workspace' : location.pathname.includes('/documents') ? 'Document centre' : 'New application'
+  const sidebarExpanded = isMobile ? menuOpen : !menuOpen
+  return <div className={`app-shell ${!isMobile && menuOpen ? 'sidebar-collapsed' : ''}`}>
     {transitionPath === location.pathname && <div key={transitionPath} className="holo-transition is-active" aria-hidden="true"><span className="holo-veil"/><span className="holo-grid"/><span className="holo-document-outline"><i className="holo-corner corner-tl"/><i className="holo-corner corner-tr"/><i className="holo-corner corner-bl"/><i className="holo-corner corner-br"/></span><span className="holo-scan-line"/><span className="holo-fragment fragment-a"/><span className="holo-fragment fragment-b"/><span className="holo-fragment fragment-c"/></div>}
-    <div className={`sidebar-backdrop ${menuOpen ? 'visible' : ''}`} onClick={() => setMenuOpen(false)} />
-    <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
-      <Link to="/" className="brand"><span className="brand-mark"><span>p</span></span><span><b>pramaan</b><small>REVIEW WORKSPACE</small></span></Link>
-      <div className="workspace-label">WORKSPACE <span>01</span></div>
-      <nav className="side-nav" aria-label="Main navigation">{primary.map(([to, icon, label]) => <NavLink key={to} to={to} end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Icon name={icon} size={19}/><span>{label}</span>{label === 'Overview' && <span className="nav-shortcut">⌘ 1</span>}</NavLink>)}</nav>
-      {appLinks.length > 0 && <><div className="workspace-label app-nav-label">CURRENT APPLICATION</div><nav className="side-nav" aria-label="Application navigation">{appLinks.map(([to, icon, label]) => <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Icon name={icon} size={19}/><span>{label}</span></NavLink>)}</nav></>}
-      <div className="sidebar-foot"><div className="review-note"><Icon name="shield" size={18}/><p>Preliminary scrutiny supports a reviewer. It does not verify authenticity or decide approval.</p></div><div className="sidebar-user"><span className="avatar">AR</span><span><b>Review desk</b><small>Institutional scrutiny</small></span><span className="user-menu">•••</span></div></div>
+    <button type="button" className={`sidebar-backdrop ${isMobile && menuOpen ? 'visible' : ''}`} aria-label="Close navigation" tabIndex={isMobile && menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />
+    <aside id="primary-navigation" className={`sidebar ${isMobile && menuOpen ? 'sidebar-open' : ''}`} aria-label="Primary navigation" aria-hidden={isMobile && !menuOpen} inert={isMobile && !menuOpen}>
+      <Link to="/" className="brand" aria-label="Pramaan home"><span className="brand-mark"><svg aria-hidden="true" viewBox="0 0 32 32" fill="none"><path d="M12 5H7v22h5M20 5h5v22h-5" stroke="#e6e1d7" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter"/><path d="M12.5 12.5h7M12.5 16h5" stroke="#e6e1d7" strokeWidth="1.6" strokeLinecap="round"/><path d="m18 21 2 2 4-5" stroke="#d8a66c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span><span className="brand-copy"><b>pramaan</b><small>REVIEW WORKSPACE</small></span></Link>
+      <nav className="side-nav">{primary.map(([to, icon, label]) => <NavLink key={to} to={to} end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title={label} aria-label={label}><Icon name={icon} size={18}/><span>{label}</span></NavLink>)}</nav>
+      <div className="sidebar-foot"><div className="review-note"><Icon name="shield" size={16}/><p>Preliminary scrutiny supports reviewers; it does not verify authenticity or decide approval.</p></div><div className="sidebar-user"><span className="sidebar-user-copy"><b>Review desk</b><small>Institutional scrutiny</small></span></div></div>
     </aside>
-    <main className="main-area"><div className="ambient-contours" aria-hidden="true"><svg viewBox="0 0 600 600" fill="none"><path d="M608 31C494 4 331 34 274 115c-38 54-13 115 43 135 76 28 196-25 198-94 2-59-78-89-144-65-82 30-114 123-86 204 28 80 121 126 220 101 75-19 122-75 99-131-21-50-98-63-155-33-70 37-82 118-42 183 40 66 116 103 193 91"/><path d="M603 66c-94-20-228 5-277 67-33 43-15 91 32 109 63 24 163-20 164-76 1-48-64-73-120-52-69 26-95 103-72 170 23 66 102 103 185 83 63-16 101-62 82-108-18-42-82-53-130-28-57 30-67 96-35 150 34 56 96 87 160 77"/><path d="M600 103c-75-15-177 1-216 49-27 33-15 69 23 84 49 18 128-16 129-59 1-37-51-56-95-39-55 21-75 82-58 135 18 52 81 81 148 65 50-12 80-49 65-84-14-33-65-41-103-22-45 24-53 75-27 117 26 44 76 68 127 60"/><path d="M596 144c-55-9-128 0-158 34-21 23-13 48 15 59 37 13 96-12 97-43 1-27-38-41-70-28-40 15-55 60-42 99 13 38 60 58 108 47 36-8 57-36 46-62-10-23-47-29-74-15-32 17-37 53-19 83 19 32 55 49 92 43"/></svg></div><header className="topbar"><button type="button" className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMenuOpen(true)}><Icon name="menu"/></button><div className="breadcrumbs"><span>Workspace</span><Icon name="chevron" size={15}/><strong>{location.pathname === '/' ? 'Overview' : location.pathname === '/documents' ? 'Documents' : location.pathname.includes('/report') ? 'Validation report' : location.pathname.includes('/audit') ? 'Audit workspace' : location.pathname.includes('/documents') ? 'Document centre' : 'New application'}</strong></div><div className="topbar-right"><span className="topbar-context">AICTE · APPLICATION REVIEW</span><ModeLabel/><span className="top-avatar">AR</span></div></header>
+    <main className="main-area"><div className="ambient-contours" aria-hidden="true"><svg viewBox="0 0 600 600" fill="none"><path d="M608 31C494 4 331 34 274 115c-38 54-13 115 43 135 76 28 196-25 198-94 2-59-78-89-144-65-82 30-114 123-86 204 28 80 121 126 220 101 75-19 122-75 99-131-21-50-98-63-155-33-70 37-82 118-42 183 40 66 116 103 193 91"/><path d="M603 66c-94-20-228 5-277 67-33 43-15 91 32 109 63 24 163-20 164-76 1-48-64-73-120-52-69 26-95 103-72 170 23 66 102 103 185 83 63-16 101-62 82-108-18-42-82-53-130-28-57 30-67 96-35 150 34 56 96 87 160 77"/><path d="M600 103c-75-15-177 1-216 49-27 33-15 69 23 84 49 18 128-16 129-59 1-37-51-56-95-39-55 21-75 82-58 135 18 52 81 81 148 65 50-12 80-49 65-84-14-33-65-41-103-22-45 24-53 75-27 117 26 44 76 68 127 60"/><path d="M596 144c-55-9-128 0-158 34-21 23-13 48 15 59 37 13 96-12 97-43 1-27-38-41-70-28-40 15-55 60-42 99 13 38 60 58 108 47 36-8 57-36 46-62-10-23-47-29-74-15-32 17-37 53-19 83 19 32 55 49 92 43"/></svg></div><header className="topbar"><button type="button" className="icon-button mobile-menu" aria-controls="primary-navigation" aria-expanded={sidebarExpanded} aria-label={sidebarExpanded ? 'Collapse navigation sidebar' : 'Expand navigation sidebar'} onClick={() => setMenuOpen((open) => !open)}><Icon name="menu"/></button><div className="topbar-page-title" aria-live="polite">{pageTitle}</div></header>
       <div className={`page-stage ${transitionPath === location.pathname ? 'route-entering' : ''}`} key={location.pathname}>{children}</div>
       <footer className="footer"><span>SIH 2026 · PS 26261</span><span>Preliminary review only <i>·</i> Human judgment required</span></footer>
     </main>
@@ -75,20 +81,22 @@ function Overview() {
   const load = () => { setError(''); listApplications().then(setApps).catch((e) => setError(e.message)) }
   useEffect(load, [])
   const counts = useMemo(() => (apps || []).reduce((sum, app) => { sum[app.overall_status] = (sum[app.overall_status] || 0) + 1; return sum }, {}), [apps])
-  return <>
-    <div className="overview-masthead"><div className="masthead-copy"><div className="eyebrow">REVIEW DESK <span>—</span> 2026 / 27</div><h1>Make every review<br/><em>evidence-led.</em></h1><p>A considered workspace for preliminary application scrutiny. Keep the evidence close, the checks clear, and the reviewer in control.</p><div className="hero-actions"><ButtonLink to="/applications/new" icon="arrow">Create an application</ButtonLink><ButtonLink to="/documents" variant="outline-light" icon="upload">Upload Documents</ButtonLink></div></div><div className="masthead-art" aria-hidden="true"><div className="art-circle circle-one"/><div className="art-circle circle-two"/><div className="art-grid"/><svg className="masthead-signature" viewBox="0 0 460 350" preserveAspectRatio="none"><path d="M-30 230C35 205 56 85 112 95c43 8-4 112 38 119 49 8 60-143 105-141 38 2-14 117 32 126 42 8 65-87 110-71 29 11 9 62 66 54"/><path className="signature-thread" d="M-30 236C38 211 61 91 113 101c38 7 0 105 36 114 44 12 63-145 107-145 32 0-11 121 33 131 40 9 68-88 111-72 29 11 10 63 63 56"/></svg><div className="art-doc"><div className="art-doc-top"><span>APPLICATION FILE</span><span>01 / 03</span></div><div className="art-rule wide"/><div className="art-rule"/><div className="art-rule short"/><div className="art-highlight"><i/><span>Evidence captured</span></div><div className="art-rule wide"/><div className="art-rule short"/><div className="art-stamp">REVIEW<br/>PENDING</div></div><div className="art-caption"><span>01</span><span>DOCUMENT<br/>SCRUTINY</span></div></div><div className="masthead-index"><span>01</span><span className="index-line"/><span>THE REVIEW DESK</span></div></div>
-    <div className="overview-content"><div className="section-title-row"><div><div className="eyebrow">AT A GLANCE</div><h2>Application queue</h2></div><span className="data-note">{USE_MOCKS ? 'Synthetic demonstration records' : 'Live API data'}</span></div>
+  return <div className="mx-auto w-full max-w-6xl">
+    <header className="mb-7 mt-2 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
+      <div><div className="eyebrow text-[#6e7872]">REVIEW DESK · 2026 / 27</div><h1 className="my-2 text-[29px] font-semibold leading-tight tracking-[-0.035em] text-[#1d3036] sm:text-4xl">Application queue</h1><p className="m-0 max-w-2xl text-[13px] leading-relaxed text-[#68736d] sm:text-sm">Review submitted applications and open a record to inspect its documents and findings.</p></div>
+      <ButtonLink to="/applications/new" icon="plus">New application</ButtonLink>
+    </header>
+    <div><div className="mb-3 text-xs text-[#777f78]">{USE_MOCKS ? 'Synthetic demonstration records' : 'Applications from the live API'}</div>
       {error && <ErrorNotice message={error} onRetry={load}/>}
       {!apps && !error && <div className="queue-loading"><Loading label="Gathering applications"/></div>}
-      {apps && <><div className="metric-strip"><Metric label="In the queue" value={apps.length} caption="Applications available"/><Metric label="Needs attention" value={apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length} caption="Review status requires follow-up" accent/><Metric label="Checks passed" value={counts.checks_passed || 0} caption="Configured checks only"/></div>
-        <section className="queue-section"><div className="queue-heading"><div><h3>Recent applications</h3><p>Open an application to review its documents and findings.</p></div><Link to="/applications/new" className="quiet-link">New application <Icon name="arrow" size={16}/></Link></div>
-          {apps.length === 0 ? <EmptyState title="The queue is clear" text="Create an application to begin a preliminary document review." action={<ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink>}/> : <div className="application-table"><div className="table-head"><span>INSTITUTION</span><span>CATEGORY</span><span>ACADEMIC YEAR</span><span>REVIEW STATUS</span><span/></div>{apps.map((app, index) => <div className="application-row" key={app.id} style={{ '--row': index }}><div className="institution-cell"><span className="institution-monogram">{app.institution_name?.split(' ').slice(0,2).map((v) => v[0]).join('')}</span><span><b>{app.institution_name}</b><small>{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Creation date not provided'}</small></span></div><span className="category-cell">{APPLICATION_CATEGORIES.find((c) => c.code === app.application_category)?.label || app.application_category}</span><span>{app.academic_year}</span><Status value={app.overall_status}/><Link className="row-open" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}><span>Documents</span><Icon name="arrow" size={16}/></Link></div>)}</div>}
+      {apps && <><div className="mb-6 grid grid-cols-3 border-y border-[#263b42]/15" aria-label="Application queue summary"><Metric label="In the queue" value={apps.length}/><Metric label="Needs attention" value={apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length} accent/><Metric label="Checks passed" value={counts.checks_passed || 0}/></div>
+        <section aria-labelledby="queue-heading"><div className="mb-3"><h2 id="queue-heading" className="m-0 text-lg font-semibold tracking-tight text-[#334b49]">Applications</h2><p className="mt-1 text-xs leading-relaxed text-[#68736d] sm:text-[13px]">Select a record to review its documents and validation findings.</p></div>
+          {apps.length === 0 ? <EmptyState title="No applications yet" text="Create an application to begin a preliminary document review." action={<ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink>}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:block"><Status value={app.overall_status}/></span><Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link></div>)}</div>}
         </section></>}
-      <div className="scope-ribbon"><span className="scope-icon"><Icon name="shield" size={18}/></span><div><b>A careful distinction</b><p>These checks support preliminary scrutiny. An issue is a prompt for reviewer attention, not proof of fraud or an approval decision.</p></div><span className="ribbon-index">SCOPE / 01</span></div>
     </div>
-  </>
+  </div>
 }
-function Metric({ label, value, caption, accent }) { return <div className={`metric ${accent ? 'metric-accent' : ''}`}><span>{label}</span><strong>{value}</strong><small>{caption}</small></div> }
+function Metric({ label, value, accent }) { return <div className={`flex min-h-15.5 flex-col justify-center gap-1 py-2 pr-1 sm:min-h-17.5 sm:pr-4 ${accent ? 'text-[#9a5d43]' : 'text-[#344f4d]'} [&+div]:border-l [&+div]:border-[#263b42]/15 [&+div]:pl-2 sm:[&+div]:pl-5`}><span className="text-[10px] font-semibold leading-snug text-[#626f69] sm:text-[11px]">{label}</span><strong className="text-xl font-semibold leading-tight sm:text-2xl">{value}</strong></div> }
 
 function DocumentEntry() {
   const [apps, setApps] = useState(null); const [error, setError] = useState('')
@@ -165,7 +173,7 @@ function ApplicationDocumentCentre() {
       setApp((current) => ({ ...current, documents: [...(current.documents || []), uploaded] }))
       setFile(null)
       setType('')
-      event.currentTarget.reset()
+      if (fileInputRef.current) fileInputRef.current.value = ''
       setMessage('Upload received. Processing status will update when the service reports it.')
     } catch (requestError) {
       setMessage(requestError.message)

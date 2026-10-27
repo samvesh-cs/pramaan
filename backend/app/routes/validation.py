@@ -9,9 +9,14 @@ from app.auth.dependencies import (
 from app.database import get_db
 from app.models.application import Application
 from app.models.user import User
-from app.schemas.finding import FindingResponse, FindingReviewUpdate
+from app.schemas.finding import (
+    AcknowledgeDuplicateRequest,
+    FindingResponse,
+    FindingReviewUpdate,
+)
 from app.schemas.report import ReportResponse
 from app.services.validation_engine import validation_engine
+from app.schemas.document import DocumentResponse
 
 router = APIRouter(prefix="/applications/{application_id}", tags=["Validation"])
 
@@ -82,3 +87,27 @@ async def review_finding(
         review_data=payload,
     )
 
+@router.post(
+    "/duplicates/{finding_id}/acknowledge",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    summary="Acknowledge a duplicate warning after reviewer review",
+)
+async def acknowledge_duplicate(
+    application_id: str,
+    finding_id: str,
+    payload: AcknowledgeDuplicateRequest,
+    application: Application = Depends(require_application_access),
+    current_user: User = Depends(require_role("REVIEWER")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Record an authorized reviewer acknowledgment of a duplicate warning.
+    After acknowledgment, the validation report can be generated and will still show the duplicate note.
+    """
+    return await validation_engine.acknowledge_duplicate(
+        db=db,
+        application_id=application.id,
+        finding_id=finding_id,
+        reviewer_notes=payload.reviewer_notes,
+        reviewed_by=payload.reviewed_by or current_user.email,
+    )

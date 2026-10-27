@@ -1,151 +1,239 @@
-"""Generate synthetic test set in backend/tests/samples with 8 documents and backend/tests/ground_truth.json."""
+"""Generate updated synthetic test set in backend/tests/samples with the 3 agreed document types:
+  1. fire_safety_certificate
+  2. building_completion_certificate
+  3. affidavit_2
+
+Includes variants:
+  - clean PDF
+  - scanned-style image
+  - noisy image
+  - tilted image
+  - missing-field variant
+  - expired variant
+  - plus bad-input cases (corrupt, empty, unsupported, password-protected).
+
+Generates backend/tests/ground_truth.json.
+"""
 
 import os
+import shutil
 import json
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 import pymupdf as fitz
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SAMPLES_DIR = os.path.join(BASE_DIR, "samples")
+
+# Clean out old samples directory
+if os.path.exists(SAMPLES_DIR):
+    shutil.rmtree(SAMPLES_DIR)
 os.makedirs(SAMPLES_DIR, exist_ok=True)
 
+
 # 1. Clean PDF: fire_safety_certificate
-def create_clean_pdf(output_path):
+def create_clean_fire_safety(path):
     doc = fitz.open()
-    page = doc.new_page(width=595, height=842) # A4
+    page = doc.new_page(width=595, height=842)
     text = (
-        "GOVERNMENT FIRE & RESCUE SERVICES DEPARTMENT\n"
+        "GOVERNMENT OF NCT OF DELHI\n"
+        "DELHI FIRE SERVICES DEPARTMENT\n"
         "FIRE SAFETY COMPLIANCE CERTIFICATE\n\n"
-        "Institution Name: Synthetic ABC Institute of Technology\n"
+        "Issuing Authority: Delhi Fire Services Department\n"
         "Certificate No: FS-2026-881\n"
         "Date of Issue: 10/02/2026\n"
-        "Valid Until: 09/02/2027\n\n"
-        "This is to certify that the premises of Synthetic ABC Institute of Technology have been inspected "
-        "and found to comply with the National Building Code fire protection norms."
+        "Valid Upto: 09/02/2027\n\n"
+        "Name of the Institution: Synthetic ABC Institute of Technology\n\n"
+        "Certified that the educational premises comprised of ground plus three upper floors "
+        "have complied with fire safety directives under Rule 33 of Delhi Fire Service Rules."
     )
     page.insert_text((50, 80), text, fontsize=12)
-    doc.save(output_path)
+    doc.save(path)
     doc.close()
 
-# 2. Scanned-style image: structural_stability_certificate
-def create_scanned_image(output_path):
-    img = Image.new("RGB", (1240, 1754), color=(248, 248, 246))
+
+# 2. Expired PDF variant: fire_safety_certificate
+def create_expired_fire_safety(path):
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    text = (
+        "GOVERNMENT OF NCT OF DELHI\n"
+        "DELHI FIRE SERVICES DEPARTMENT\n"
+        "FIRE SAFETY COMPLIANCE CERTIFICATE\n\n"
+        "Issuing Authority: Delhi Fire Services Department\n"
+        "Certificate No: FS-2023-104\n"
+        "Date of Issue: 15/01/2023\n"
+        "Valid Until: 14/01/2024\n\n"
+        "Institution Name: Synthetic ABC Institute of Technology\n\n"
+        "Inspection completed for academic year 2023. Validity expired."
+    )
+    page.insert_text((50, 80), text, fontsize=12)
+    doc.save(path)
+    doc.close()
+
+
+# 3. Missing-field PDF variant: fire_safety_certificate (expiry_date missing)
+def create_missing_field_fire_safety(path):
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    text = (
+        "GOVERNMENT OF NCT OF DELHI\n"
+        "DELHI FIRE SERVICES DEPARTMENT\n"
+        "PROVISIONAL FIRE NOC\n\n"
+        "Issuing Authority: Delhi Fire Services Department\n"
+        "NOC No: FS-2026-550\n"
+        "Date of Issue: 01/03/2026\n\n"
+        "Premises of: Synthetic ABC Institute of Technology\n\n"
+        "Provisional NOC issued pending installation of automatic sprinklers. Expiry date omitted."
+    )
+    page.insert_text((50, 80), text, fontsize=12)
+    doc.save(path)
+    doc.close()
+
+
+# 4. Scanned-style image: building_completion_certificate
+def create_scanned_building_completion(path):
+    img = Image.new("RGB", (1240, 1754), color=(248, 248, 245))
     draw = ImageDraw.Draw(img)
     lines = [
-        ("OFFICE OF ACCREDITED STRUCTURAL ENGINEERS", 100, 120),
-        ("STRUCTURAL STABILITY & SOUNDNESS CERTIFICATE", 90, 180),
-        ("Institution Name: Synthetic ABC Institute of Technology", 80, 320),
-        ("Certificate No: SSC-2026-402", 80, 400),
-        ("Engineer License Number: STR-ENG-9821", 80, 480),
-        ("Date of Inspection: 20/01/2026", 80, 560),
-        ("Valid Until: 19/01/2031", 80, 640),
-        ("This is to certify that all instructional buildings and structures are sound and safe.", 80, 750)
+        ("GREATER NOIDA INDUSTRIAL DEVELOPMENT AUTHORITY", 100, 120),
+        ("BUILDING COMPLETION AND OCCUPANCY CERTIFICATE", 90, 180),
+        ("Issuing Authority: Greater Noida Industrial Development Authority", 80, 280),
+        ("Building Completion Certificate No: BCC-2025-901", 80, 360),
+        ("Date of Issue: 20/08/2025", 80, 440),
+        ("Institution Name: Synthetic ABC Institute of Technology", 80, 520),
+        ("Certified that instructional building block A and B have been completed per approved plan.", 80, 620),
+        ("Sanctioned under Building Regulations Clause 7.17 of AICTE Handbook.", 80, 700),
     ]
     for text, x, y in lines:
         draw.text((x, y), text, fill=(20, 20, 20))
-    img.save(output_path, "PNG")
+    img.save(path, "PNG")
 
-# 3. Low-quality image: land_title_deed (with noise, low-res and slight blur)
-def create_low_quality_image(output_path):
-    img = Image.new("RGB", (800, 1100), color=(235, 230, 220))
+
+# 5. Noisy image variant: building_completion_certificate
+def create_noisy_building_completion(path):
+    img = Image.new("RGB", (1100, 1500), color=(238, 235, 228))
     draw = ImageDraw.Draw(img)
     lines = [
-        ("REGISTRATION AND REVENUE DEPARTMENT", 50, 80),
-        ("CERTIFIED COPY OF LAND TITLE DEED", 50, 130),
-        ("Institution Name: Synthetic ABC Institute of Technology", 50, 220),
-        ("Deed No: DEED-2026-5541", 50, 280),
-        ("Total Land Area: 10.5 Acres", 50, 340),
-        ("Date of Registration: 15/11/2025", 50, 400),
-        ("Survey / Khasra No: 142/1, Village Ramnagar", 50, 460),
+        ("MUNICIPAL CORPORATION OF GREATER MUMBAI", 80, 100),
+        ("FORM D - OCCUPANCY / COMPLETION CERTIFICATE", 70, 160),
+        ("Issuing Authority: Municipal Corporation of Greater Mumbai", 60, 260),
+        ("Certificate No: BCC-2025-442", 60, 340),
+        ("Date of Completion: 10/11/2025", 60, 420),
+        ("Name of the Institution: Synthetic ABC Institute of Technology", 60, 500),
+        ("The building complies with municipal building development controls.", 60, 600),
     ]
     for text, x, y in lines:
-        draw.text((x, y), text, fill=(40, 40, 40))
-    
-    # Add noise
+        draw.text((x, y), text, fill=(35, 35, 35))
+
+    # Add noise & compression artifacts
     np_img = np.array(img)
-    noise = np.random.normal(0, 15, np_img.shape).astype(np.int16)
+    noise = np.random.normal(0, 12, np_img.shape).astype(np.int16)
     noisy_img = np.clip(np_img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
-    img = Image.fromarray(noisy_img)
-    img = img.filter(ImageFilter.GaussianBlur(radius=0.8))
-    img.save(output_path, "PNG", quality=40)
+    res_img = Image.fromarray(noisy_img)
+    res_img = res_img.filter(ImageFilter.GaussianBlur(radius=0.5))
+    res_img.save(path, "PNG")
 
-# 4. Multi-page PDF: structural_stability_certificate (Page 1 + Page 2)
-def create_multipage_pdf(output_path):
+
+# 6. Clean PDF: affidavit_2
+def create_clean_affidavit_2(path):
     doc = fitz.open()
-    # Page 1
-    p1 = doc.new_page(width=595, height=842)
-    p1_text = (
-        "CONSULTING STRUCTURAL ENGINEERS & ASSESSORS\n"
-        "COMPREHENSIVE STRUCTURAL AUDIT REPORT\n\n"
-        "Institution Name: Synthetic ABC Institute of Technology\n"
-        "Campus Location: Sector 12, Knowledge Park\n\n"
-        "Page 1 of 2: Preliminary Site Inspection Summary.\n"
-        "Visual assessment and non-destructive rebound hammer tests conducted."
+    page = doc.new_page(width=595, height=842)
+    text = (
+        "GOVERNMENT OF INDIA\n"
+        "NON-JUDICIAL E-STAMP CERTIFICATE - RS. 100\n"
+        "FORMAT OF AFFIDAVIT - 2 (Clause 2.1(i) of Annexure-2)\n\n"
+        "I, Rajesh Kumar Sharma, Chairman of the Trust, on behalf of\n"
+        "Synthetic ABC Institute of Technology do hereby solemnly affirm and state:\n\n"
+        "1. That the information furnished in the AICTE application portal is true and correct.\n"
+        "2. That the institution possesses required land, buildings and faculty per AICTE norms.\n"
+        "3. That all uploaded certificates including Fire Safety and Completion are genuine.\n\n"
+        "Deponent: Rajesh Kumar Sharma\n\n"
+        "Sworn before me on: 15/01/2026\n"
+        "Notary Public, New Delhi"
     )
-    p1.insert_text((50, 80), p1_text, fontsize=12)
-
-    # Page 2
-    p2 = doc.new_page(width=595, height=842)
-    p2_text = (
-        "FINAL COMPLIANCE & CERTIFICATION DETAILS\n\n"
-        "Certificate No: SSC-2026-905\n"
-        "Engineer License Number: SE-LIC-4421\n"
-        "Date of Inspection: 01/03/2026\n"
-        "Valid Until: 28/02/2029\n\n"
-        "The institutional superstructure satisfies seismic zone III design criteria."
-    )
-    p2.insert_text((50, 80), p2_text, fontsize=12)
-    doc.save(output_path)
+    page.insert_text((50, 80), text, fontsize=12)
+    doc.save(path)
     doc.close()
 
-# 5. Corrupt file: corrupt_doc.pdf
-def create_corrupt_file(output_path):
-    with open(output_path, "wb") as f:
-        f.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\nThis is completely broken and corrupt content.\x00\xff\xfe\x00")
 
-# 6. Empty file: empty_doc.pdf
-def create_empty_file(output_path):
-    with open(output_path, "wb") as f:
+# 7. Tilted image variant: affidavit_2
+def create_tilted_affidavit_2(path):
+    img = Image.new("RGB", (1240, 1754), color=(250, 250, 248))
+    draw = ImageDraw.Draw(img)
+    lines = [
+        ("GOVERNMENT OF INDIA E-STAMP", 120, 100),
+        ("AFFIDAVIT - 2 (AICTE EOA SELF-DISCLOSURE)", 100, 170),
+        ("I, Vikram Singh, Secretary, deponent for", 80, 280),
+        ("Institution Name: Synthetic ABC Institute of Technology", 80, 360),
+        ("solemnly declare that all statutory requirements are duly fulfilled.", 80, 460),
+        ("Deponent Name: Vikram Singh", 80, 560),
+        ("Sworn before me on: 18/02/2026", 80, 660),
+        ("Advocate & Notary Public", 80, 740),
+    ]
+    for text, x, y in lines:
+        draw.text((x, y), text, fill=(25, 25, 25))
+
+    # Tilt by 1.8 degrees
+    tilted = img.rotate(1.8, expand=True, fillcolor=(250, 250, 248))
+    tilted.save(path, "PNG")
+
+
+# 8. Corrupt file: corrupt_doc.pdf
+def create_corrupt_file(path):
+    with open(path, "wb") as f:
+        f.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\nBroken invalid content\x00\xff\xfe")
+
+
+# 9. Empty file: empty_doc.pdf
+def create_empty_file(path):
+    with open(path, "wb") as f:
         pass
 
-# 7. Unsupported type: unsupported_format.docx
-def create_unsupported_file(output_path):
-    with open(output_path, "wb") as f:
-        f.write(b"PK\x03\x04Mock Docx unsupported archive content.")
 
-# 8. Password-protected PDF: password_protected.pdf
-def create_password_pdf(output_path):
+# 10. Unsupported file: unsupported_format.docx
+def create_unsupported_file(path):
+    with open(path, "wb") as f:
+        f.write(b"PK\x03\x04Unsupported MS Word format archive")
+
+
+# 11. Password-protected PDF: password_protected.pdf
+def create_password_pdf(path):
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     page.insert_text((50, 80), "Encrypted Confidential Document\nInstitution: Synthetic ABC Institute of Technology", fontsize=12)
-    # Encrypt with owner/user password
     perm = fitz.PDF_PERM_ACCESSIBILITY
     encrypt_meth = fitz.PDF_ENCRYPT_AES_256
-    doc.save(output_path, encryption=encrypt_meth, user_pw="secret123", owner_pw="adminpass", permissions=perm)
+    doc.save(path, encryption=encrypt_meth, user_pw="secret123", owner_pw="adminpass", permissions=perm)
     doc.close()
 
 
 def generate_all():
     files = {
-        "clean_pdf": os.path.join(SAMPLES_DIR, "clean_fire_safety.pdf"),
-        "scanned_image": os.path.join(SAMPLES_DIR, "scanned_structural_stability.png"),
-        "low_quality_image": os.path.join(SAMPLES_DIR, "low_quality_land_deed.png"),
-        "multipage_pdf": os.path.join(SAMPLES_DIR, "multipage_structural_stability.pdf"),
-        "corrupt_file": os.path.join(SAMPLES_DIR, "corrupt_doc.pdf"),
-        "empty_file": os.path.join(SAMPLES_DIR, "empty_doc.pdf"),
-        "unsupported_type": os.path.join(SAMPLES_DIR, "unsupported_format.docx"),
-        "password_protected_pdf": os.path.join(SAMPLES_DIR, "password_protected.pdf")
+        "clean_fire_safety.pdf": os.path.join(SAMPLES_DIR, "clean_fire_safety.pdf"),
+        "expired_fire_safety.pdf": os.path.join(SAMPLES_DIR, "expired_fire_safety.pdf"),
+        "missing_field_fire_safety.pdf": os.path.join(SAMPLES_DIR, "missing_field_fire_safety.pdf"),
+        "scanned_building_completion.png": os.path.join(SAMPLES_DIR, "scanned_building_completion.png"),
+        "noisy_building_completion.png": os.path.join(SAMPLES_DIR, "noisy_building_completion.png"),
+        "clean_affidavit_2.pdf": os.path.join(SAMPLES_DIR, "clean_affidavit_2.pdf"),
+        "tilted_affidavit_2.png": os.path.join(SAMPLES_DIR, "tilted_affidavit_2.png"),
+        "corrupt_doc.pdf": os.path.join(SAMPLES_DIR, "corrupt_doc.pdf"),
+        "empty_doc.pdf": os.path.join(SAMPLES_DIR, "empty_doc.pdf"),
+        "unsupported_format.docx": os.path.join(SAMPLES_DIR, "unsupported_format.docx"),
+        "password_protected.pdf": os.path.join(SAMPLES_DIR, "password_protected.pdf"),
     }
 
-    create_clean_pdf(files["clean_pdf"])
-    create_scanned_image(files["scanned_image"])
-    create_low_quality_image(files["low_quality_image"])
-    create_multipage_pdf(files["multipage_pdf"])
-    create_corrupt_file(files["corrupt_file"])
-    create_empty_file(files["empty_file"])
-    create_unsupported_file(files["unsupported_type"])
-    create_password_pdf(files["password_protected_pdf"])
+    create_clean_fire_safety(files["clean_fire_safety.pdf"])
+    create_expired_fire_safety(files["expired_fire_safety.pdf"])
+    create_missing_field_fire_safety(files["missing_field_fire_safety.pdf"])
+    create_scanned_building_completion(files["scanned_building_completion.png"])
+    create_noisy_building_completion(files["noisy_building_completion.png"])
+    create_clean_affidavit_2(files["clean_affidavit_2.pdf"])
+    create_tilted_affidavit_2(files["tilted_affidavit_2.png"])
+    create_corrupt_file(files["corrupt_doc.pdf"])
+    create_empty_file(files["empty_doc.pdf"])
+    create_unsupported_file(files["unsupported_format.docx"])
+    create_password_pdf(files["password_protected.pdf"])
 
     ground_truth = {
         "clean_fire_safety.pdf": {
@@ -156,42 +244,74 @@ def generate_all():
                 "institution_name": "Synthetic ABC Institute of Technology",
                 "document_number": "FS-2026-881",
                 "issue_date": "2026-02-10",
-                "expiry_date": "2027-02-09"
+                "expiry_date": "2027-02-09",
+                "issuing_authority": "Delhi Fire Services Department"
             }
         },
-        "scanned_structural_stability.png": {
-            "category": "scanned-style image",
-            "document_type": "structural_stability_certificate",
+        "expired_fire_safety.pdf": {
+            "category": "expired variant (PDF)",
+            "document_type": "fire_safety_certificate",
             "expected_processing_status": "processed",
             "expected_fields": {
                 "institution_name": "Synthetic ABC Institute of Technology",
-                "document_number": "SSC-2026-402",
-                "engineer_license_number": "STR-ENG-9821",
-                "issue_date": "2026-01-20",
-                "expiry_date": "2031-01-19"
+                "document_number": "FS-2023-104",
+                "issue_date": "2023-01-15",
+                "expiry_date": "2024-01-14",
+                "issuing_authority": "Delhi Fire Services Department"
             }
         },
-        "low_quality_land_deed.png": {
-            "category": "low-quality image",
-            "document_type": "land_title_deed",
+        "missing_field_fire_safety.pdf": {
+            "category": "missing-field variant (PDF)",
+            "document_type": "fire_safety_certificate",
             "expected_processing_status": "processed",
             "expected_fields": {
                 "institution_name": "Synthetic ABC Institute of Technology",
-                "document_number": "DEED-2026-5541",
-                "land_area": "10.5 Acres",
-                "issue_date": "2025-11-15"
-            }
-        },
-        "multipage_structural_stability.pdf": {
-            "category": "multi-page PDF",
-            "document_type": "structural_stability_certificate",
-            "expected_processing_status": "processed",
-            "expected_fields": {
-                "institution_name": "Synthetic ABC Institute of Technology",
-                "document_number": "SSC-2026-905",
-                "engineer_license_number": "SE-LIC-4421",
+                "document_number": "FS-2026-550",
                 "issue_date": "2026-03-01",
-                "expiry_date": "2029-02-28"
+                "expiry_date": None,
+                "issuing_authority": "Delhi Fire Services Department"
+            }
+        },
+        "scanned_building_completion.png": {
+            "category": "scanned-style image",
+            "document_type": "building_completion_certificate",
+            "expected_processing_status": "processed",
+            "expected_fields": {
+                "institution_name": "Synthetic ABC Institute of Technology",
+                "document_number": "BCC-2025-901",
+                "issue_date": "2025-08-20",
+                "issuing_authority": "Greater Noida Industrial Development Authority"
+            }
+        },
+        "noisy_building_completion.png": {
+            "category": "noisy image variant",
+            "document_type": "building_completion_certificate",
+            "expected_processing_status": "processed",
+            "expected_fields": {
+                "institution_name": "Synthetic ABC Institute of Technology",
+                "document_number": "BCC-2025-442",
+                "issue_date": "2025-11-10",
+                "issuing_authority": "Municipal Corporation of Greater Mumbai"
+            }
+        },
+        "clean_affidavit_2.pdf": {
+            "category": "clean PDF",
+            "document_type": "affidavit_2",
+            "expected_processing_status": "processed",
+            "expected_fields": {
+                "institution_name": "Synthetic ABC Institute of Technology",
+                "notary_date": "2026-01-15",
+                "signatory_name": "Rajesh Kumar Sharma"
+            }
+        },
+        "tilted_affidavit_2.png": {
+            "category": "tilted image variant",
+            "document_type": "affidavit_2",
+            "expected_processing_status": "processed",
+            "expected_fields": {
+                "institution_name": "Synthetic ABC Institute of Technology",
+                "notary_date": "2026-02-18",
+                "signatory_name": "Vikram Singh"
             }
         },
         "corrupt_doc.pdf": {
@@ -214,7 +334,7 @@ def generate_all():
         },
         "password_protected.pdf": {
             "category": "bad input: password-protected PDF",
-            "document_type": "structural_stability_certificate",
+            "document_type": "building_completion_certificate",
             "expected_processing_status": "processing_failed",
             "expected_fields": {}
         }
@@ -224,8 +344,8 @@ def generate_all():
     with open(gt_path, "w", encoding="utf-8") as f:
         json.dump(ground_truth, f, indent=2)
 
-    print(f"Generated 8 synthetic documents in: {SAMPLES_DIR}")
-    print(f"Generated ground truth file in: {gt_path}")
+    print(f"Generated {len(files)} synthetic documents in: {SAMPLES_DIR}")
+    print(f"Updated ground truth in: {gt_path}")
 
 
 if __name__ == "__main__":

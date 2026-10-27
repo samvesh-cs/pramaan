@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
-import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl, submitApplication } from './api'
+import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl, fetchDocumentBlob, submitApplication } from './api'
 import { useAuth } from './auth/useAuth'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -293,6 +293,8 @@ function ApplicationDocumentCentre() {
   const [message, setMessage] = useState('')
   const [dragging, setDragging] = useState(false)
 
+  const [drawerDoc, setDrawerDoc] = useState(null)
+
   const load = () => {
     setLoading(true)
     setError('')
@@ -318,8 +320,12 @@ function ApplicationDocumentCentre() {
     uploadSectionRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
     requestAnimationFrame(() => documentTypeRef.current?.focus())
   }
-  const showUploadedFile = (documentId) => {
-    window.document.getElementById(`uploaded-${documentId}`)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
+  const inspectDoc = (doc) => {
+    setDrawerDoc({
+      documentId: doc.id,
+      documentName: doc.original_filename || labelForDocument(doc.document_type),
+      pageNumber: 1,
+    })
   }
   const submit = async (event) => {
     event.preventDefault()
@@ -424,7 +430,7 @@ function ApplicationDocumentCentre() {
         const doc = documents.find((entry) => entry.document_type === item.code)
         const state = doc?.processing_status || 'missing'
         const stateLabel = { missing: 'Missing · not received', uploaded: 'Uploaded · awaiting processing', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed' }[state] || state
-        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked || isReviewer ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : (isLocked || isReviewer) ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
+        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked || isReviewer ? <button type="button" className="workflow-row-action" onClick={() => inspectDoc(doc)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => inspectDoc(doc)}>Review file <Icon name="arrow" size={14} /></button> : (isLocked || isReviewer) ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
       })}</div>
       <p className="checklist-disclaimer">Presence and processing status are based on the application response. The listed types remain demo configuration until the team confirms an official source.</p>
     </section>
@@ -450,7 +456,7 @@ function ApplicationDocumentCentre() {
       </section>
     )}
 
-    <section className="workflow-section uploaded-section" aria-labelledby="uploaded-heading"><div className="workflow-section-head"><div><span className="workflow-step-number">{isReviewer ? '02' : '03'}</span><div><div className="eyebrow">APPLICATION FILE</div><h2 id="uploaded-heading">Uploaded documents</h2></div></div><span className="section-side-note">{documents.length} {documents.length === 1 ? 'file' : 'files'} · {processedCount} processed</span></div>{documents.length === 0 ? <EmptyState title="No documents received" text="Files appear here after the upload request returns successfully." /> : <div className="uploaded-file-table"><div className="uploaded-file-header"><span>FILE NAME</span><span>DOCUMENT TYPE</span><span>PROCESSING STATUS</span><span>FILE TYPE</span></div>{documents.map((doc) => <DocumentItem key={doc.id} doc={doc} />)}</div>}
+    <section className="workflow-section uploaded-section" aria-labelledby="uploaded-heading"><div className="workflow-section-head"><div><span className="workflow-step-number">{isReviewer ? '02' : '03'}</span><div><div className="eyebrow">APPLICATION FILE</div><h2 id="uploaded-heading">Uploaded documents</h2></div></div><span className="section-side-note">{documents.length} {documents.length === 1 ? 'file' : 'files'} · {processedCount} processed</span></div>{documents.length === 0 ? <EmptyState title="No documents received" text="Files appear here after the upload request returns successfully." /> : <div className="uploaded-file-table"><div className="uploaded-file-header"><span>FILE NAME</span><span>DOCUMENT TYPE</span><span>PROCESSING STATUS</span><span>FILE TYPE</span></div>{documents.map((doc) => <DocumentItem key={doc.id} doc={doc} onInspect={inspectDoc} />)}</div>}
       {isReviewer && documents.some((doc) => fieldsForDocument(doc).length) && (
         <div className="fields-panel">
           <div className="eyebrow">EXTRACTED FIELD INSPECTION</div>
@@ -512,9 +518,35 @@ function ApplicationDocumentCentre() {
         </div>
       </section>
     )}
+
+    <DocumentViewerDrawer
+      isOpen={!!drawerDoc}
+      onClose={() => setDrawerDoc(null)}
+      applicationId={id}
+      docInfo={drawerDoc}
+    />
   </div>
 }
-function DocumentItem({ doc }) { return <article className="received-item uploaded-file-row" id={`uploaded-${doc.id}`}><span className="uploaded-file-name"><span className="file-mark"><Icon name="documents" size={20} /></span><b>{doc.original_filename || labelForDocument(doc.document_type)}</b></span><span className="uploaded-type-name">{labelForDocument(doc.document_type)}</span><Status value={doc.processing_status || 'uploaded'} /><span className="uploaded-mime">{doc.mime_type?.includes('pdf') ? 'PDF' : doc.mime_type?.split('/')[1]?.toUpperCase() || doc.mime_type || 'Not provided'}</span></article> }
+function DocumentItem({ doc, onInspect }) {
+  return (
+    <article className="received-item uploaded-file-row" id={`uploaded-${doc.id}`} style={{ cursor: onInspect ? 'pointer' : 'default' }} onClick={() => onInspect?.(doc)}>
+      <span className="uploaded-file-name">
+        <span className="file-mark"><Icon name="documents" size={20} /></span>
+        <b>{doc.original_filename || labelForDocument(doc.document_type)}</b>
+      </span>
+      <span className="uploaded-type-name">{labelForDocument(doc.document_type)}</span>
+      <Status value={doc.processing_status || 'uploaded'} />
+      <span className="uploaded-mime" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+        <span>{doc.mime_type?.includes('pdf') ? 'PDF' : doc.mime_type?.split('/')[1]?.toUpperCase() || doc.mime_type || 'Not provided'}</span>
+        {onInspect && (
+          <span style={{ fontSize: '11px', color: '#315e5b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px', textDecoration: 'underline' }}>
+            View <Icon name="arrow" size={12} />
+          </span>
+        )}
+      </span>
+    </article>
+  )
+}
 function fieldsForDocument(doc) {
   if (Array.isArray(doc.fields)) return doc.fields
   if (doc.fields && typeof doc.fields === 'object') return Object.entries(doc.fields).map(([name, data]) => ({ name: name.replaceAll('_', ' '), field: name, ...data, status: data.status === 'uncertain' ? 'unresolved' : data.status === 'missing' || data.value == null ? 'missing' : 'processed', evidence: data.raw_text || null }))
@@ -703,9 +735,47 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
 }
 
 function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
+  const { documentId, documentName, pageNumber, bbox, evidenceText } = docInfo || {}
+  const fileUrl = applicationId && documentId ? getDocumentFileUrl(applicationId, documentId) : ''
+  const [blobUrl, setBlobUrl] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    if (!isOpen || !applicationId || !documentId) {
+      setBlobUrl(null)
+      return undefined
+    }
+
+    let active = true
+    let createdUrl = null
+    setLoading(true)
+    setLoadError('')
+    setBlobUrl(null)
+
+    fetchDocumentBlob(applicationId, documentId)
+      .then((blob) => {
+        if (!active) return
+        createdUrl = URL.createObjectURL(blob)
+        setBlobUrl(createdUrl)
+      })
+      .catch((err) => {
+        if (!active) return
+        setLoadError(err.message || 'Could not load document preview.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl)
+      }
+    }
+  }, [isOpen, applicationId, documentId])
+
   if (!isOpen || !docInfo) return null
-  const { documentId, documentName, pageNumber, bbox, evidenceText } = docInfo
-  const fileUrl = getDocumentFileUrl(applicationId, documentId)
 
   return (
     <div className="viewer-drawer-backdrop" onClick={onClose}>
@@ -735,12 +805,26 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
           </div>
         )}
 
-        <div className="viewer-frame-container">
-          <iframe
-            src={`${fileUrl}#page=${pageNumber || 1}`}
-            title="Document Viewer"
-            className="viewer-iframe"
-          />
+        <div className="viewer-frame-container" style={{ position: 'relative', minHeight: '400px' }}>
+          {loading && <Loading label="Loading document preview…" />}
+          {loadError && (
+            <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+              <ErrorNotice message={loadError} />
+              <p style={{ marginTop: '16px', fontSize: '13px', color: '#68736d' }}>
+                You can also try opening the authenticated document in a new tab:
+              </p>
+              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="button button-primary" style={{ display: 'inline-flex', marginTop: '8px' }}>
+                Open in new tab <Icon name="arrow" size={14} />
+              </a>
+            </div>
+          )}
+          {blobUrl && (
+            <iframe
+              src={`${blobUrl}#page=${pageNumber || 1}`}
+              title="Document Viewer"
+              className="viewer-iframe"
+            />
+          )}
         </div>
 
         <div className="viewer-footer">

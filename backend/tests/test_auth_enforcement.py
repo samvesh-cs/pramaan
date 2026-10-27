@@ -291,6 +291,19 @@ async def test_reviewer_can_validate_submitted_app(client: AsyncClient, users_an
     assert "findings" in data
 
 
+@pytest.mark.asyncio
+async def test_token_in_query_param_authenticates_request(client: AsyncClient, users_and_apps):
+    rev_token = users_and_apps["rev"]
+    # Request without token fails with 401
+    res_no_auth = await client.get("/api/applications/app-inst1-submitted")
+    assert res_no_auth.status_code == 401
+
+    # Request with ?token= query parameter succeeds with 200
+    res = await client.get(f"/api/applications/app-inst1-submitted?token={rev_token}")
+    assert res.status_code == 200
+    assert res.json()["id"] == "app-inst1-submitted"
+
+
 # ==========================================
 # 5. Unauthenticated / Invalid Token Tests
 # ==========================================

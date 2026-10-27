@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,16 +17,18 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
+    token_query: str | None = Query(None, alias="token"),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if not token:
+    effective_token = token or token_query
+    if not effective_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials were not provided.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(token)
+    payload = decode_access_token(effective_token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -61,12 +63,14 @@ async def get_current_user(
 
 async def get_optional_user(
     token: str | None = Depends(oauth2_scheme),
+    token_query: str | None = Query(None, alias="token"),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
-    if not token:
+    effective_token = token or token_query
+    if not effective_token:
         return None
     try:
-        return await get_current_user(token=token, db=db)
+        return await get_current_user(token=token, token_query=token_query, db=db)
     except HTTPException:
         return None
 

@@ -268,7 +268,43 @@ export async function reviewFinding(applicationId, findingId, payload) {
 }
 
 export function getDocumentFileUrl(applicationId, documentId) {
-  return `${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(documentId)}/file`
+  const token = inMemoryAccessToken
+  const query = token ? `?token=${encodeURIComponent(token)}` : ''
+  return `${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(documentId)}/file${query}`
+}
+
+export async function fetchDocumentBlob(applicationId, documentId) {
+  let token = inMemoryAccessToken
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  const url = `${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(documentId)}/file`
+  let response = await fetch(url, { headers, credentials: 'include' })
+
+  if (response.status === 401) {
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAuth().finally(() => {
+          refreshPromise = null
+        })
+      }
+      const refreshResult = await refreshPromise
+      if (refreshResult?.access_token) {
+        token = refreshResult.access_token
+        headers['Authorization'] = `Bearer ${token}`
+        response = await fetch(url, { headers, credentials: 'include' })
+      }
+    } catch {
+      inMemoryAccessToken = null
+      throw new Error('Authentication expired. Please log in again.')
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+  return response.blob()
 }
 
 export function getChecklist() { return DOCUMENT_TYPES }

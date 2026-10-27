@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
-import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl } from './api'
+import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, getDocumentFileUrl, submitApplication } from './api'
+import { useAuth } from './auth/useAuth'
+import { ProtectedRoute } from './auth/ProtectedRoute'
+import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 
 const iconPaths = {
   overview: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></>,
@@ -34,6 +38,7 @@ function ErrorNotice({ message, onRetry }) { return <div className="error-notice
 
 function Shell({ children }) {
   const location = useLocation()
+  const { user, logout, isReviewer } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 800px)').matches)
   const previousPath = useRef(location.pathname)
@@ -59,8 +64,10 @@ function Shell({ children }) {
     const timeout = window.setTimeout(() => setTransitionPath((activePath) => activePath === location.pathname ? null : activePath), 720)
     return () => window.clearTimeout(timeout)
   }, [location.pathname])
-  const primary = [['/', 'overview', 'Overview'], ['/documents', 'upload', 'Documents'], ['/applications/new', 'plus', 'New application']]
-  const pageTitle = location.pathname === '/' ? 'Overview' : location.pathname === '/documents' ? 'Documents' : location.pathname.includes('/report') ? 'Validation report' : location.pathname.includes('/audit') ? 'Audit workspace' : location.pathname.includes('/documents') ? 'Document centre' : 'New application'
+  const primary = isReviewer
+    ? [['/', 'overview', 'Scrutiny Queue']]
+    : [['/', 'overview', 'My Applications'], ['/documents', 'upload', 'Documents'], ['/applications/new', 'plus', 'New application']]
+  const pageTitle = location.pathname === '/' ? (isReviewer ? 'Scrutiny Queue' : 'My Applications') : location.pathname === '/documents' ? 'Documents' : location.pathname.includes('/report') ? 'Validation report' : location.pathname.includes('/audit') ? 'Audit workspace' : location.pathname.includes('/documents') ? 'Document centre' : 'New application'
   const sidebarExpanded = isMobile ? menuOpen : !menuOpen
   return <div className={`app-shell ${!isMobile && menuOpen ? 'sidebar-collapsed' : ''}`}>
     {transitionPath === location.pathname && <div key={transitionPath} className="holo-transition is-active" aria-hidden="true"><span className="holo-veil"/><span className="holo-grid"/><span className="holo-document-outline"><i className="holo-corner corner-tl"/><i className="holo-corner corner-tr"/><i className="holo-corner corner-bl"/><i className="holo-corner corner-br"/></span><span className="holo-scan-line"/><span className="holo-fragment fragment-a"/><span className="holo-fragment fragment-b"/><span className="holo-fragment fragment-c"/></div>}
@@ -68,9 +75,28 @@ function Shell({ children }) {
     <aside id="primary-navigation" className={`sidebar ${isMobile && menuOpen ? 'sidebar-open' : ''}`} aria-label="Primary navigation" aria-hidden={isMobile && !menuOpen} inert={isMobile && !menuOpen}>
       <Link to="/" className="brand" aria-label="Pramaan home"><span className="brand-mark"><svg aria-hidden="true" viewBox="0 0 32 32" fill="none"><path d="M12 5H7v22h5M20 5h5v22h-5" stroke="#e6e1d7" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter"/><path d="M12.5 12.5h7M12.5 16h5" stroke="#e6e1d7" strokeWidth="1.6" strokeLinecap="round"/><path d="m18 21 2 2 4-5" stroke="#d8a66c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span><span className="brand-copy"><b>pramaan</b><small>REVIEW WORKSPACE</small></span></Link>
       <nav className="side-nav">{primary.map(([to, icon, label]) => <NavLink key={to} to={to} end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title={label} aria-label={label}><Icon name={icon} size={18}/><span>{label}</span></NavLink>)}</nav>
-      <div className="sidebar-foot"><div className="review-note"><Icon name="shield" size={16}/><p>Preliminary scrutiny supports reviewers; it does not verify authenticity or decide approval.</p></div><div className="sidebar-user"><span className="sidebar-user-copy"><b>Review desk</b><small>Institutional scrutiny</small></span></div></div>
+      <div className="sidebar-foot">
+        <div className="review-note"><Icon name="shield" size={16}/><p>Preliminary scrutiny supports reviewers; it does not verify authenticity or decide approval.</p></div>
+        <div className="sidebar-user" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="sidebar-user-copy" style={{ maxWidth: '140px', overflow: 'hidden' }}>
+            <b style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={user?.institution_name || user?.email}>{user?.institution_name || user?.email}</b>
+            <small style={{ color: isReviewer ? '#d8a66c' : '#7fc4be', fontWeight: 600 }}>{isReviewer ? 'AICTE REVIEWER' : 'INSTITUTION'}</small>
+          </span>
+          <button type="button" onClick={logout} style={{ background: 'none', border: 'none', color: '#aab4ac', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}>Sign out</button>
+        </div>
+      </div>
     </aside>
-    <main className="main-area"><div className="ambient-contours" aria-hidden="true"><svg viewBox="0 0 600 600" fill="none"><path d="M608 31C494 4 331 34 274 115c-38 54-13 115 43 135 76 28 196-25 198-94 2-59-78-89-144-65-82 30-114 123-86 204 28 80 121 126 220 101 75-19 122-75 99-131-21-50-98-63-155-33-70 37-82 118-42 183 40 66 116 103 193 91"/><path d="M603 66c-94-20-228 5-277 67-33 43-15 91 32 109 63 24 163-20 164-76 1-48-64-73-120-52-69 26-95 103-72 170 23 66 102 103 185 83 63-16 101-62 82-108-18-42-82-53-130-28-57 30-67 96-35 150 34 56 96 87 160 77"/><path d="M600 103c-75-15-177 1-216 49-27 33-15 69 23 84 49 18 128-16 129-59 1-37-51-56-95-39-55 21-75 82-58 135 18 52 81 81 148 65 50-12 80-49 65-84-14-33-65-41-103-22-45 24-53 75-27 117 26 44 76 68 127 60"/><path d="M596 144c-55-9-128 0-158 34-21 23-13 48 15 59 37 13 96-12 97-43 1-27-38-41-70-28-40 15-55 60-42 99 13 38 60 58 108 47 36-8 57-36 46-62-10-23-47-29-74-15-32 17-37 53-19 83 19 32 55 49 92 43"/></svg></div><header className="topbar"><button type="button" className="icon-button mobile-menu" aria-controls="primary-navigation" aria-expanded={sidebarExpanded} aria-label={sidebarExpanded ? 'Collapse navigation sidebar' : 'Expand navigation sidebar'} onClick={() => setMenuOpen((open) => !open)}><Icon name="menu"/></button><div className="topbar-page-title" aria-live="polite">{pageTitle}</div></header>
+    <main className="main-area"><div className="ambient-contours" aria-hidden="true"><svg viewBox="0 0 600 600" fill="none"><path d="M608 31C494 4 331 34 274 115c-38 54-13 115 43 135 76 28 196-25 198-94 2-59-78-89-144-65-82 30-114 123-86 204 28 80 121 126 220 101 75-19 122-75 99-131-21-50-98-63-155-33-70 37-82 118-42 183 40 66 116 103 193 91"/><path d="M603 66c-94-20-228 5-277 67-33 43-15 91 32 109 63 24 163-20 164-76 1-48-64-73-120-52-69 26-95 103-72 170 23 66 102 103 185 83 63-16 101-62 82-108-18-42-82-53-130-28-57 30-67 96-35 150 34 56 96 87 160 77"/><path d="M600 103c-75-15-177 1-216 49-27 33-15 69 23 84 49 18 128-16 129-59 1-37-51-56-95-39-55 21-75 82-58 135 18 52 81 81 148 65 50-12 80-49 65-84-14-33-65-41-103-22-45 24-53 75-27 117 26 44 76 68 127 60"/><path d="M596 144c-55-9-128 0-158 34-21 23-13 48 15 59 37 13 96-12 97-43 1-27-38-41-70-28-40 15-55 60-42 99 13 38 60 58 108 47 36-8 57-36 46-62-10-23-47-29-74-15-32 17-37 53-19 83 19 32 55 49 92 43"/></svg></div>
+      <header className="topbar">
+        <button type="button" className="icon-button mobile-menu" aria-controls="primary-navigation" aria-expanded={sidebarExpanded} aria-label={sidebarExpanded ? 'Collapse navigation sidebar' : 'Expand navigation sidebar'} onClick={() => setMenuOpen((open) => !open)}><Icon name="menu"/></button>
+        <div className="topbar-page-title" aria-live="polite">{pageTitle}</div>
+        <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '12px', color: '#68736d' }}>{user?.email}</span>
+          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '3px', background: isReviewer ? '#d8a66c22' : '#315e5b22', color: isReviewer ? '#9a5d43' : '#315e5b', fontWeight: 600 }}>
+            {isReviewer ? 'REVIEWER' : 'INSTITUTION'}
+          </span>
+        </div>
+      </header>
       <div className={`page-stage ${transitionPath === location.pathname ? 'route-entering' : ''}`} key={location.pathname}>{children}</div>
       <footer className="footer"><span>SIH 2026 · PS 26261</span><span>Preliminary review only <i>·</i> Human judgment required</span></footer>
     </main>
@@ -78,21 +104,30 @@ function Shell({ children }) {
 }
 
 function Overview() {
+  const { isReviewer, isInstitution } = useAuth()
   const [apps, setApps] = useState(null); const [error, setError] = useState('')
   const load = () => { setError(''); listApplications().then(setApps).catch((e) => setError(e.message)) }
   useEffect(load, [])
   const counts = useMemo(() => (apps || []).reduce((sum, app) => { sum[app.overall_status] = (sum[app.overall_status] || 0) + 1; return sum }, {}), [apps])
   return <div className="mx-auto w-full max-w-6xl">
     <header className="mb-7 mt-2 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
-      <div><div className="eyebrow text-[#6e7872]">REVIEW DESK · 2026 / 27</div><h1 className="my-2 text-[29px] font-semibold leading-tight tracking-[-0.035em] text-[#1d3036] sm:text-4xl">Application queue</h1><p className="m-0 max-w-2xl text-[13px] leading-relaxed text-[#68736d] sm:text-sm">Review submitted applications and open a record to inspect its documents and findings.</p></div>
-      <ButtonLink to="/applications/new" icon="plus">New application</ButtonLink>
+      <div>
+        <div className="eyebrow text-[#6e7872]">{isReviewer ? 'AICTE SCRUTINY DESK · 2026 / 27' : 'INSTITUTION WORKSPACE · 2026 / 27'}</div>
+        <h1 className="my-2 text-[29px] font-semibold leading-tight tracking-[-0.035em] text-[#1d3036] sm:text-4xl">{isReviewer ? 'Scrutiny queue' : 'My applications'}</h1>
+        <p className="m-0 max-w-2xl text-[13px] leading-relaxed text-[#68736d] sm:text-sm">
+          {isReviewer
+            ? 'Review submitted institution applications, inspect supporting documents, and audit rule findings.'
+            : 'Manage your AICTE applications, upload supporting documents, run preliminary validation, and track review status.'}
+        </p>
+      </div>
+      {isInstitution && <ButtonLink to="/applications/new" icon="plus">New application</ButtonLink>}
     </header>
     <div><div className="mb-3 text-xs text-[#777f78]">{USE_MOCKS ? 'Synthetic demonstration records' : 'Applications from the live API'}</div>
       {error && <ErrorNotice message={error} onRetry={load}/>}
       {!apps && !error && <div className="queue-loading"><Loading label="Gathering applications"/></div>}
       {apps && <><div className="mb-6 grid grid-cols-3 border-y border-[#263b42]/15" aria-label="Application queue summary"><Metric label="In the queue" value={apps.length}/><Metric label="Needs attention" value={apps.filter((a) => ['missing_documents','discrepancies_found','unresolved_checks','processing_incomplete'].includes(a.overall_status)).length} accent/><Metric label="Checks passed" value={counts.checks_passed || 0}/></div>
         <section aria-labelledby="queue-heading"><div className="mb-3"><h2 id="queue-heading" className="m-0 text-lg font-semibold tracking-tight text-[#334b49]">Applications</h2><p className="mt-1 text-xs leading-relaxed text-[#68736d] sm:text-[13px]">Select a record to review its documents and validation findings.</p></div>
-          {apps.length === 0 ? <EmptyState title="No applications yet" text="Create an application to begin a preliminary document review." action={<ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink>}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:block"><Status value={app.overall_status}/></span><Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link></div>)}</div>}
+          {apps.length === 0 ? <EmptyState title={isReviewer ? 'No applications submitted yet' : 'No applications yet'} text={isReviewer ? 'Submitted applications from institutions will appear here.' : 'Create an application to begin a preliminary document review.'} action={isInstitution ? <ButtonLink to="/applications/new" icon="arrow">Create application</ButtonLink> : null}/> : <div className="overflow-x-auto border-t border-[#263b42]/20"><div className="hidden min-w-190 grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] items-center gap-4 border-b border-[#263b42]/15 px-3 py-3 text-[10px] font-semibold tracking-[.06em] text-[#777f78] sm:grid"><span>INSTITUTION</span><span>ACADEMIC YEAR</span><span>DOCUMENTS</span><span>REVIEW STATUS</span><span/></div>{apps.map((app) => <div className="grid min-h-17 min-w-90 grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2 border-b border-[#263b42]/15 px-1 py-2.5 text-sm text-[#394d4b] sm:min-w-190 sm:grid-cols-[minmax(260px,2fr)_120px_100px_minmax(170px,1.2fr)_80px] sm:gap-4 sm:px-3" key={app.id}><div className="min-w-0"><b className="block truncate text-xs font-semibold leading-snug text-[#293f3e] sm:text-sm">{app.institution_name}</b><small className="mt-1 block text-[10px] text-[#737d76] sm:text-xs">{app.created_at ? `Created ${new Date(app.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Creation date not provided'}<span className="sm:hidden"> · {app.academic_year} · {app.documents?.length ?? '—'} docs · {app.status || 'draft'}</span></small><span className="mt-1 block sm:hidden"><Status value={app.overall_status}/></span></div><span className="hidden text-[13px] text-[#465b57] sm:block">{app.academic_year}</span><span className="hidden text-[13px] text-[#465b57] sm:block">{app.documents?.length ?? '—'}</span><span className="hidden sm:flex sm:items-center sm:gap-2"><Status value={app.overall_status}/><span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '1px 5px', borderRadius: '3px', fontWeight: 600, background: app.status === 'submitted' ? 'rgba(216,166,108,0.2)' : 'rgba(38,59,66,0.08)', color: app.status === 'submitted' ? '#9a5d43' : '#68736d' }}>{app.status || 'draft'}</span></span><Link className="inline-flex min-h-8 items-center justify-end gap-1 text-[0px] font-semibold text-[#315e5b] underline underline-offset-4 hover:text-[#234643] sm:text-xs" aria-label={`Open documents for ${app.institution_name}`} to={`/applications/${app.id}/documents`}>Open <Icon name="arrow" size={16}/></Link></div>)}</div>}
         </section></>}
     </div>
   </div>
@@ -113,17 +148,138 @@ function DocumentEntry() {
 }
 
 function CreateApplication() {
-  const navigate = useNavigate(); const [form, setForm] = useState({ institution_name: '', application_category: APPLICATION_CATEGORIES[0]?.code || '', academic_year: '2026-27' });
-  const [errors, setErrors] = useState({}); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  const submit = async (event) => { event.preventDefault(); const next = {}; if (!form.institution_name.trim()) next.institution_name = 'Enter the institution name.'; if (!form.application_category) next.application_category = 'Choose the configured category.'; if (!/^\d{4}-\d{2}$/.test(form.academic_year.trim())) next.academic_year = 'Use the format 2026-27.'; setErrors(next); if (Object.keys(next).length) return; setBusy(true); setError(''); try { const app = await createApplication({ ...form, institution_name: form.institution_name.trim(), academic_year: form.academic_year.trim() }); navigate(`/applications/${app.id}/documents`, { state: { created: true } }) } catch (e) { setError(e.message) } finally { setBusy(false) } }
-  return <div className="form-page"><PageHeader eyebrow="APPLICATION INTAKE · 01" title={<>Start with the<br/><em>institution.</em></>} description="Create a review record before adding its supporting documents."/><div className="form-layout"><form className="editorial-form" onSubmit={submit} noValidate><div className="form-section-label"><span>01</span><div><b>Application identity</b><small>Use the institution name as submitted.</small></div></div><label className="field-label" htmlFor="institution">Institution name <span>REQUIRED</span></label><input id="institution" autoComplete="organization" placeholder="e.g. Synthetic Northfield Institute of Technology" value={form.institution_name} onChange={(e) => setForm({ ...form, institution_name: e.target.value })} aria-invalid={!!errors.institution_name} aria-describedby={errors.institution_name ? 'institution-error' : undefined}/>{errors.institution_name && <small id="institution-error" className="field-error">{errors.institution_name}</small>}
-      <div className="form-grid"><div><label className="field-label" htmlFor="category">Application category <span>CONFIGURED CODE</span></label><select id="category" value={form.application_category} onChange={(e) => setForm({ ...form, application_category: e.target.value })} aria-invalid={!!errors.application_category}>{APPLICATION_CATEGORIES.map((category) => <option value={category.code} key={category.code}>{category.label}</option>)}</select>{errors.application_category && <small className="field-error">{errors.application_category}</small>}<small className="field-helper">The contract lists EoA as a candidate. Team confirmation is pending.</small></div><div><label className="field-label" htmlFor="year">Academic year <span>FORMAT: YYYY-YY</span></label><input id="year" placeholder="2026-27" value={form.academic_year} onChange={(e) => setForm({ ...form, academic_year: e.target.value })} aria-invalid={!!errors.academic_year}/>{errors.academic_year && <small className="field-error">{errors.academic_year}</small>}</div></div>
-      <div className="form-submit"><button type="submit" className="button button-primary" disabled={busy}>{busy ? <><span className="spinner spinner-light"/>Creating record…</> : <>Create application <Icon name="arrow" size={17}/></>}</button><span>Fields marked required must be completed.</span></div>{error && <ErrorNotice message={error}/>}</form>
-      <aside className="form-aside"><div className="aside-number">INTAKE NOTE <span>01 / 03</span></div><h3>Keep the record<br/>grounded in the file.</h3><p>This creates an application record. Documents are added in the next step. Validation status comes from actual processing and configured checks.</p><div className="aside-line"/><div className="aside-meta"><span>CONTRACT REQUEST</span><code>institution_name<br/>application_category<br/>academic_year</code></div><div className="aside-meta"><span>REVIEW PRINCIPLE</span><b>Preliminary scrutiny<br/>with a human in control.</b></div></aside></div></div>
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user } = useAuth()
+  const prefill = location.state?.prefill || {}
+  const [form, setForm] = useState({
+    institution_name: prefill.institution_name || user?.institution_name || '',
+    application_category: prefill.application_category || APPLICATION_CATEGORIES[0]?.code || '',
+    academic_year: prefill.academic_year || '2026-27',
+  })
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async (event) => {
+    event.preventDefault()
+    const next = {}
+    if (!form.institution_name.trim()) next.institution_name = 'Enter the institution name.'
+    if (!form.application_category) next.application_category = 'Choose the configured category.'
+    if (!/^\d{4}-\d{2}$/.test(form.academic_year.trim())) next.academic_year = 'Use the format 2026-27.'
+    setErrors(next)
+    if (Object.keys(next).length) return
+    setBusy(true)
+    setError('')
+    try {
+      const app = await createApplication({
+        ...form,
+        institution_name: form.institution_name.trim(),
+        academic_year: form.academic_year.trim(),
+      })
+      navigate(`/applications/${app.id}/documents`, { state: { created: true } })
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="form-page">
+      <PageHeader
+        eyebrow="APPLICATION INTAKE · 01"
+        title={<>Start with the<br/><em>institution.</em></>}
+        description="Create a review record before adding its supporting documents."
+      />
+      {prefill.institution_name && (
+        <div style={{
+          background: 'rgba(216,166,108,0.12)',
+          border: '1px solid rgba(216,166,108,0.3)',
+          borderRadius: '4px',
+          padding: '12px 16px',
+          marginBottom: '20px',
+          fontSize: '13px',
+          color: '#344f4d',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Icon name="check" size={16} />
+          <span>Creating a revised application based on previous report for <b>{prefill.institution_name}</b>. You can update category/year and upload new or corrected documents.</span>
+        </div>
+      )}
+      <div className="form-layout">
+        <form className="editorial-form" onSubmit={submit} noValidate>
+          <div className="form-section-label">
+            <span>01</span>
+            <div><b>Application identity</b><small>Use the institution name as submitted.</small></div>
+          </div>
+          <label className="field-label" htmlFor="institution">Institution name <span>REQUIRED</span></label>
+          <input
+            id="institution"
+            autoComplete="organization"
+            placeholder="e.g. Synthetic Northfield Institute of Technology"
+            value={form.institution_name}
+            onChange={(e) => setForm({ ...form, institution_name: e.target.value })}
+            aria-invalid={!!errors.institution_name}
+            aria-describedby={errors.institution_name ? 'institution-error' : undefined}
+          />
+          {errors.institution_name && <small id="institution-error" className="field-error">{errors.institution_name}</small>}
+
+          <div className="form-grid">
+            <div>
+              <label className="field-label" htmlFor="category">Application category <span>CONFIGURED CODE</span></label>
+              <select
+                id="category"
+                value={form.application_category}
+                onChange={(e) => setForm({ ...form, application_category: e.target.value })}
+                aria-invalid={!!errors.application_category}
+              >
+                {APPLICATION_CATEGORIES.map((category) => (
+                  <option value={category.code} key={category.code}>{category.label}</option>
+                ))}
+              </select>
+              {errors.application_category && <small className="field-error">{errors.application_category}</small>}
+              <small className="field-helper">The contract lists EoA as a candidate. Team confirmation is pending.</small>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="year">Academic year <span>FORMAT: YYYY-YY</span></label>
+              <input
+                id="year"
+                placeholder="2026-27"
+                value={form.academic_year}
+                onChange={(e) => setForm({ ...form, academic_year: e.target.value })}
+                aria-invalid={!!errors.academic_year}
+              />
+              {errors.academic_year && <small className="field-error">{errors.academic_year}</small>}
+            </div>
+          </div>
+
+          <div className="form-submit">
+            <button type="submit" className="button button-primary" disabled={busy}>
+              {busy ? <><span className="spinner spinner-light"/>Creating record…</> : <>Create application <Icon name="arrow" size={17}/></>}
+            </button>
+            <span>Fields marked required must be completed.</span>
+          </div>
+          {error && <ErrorNotice message={error}/>}
+        </form>
+        <aside className="form-aside">
+          <div className="aside-number">INTAKE NOTE <span>01 / 03</span></div>
+          <h3>Keep the record<br/>grounded in the file.</h3>
+          <p>This creates an application record. Documents are added in the next step. Validation status comes from actual processing and configured checks.</p>
+          <div className="aside-line"/>
+          <div className="aside-meta"><span>CONTRACT REQUEST</span><code>institution_name<br/>application_category<br/>academic_year</code></div>
+          <div className="aside-meta"><span>REVIEW PRINCIPLE</span><b>Preliminary scrutiny<br/>with a human in control.</b></div>
+        </aside>
+      </div>
+    </div>
+  )
 }
 
 function ApplicationDocumentCentre() {
   const { id } = useParams()
+  const { isInstitution } = useAuth()
   const fileInputRef = useRef(null)
   const uploadSectionRef = useRef(null)
   const documentTypeRef = useRef(null)
@@ -133,6 +289,7 @@ function ApplicationDocumentCentre() {
   const [file, setFile] = useState(null)
   const [type, setType] = useState('')
   const [busy, setBusy] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [dragging, setDragging] = useState(false)
 
@@ -183,6 +340,23 @@ function ApplicationDocumentCentre() {
     }
   }
 
+  const handleSubmitToAicte = async () => {
+    if (!window.confirm('Are you sure you want to submit this application to AICTE? Once submitted, the application will be locked for review and no further documents can be uploaded.')) {
+      return
+    }
+    setSubmitting(true)
+    setMessage('')
+    try {
+      const updated = await submitApplication(id)
+      setApp((current) => ({ ...current, status: 'submitted', ...(updated || {}) }))
+      setMessage('Application submitted successfully to AICTE. It is now locked for scrutiny.')
+    } catch (err) {
+      setMessage(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) return <Loading label="Opening application record" />
   if (error) return <ErrorNotice message={error} onRetry={load} />
   const documents = Array.isArray(app?.documents) ? app.documents : []
@@ -194,6 +368,7 @@ function ApplicationDocumentCentre() {
   const failedCount = documents.filter((doc) => doc.processing_status === 'processing_failed').length
   const processedCount = documents.filter((doc) => doc.processing_status === 'processed').length
   const canContinue = documents.length > 0
+  const isLocked = app?.status === 'submitted'
   const auditMessage = !canContinue
     ? 'Upload at least one document to open the audit workspace.'
     : missingCount
@@ -204,8 +379,32 @@ function ApplicationDocumentCentre() {
 
   return <div className="document-page document-workflow-page">
     <PageHeader eyebrow="DOCUMENT CENTRE · APPLICATION WORKFLOW" title={<>Document<br /><em>workflow.</em></>} description="Review the configured requirements, add files, then inspect their reported processing states." />
+
+    {isLocked && (
+      <div style={{
+        background: '#fdf6ed',
+        border: '1px solid #e0c69f',
+        borderLeft: '4px solid #d8a66c',
+        padding: '16px 20px',
+        borderRadius: '4px',
+        marginBottom: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        color: '#6e4b29'
+      }}>
+        <Icon name="shield" size={24} />
+        <div>
+          <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>Application Submitted — Locked for Review</strong>
+          <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
+            This application has been formally submitted to the AICTE Review Committee. Document uploads and re-validation are locked while under scrutiny. Reviewers inspect documents and verify findings.
+          </p>
+        </div>
+      </div>
+    )}
+
     <section className="application-identity" aria-labelledby="application-identity-title">
-      <div className="identity-heading"><div><div className="eyebrow">APPLICATION IDENTIFICATION</div><h2 id="application-identity-title">{app.institution_name || 'Institution name not provided'}</h2><div className="identity-meta"><span>{APPLICATION_CATEGORIES.find((category) => category.code === app.application_category)?.label || app.application_category || 'Category not provided'}</span><i>·</i><span>Academic year {app.academic_year || 'not provided'}</span><i>·</i><span>Reference {app.id}</span></div></div><Status value={app.overall_status} /></div>
+      <div className="identity-heading"><div><div className="eyebrow">APPLICATION IDENTIFICATION</div><h2 id="application-identity-title">{app.institution_name || 'Institution name not provided'}</h2><div className="identity-meta"><span>{APPLICATION_CATEGORIES.find((category) => category.code === app.application_category)?.label || app.application_category || 'Category not provided'}</span><i>·</i><span>Academic year {app.academic_year || 'not provided'}</span><i>·</i><span>Reference {app.id}</span></div></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Status value={app.overall_status} /><span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 8px', borderRadius: '3px', fontWeight: 600, background: isLocked ? 'rgba(216,166,108,0.2)' : 'rgba(38,59,66,0.08)', color: isLocked ? '#9a5d43' : '#68736d' }}>{app.status || 'draft'}</span></div></div>
       <div className="identity-summary"><span><b>{presentCount} / {types.length}</b><small>listed document types with a file</small></span><span><b>{processedCount}</b><small>processed</small></span><span><b>{processingCount}</b><small>awaiting processing</small></span><span><b>{failedCount}</b><small>processing failed</small></span></div>
     </section>
     {USE_MOCKS && <div className="demo-callout"><span className="mode-dot" /><span><b>Synthetic demonstration data.</b> The three configured document types are an MVP subset, not the complete EoA checklist.</span></div>}
@@ -217,27 +416,50 @@ function ApplicationDocumentCentre() {
         const doc = documents.find((entry) => entry.document_type === item.code)
         const state = doc?.processing_status || 'missing'
         const stateLabel = { missing: 'Missing · not received', uploaded: 'Uploaded · awaiting processing', processing: 'Processing', processed: 'Processed', processing_failed: 'Processing failed' }[state] || state
-        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button> : doc ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
+        return <div className={`workflow-check-row checklist-${state}`} role="listitem" key={item.code}><span className="check-index">{String(index + 1).padStart(2, '0')}</span><span className="workflow-check-name"><b>{item.label}</b><small>{item.reference || 'Configurable document type'}</small></span><Status value={state} /><span className={`workflow-state-copy workflow-state-${state}`}>{stateLabel}</span>{doc?.processing_status === 'processing_failed' ? (isLocked ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Replace document <Icon name="arrow" size={14} /></button>) : doc ? <button type="button" className="workflow-row-action" onClick={() => showUploadedFile(doc.id)}>Review file <Icon name="arrow" size={14} /></button> : isLocked ? <span className="workflow-row-action" style={{ opacity: 0.6 }}>Not submitted</span> : <button type="button" className="workflow-row-action" onClick={() => focusUpload(item.code)}>Upload this type <Icon name="arrow" size={14} /></button>}</div>
       })}</div>
       <p className="checklist-disclaimer">Presence and processing status are based on the application response. The listed types remain demo configuration until the team confirms an official source.</p>
     </section>
 
     <section className="workflow-section upload-section" id="upload-section" ref={uploadSectionRef} aria-labelledby="upload-heading">
       <div className="workflow-section-head"><div><span className="workflow-step-number">02</span><div><div className="eyebrow">ADD TO THIS APPLICATION</div><h2 id="upload-heading">Upload documents</h2></div></div><span className="section-side-note">PDF · JPG · PNG</span></div>
-      <form onSubmit={submit} className="workflow-upload-form"><div className="upload-form-top"><div><label htmlFor="doc-type" className="field-label">Document type <span>SELECT THE CHECKLIST ITEM</span></label><select ref={documentTypeRef} id="doc-type" value={type} onChange={(event) => setType(event.target.value)} required><option value="" disabled>Select a configured type</option>{types.map((item) => <option value={item.code} key={item.code}>{item.label} · {item.code}</option>)}</select>{type && <p className="selected-type-note">This file will be associated with <b>{types.find((item) => item.code === type)?.label || type}</b>.</p>}</div><div className="upload-contract-note"><Icon name="file" size={16} /><span>Accepted formats follow the API contract. File size and content are checked by the server.</span></div></div>
-        <label className={`dropzone ${dragging ? 'dropzone-over' : ''}`} htmlFor="file-input" onDragOver={(event) => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); acceptFile(event.dataTransfer.files?.[0]) }}><input ref={fileInputRef} id="file-input" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={(event) => acceptFile(event.target.files?.[0])} /><span className="upload-symbol"><Icon name="upload" size={23} /></span><b>{file ? file.name : 'Drag a document into this space'}</b><span>{file ? `${file.type || 'File'} · selected and ready` : 'PDF, JPG, or PNG — or choose a file below'}</span><small>PDF / JPG / PNG</small></label>
-        <div className="upload-actions"><button type="button" className="browse-button" onClick={() => fileInputRef.current?.click()}><Icon name="file" size={16} />{file ? 'Choose a different file' : 'Choose file'}<span>{file ? 'Replace selection' : 'From this device'}</span></button><button className="button button-copper upload-submit" type="submit" disabled={busy || !file || !type}>{busy ? <><span className="spinner spinner-light" />Uploading…</> : <>Upload selected file <Icon name="arrow" size={17} /></>}</button></div>
-        {file && <div className="selected-file-summary"><Icon name="file" size={17} /><span><b>{file.name}</b><small>{file.type || 'File type unavailable'} · {types.find((item) => item.code === type)?.label || 'Choose a document type'}</small></span><span className="selection-status">Ready to upload</span></div>}
-        {message && <div className={`inline-message ${message.startsWith('Upload received') ? 'message-success' : 'message-error'}`} role={message.startsWith('Upload received') ? 'status' : 'alert'}>{message}</div>}
-        <p className="upload-note">Dates and fields are extracted or reviewed later; they are not accepted as authoritative upload inputs.</p>
-      </form>
+      {isLocked ? (
+        <div style={{ padding: '32px 20px', background: 'rgba(38,59,66,0.03)', borderRadius: '6px', border: '1px dashed rgba(38,59,66,0.2)', textAlign: 'center' }}>
+          <p style={{ margin: 0, color: '#68736d', fontSize: '14px' }}>
+            Document uploads are locked because this application has been submitted to AICTE for review.
+          </p>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="workflow-upload-form"><div className="upload-form-top"><div><label htmlFor="doc-type" className="field-label">Document type <span>SELECT THE CHECKLIST ITEM</span></label><select ref={documentTypeRef} id="doc-type" value={type} onChange={(event) => setType(event.target.value)} required><option value="" disabled>Select a configured type</option>{types.map((item) => <option value={item.code} key={item.code}>{item.label} · {item.code}</option>)}</select>{type && <p className="selected-type-note">This file will be associated with <b>{types.find((item) => item.code === type)?.label || type}</b>.</p>}</div><div className="upload-contract-note"><Icon name="file" size={16} /><span>Accepted formats follow the API contract. File size and content are checked by the server.</span></div></div>
+          <label className={`dropzone ${dragging ? 'dropzone-over' : ''}`} htmlFor="file-input" onDragOver={(event) => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); acceptFile(event.dataTransfer.files?.[0]) }}><input ref={fileInputRef} id="file-input" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={(event) => acceptFile(event.target.files?.[0])} /><span className="upload-symbol"><Icon name="upload" size={23} /></span><b>{file ? file.name : 'Drag a document into this space'}</b><span>{file ? `${file.type || 'File'} · selected and ready` : 'PDF, JPG, or PNG — or choose a file below'}</span><small>PDF / JPG / PNG</small></label>
+          <div className="upload-actions"><button type="button" className="browse-button" onClick={() => fileInputRef.current?.click()}><Icon name="file" size={16} />{file ? 'Choose a different file' : 'Choose file'}<span>{file ? 'Replace selection' : 'From this device'}</span></button><button className="button button-copper upload-submit" type="submit" disabled={busy || !file || !type}>{busy ? <><span className="spinner spinner-light" />Uploading…</> : <>Upload selected file <Icon name="arrow" size={17} /></>}</button></div>
+          {file && <div className="selected-file-summary"><Icon name="file" size={17} /><span><b>{file.name}</b><small>{file.type || 'File type unavailable'} · {types.find((item) => item.code === type)?.label || 'Choose a document type'}</small></span><span className="selection-status">Ready to upload</span></div>}
+          {message && <div className={`inline-message ${message.startsWith('Upload received') ? 'message-success' : 'message-error'}`} role={message.startsWith('Upload received') ? 'status' : 'alert'}>{message}</div>}
+          <p className="upload-note">Dates and fields are extracted or reviewed later; they are not accepted as authoritative upload inputs.</p>
+        </form>
+      )}
     </section>
 
     <section className="workflow-section uploaded-section" aria-labelledby="uploaded-heading"><div className="workflow-section-head"><div><span className="workflow-step-number">03</span><div><div className="eyebrow">APPLICATION FILE</div><h2 id="uploaded-heading">Uploaded documents</h2></div></div><span className="section-side-note">{documents.length} {documents.length === 1 ? 'file' : 'files'} · {processedCount} processed</span></div>{documents.length === 0 ? <EmptyState title="No documents received" text="Files appear here after the upload request returns successfully." /> : <div className="uploaded-file-table"><div className="uploaded-file-header"><span>FILE NAME</span><span>DOCUMENT TYPE</span><span>PROCESSING STATUS</span><span>FILE TYPE</span></div>{documents.map((doc) => <DocumentItem key={doc.id} doc={doc} />)}</div>}
       {documents.some((doc) => fieldsForDocument(doc).length) && <div className="fields-panel"><div className="eyebrow">EXTRACTED FIELD INSPECTION</div><h3>Fields returned by processing</h3>{documents.flatMap((doc) => fieldsForDocument(doc).map((field, index) => <FieldRow key={`${doc.id}-${index}`} field={{ ...field, source_document: field.source_document || doc.original_filename }} />))}</div>}
     </section>
 
-    <section className="audit-gate" aria-labelledby="audit-gate-heading"><div className="workflow-step-number">04</div><div className="audit-gate-copy"><div className="eyebrow">NEXT · PRELIMINARY VALIDATION</div><h2 id="audit-gate-heading">Continue to the audit workspace</h2><p>{auditMessage}</p></div>{canContinue ? <ButtonLink to={`/applications/${id}/audit`} icon="arrow">Continue to audit</ButtonLink> : <button type="button" className="button button-primary" disabled>Upload a document first <Icon name="arrow" size={17} /></button>}</section>
+    <section className="audit-gate" aria-labelledby="audit-gate-heading"><div className="workflow-step-number">04</div><div className="audit-gate-copy"><div className="eyebrow">NEXT · PRELIMINARY VALIDATION</div><h2 id="audit-gate-heading">Continue to the audit workspace</h2><p>{auditMessage}</p></div>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {canContinue ? <ButtonLink to={`/applications/${id}/audit`} icon="arrow">Continue to audit</ButtonLink> : <button type="button" className="button button-primary" disabled>Upload a document first <Icon name="arrow" size={17} /></button>}
+        {isInstitution && !isLocked && canContinue && (
+          <button
+            type="button"
+            className="button button-primary"
+            style={{ background: '#315e5b', borderColor: '#315e5b' }}
+            onClick={handleSubmitToAicte}
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting…' : 'Submit to AICTE'}
+          </button>
+        )}
+      </div>
+    </section>
   </div>
 }
 function DocumentItem({ doc }) { return <article className="received-item uploaded-file-row" id={`uploaded-${doc.id}`}><span className="uploaded-file-name"><span className="file-mark"><Icon name="documents" size={20} /></span><b>{doc.original_filename || labelForDocument(doc.document_type)}</b></span><span className="uploaded-type-name">{labelForDocument(doc.document_type)}</span><Status value={doc.processing_status || 'uploaded'} /><span className="uploaded-mime">{doc.mime_type?.includes('pdf') ? 'PDF' : doc.mime_type?.split('/')[1]?.toUpperCase() || doc.mime_type || 'Not provided'}</span></article> }
@@ -270,7 +492,23 @@ function AuditWorkspace() {
       <div className="audit-panels"><div className="audit-panel doc-panel"><div className="panel-head"><span className="panel-num">A</span><span><b>Application file</b><small>Submitted documents</small></span><span className="panel-count">{docs.length.toString().padStart(2, '0')}</span></div><div className="panel-content">{docs.length ? docs.map((doc, index) => <div className="audit-document-group" key={doc.id}><div className={`audit-doc-line ${busy ? 'stagger' : ''}`} style={{ '--i': index }}><span className="audit-doc-icon"><Icon name="documents" size={17}/></span><span><b>{doc.original_filename || labelForDocument(doc.document_type)}</b><small>{labelForDocument(doc.document_type)} · {STATUS_LABELS[doc.processing_status] || doc.processing_status}</small></span><i className={`status-marker marker-${doc.processing_status}`}/></div>{fieldsForDocument(doc).slice(0, 3).map((field, fieldIndex) => <div className={`audit-field-line ${busy ? 'stagger' : ''}`} style={{ '--i': index + fieldIndex + 1 }} key={`${doc.id}-${field.field || field.name || fieldIndex}`}><span>{field.name || field.field || 'Extracted field'}</span><b>{field.value || 'Unavailable'}</b><small>{field.raw_text || field.evidence || 'No evidence snippet provided'}</small></div>)}</div>) : <div className="panel-empty">No documents have been added yet.<Link to={`/applications/${id}/documents`}>Go to document centre <Icon name="arrow" size={14}/></Link></div>}</div><div className="panel-foot">SOURCE MATERIAL <span>As supplied by applicant</span></div></div>
         <div className="connection-lanes" aria-hidden="true"><svg className="comparison-signature" viewBox="0 0 120 230" preserveAspectRatio="none"><path className="signature-underlay" d="M-10 48C19 46 15 88 35 91s17-58 36-54 12 79 31 83 12-42 31-39"/><path className="signature-main" d="M-10 48C19 46 15 88 35 91s17-58 36-54 12 79 31 83 12-42 31-39"/><path className="signature-flick" d="M70 37c-5 28-12 54-30 79m62 4 14 20"/></svg><span className="lane-line"/><span className="lane-line"/><span className="scan-pulse"/><span className="lane-caption">FIELD<br/>COMPARISON</span></div>
         <div className="audit-panel rules-panel"><div className="panel-head"><span className="panel-num">B</span><span><b>Configured checklist</b><small>Three-document MVP subset</small></span><span className="panel-count">{getChecklist().length.toString().padStart(2, '0')}</span></div><div className="panel-content">{getChecklist().map((item, index) => <div className={`audit-rule-line ${busy ? 'stagger' : ''}`} style={{ '--i': index }} key={item.code}><span className="rule-node">{String(index + 1).padStart(2,'0')}</span><span><b>{item.label}</b><small>{item.code}</small></span><span className="rule-state"><i className={busy ? 'rule-pulse' : ''}/>{report ? 'CONFIGURED' : 'READY'}</span></div>)}</div><div className="panel-foot">SOURCE <span>APH clauses in the checklist</span></div></div></div>
-      {!report && <div className="audit-action-row"><div className="audit-caveat"><Icon name="shield" size={17}/><span>Running validation requests a preliminary report. A human reviewer remains responsible for the assessment.</span></div><button type="button" className="button button-primary begin-audit" disabled={busy || docs.length === 0} onClick={start}>{busy ? <><span className="spinner spinner-light"/>Waiting for report…</> : <>Begin validation <Icon name="arrow" size={17}/></>}</button></div>}
+      {!report && (
+        app?.status === 'submitted' ? (
+          <div className="audit-action-row">
+            <div className="audit-caveat">
+              <Icon name="shield" size={17}/>
+              <span>This application has been submitted to AICTE. Preliminary re-validation is locked; review is conducted on recorded findings.</span>
+            </div>
+          </div>
+        ) : (
+          <div className="audit-action-row">
+            <div className="audit-caveat"><Icon name="shield" size={17}/><span>Running validation requests a preliminary report. A human reviewer remains responsible for the assessment.</span></div>
+            <button type="button" className="button button-primary begin-audit" disabled={busy || docs.length === 0} onClick={start}>
+              {busy ? <><span className="spinner spinner-light"/>Waiting for report…</> : <>Begin validation <Icon name="arrow" size={17}/></>}
+            </button>
+          </div>
+        )
+      )}
       {docs.length === 0 && !report && <p className="audit-prerequisite">Add at least one document before starting validation.</p>}
       {error && <ErrorNotice message={error} onRetry={start}/>}
       {report && <div className="audit-result"><div className="result-seal"><Icon name={report.overall_status === 'checks_passed' ? 'check' : 'report'} size={22}/></div><div className="result-copy"><span className="eyebrow">REPORT RESPONSE RECEIVED</span><h3>Preliminary result returned.</h3><p>The result is ready for a reviewer to inspect. It is not an approval decision.</p><div className="result-finding-preview">{report.summary && Object.entries(report.summary).filter(([, count]) => Number(count) > 0).map(([status, count]) => <span key={status}><b>{count}</b> {STATUS_LABELS[status] || status}</span>)}{Array.isArray(report.findings) && report.findings.slice(0, 2).map((finding) => <span className="result-finding-title" key={finding.id || finding.rule_id}>{finding.title || finding.reason}</span>)}</div></div><Status value={report.overall_status}/><ButtonLink to={`/applications/${id}/report`} icon="arrow">Open validation report</ButtonLink></div>}
@@ -279,11 +517,22 @@ function AuditWorkspace() {
 }
 
 function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verified', onSave }) {
-  if (!isOpen || !finding) return null
-  const [decision, setDecision] = useState(finding.reviewer_decision || initialDecision)
-  const [notes, setNotes] = useState(finding.reviewer_notes || '')
-  const [reviewerName, setReviewerName] = useState(finding.reviewed_by || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
+  const { user } = useAuth()
+  const [decision, setDecision] = useState(initialDecision)
+  const [notes, setNotes] = useState('')
+  const [reviewerName, setReviewerName] = useState(() => user?.email || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (finding) {
+      setDecision(finding.reviewer_decision || initialDecision)
+      setNotes(finding.reviewer_notes || '')
+      setReviewerName(finding.reviewed_by || user?.email || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
+    }
+  }, [finding, initialDecision, user?.email])
+
+  if (!isOpen || !finding) return null
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -400,6 +649,8 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
 
 function ValidationReport() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const { isReviewer, isInstitution } = useAuth()
   const [app, setApp] = useState(null)
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -469,7 +720,26 @@ function ValidationReport() {
         title={<>Review the<br/><em>evidence trail.</em></>}
         description={<><b>{app?.institution_name}</b><span className="description-dot">·</span>{app?.academic_year}<span className="description-dot">·</span>{app?.application_category?.toUpperCase()} (EoA)</>}
         action={
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {isInstitution && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() =>
+                  navigate('/applications/new', {
+                    state: {
+                      prefill: {
+                        institution_name: app?.institution_name,
+                        application_category: app?.application_category,
+                        academic_year: app?.academic_year,
+                      },
+                    },
+                  })
+                }
+              >
+                <Icon name="plus" size={16} /> Create New Application from Report
+              </button>
+            )}
             <button type="button" className="button button-primary" onClick={handlePrint}>
               <Icon name="printer" size={16} /> Export Scrutiny Dossier (PDF)
             </button>
@@ -537,6 +807,7 @@ function ValidationReport() {
                 index={index}
                 onReview={handleOpenReview}
                 onInspectDoc={handleInspectDoc}
+                isReviewer={isReviewer}
               />
             ))}
           </div>
@@ -681,7 +952,7 @@ const findingContext = {
 
 function displayFieldName(value) { return value?.replaceAll('_', ' ') }
 
-function Finding({ finding, index, onReview, onInspectDoc }) {
+function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
   const evidence = finding.evidence
   const status = finding.status || 'unresolved'
   const source = finding.document_name || (finding.document_id ? `Document ID ${finding.document_id}` : 'Application-level finding; no document was specified')
@@ -781,27 +1052,31 @@ function Finding({ finding, index, onReview, onInspectDoc }) {
         </section>
 
         <div className="auditor-action-bar">
-          <button
-            type="button"
-            className="button-auditor button-auditor-verify"
-            onClick={() => onReview(finding, 'verified')}
-          >
-            <Icon name="check" size={14} /> Mark Verified
-          </button>
-          <button
-            type="button"
-            className="button-auditor button-auditor-resubmit"
-            onClick={() => onReview(finding, 'requested_resubmission')}
-          >
-            <Icon name="alert" size={14} /> Request Resubmission
-          </button>
-          <button
-            type="button"
-            className="button-auditor button-auditor-escalate"
-            onClick={() => onReview(finding, 'escalated')}
-          >
-            <Icon name="shield" size={14} /> Escalate
-          </button>
+          {isReviewer && (
+            <>
+              <button
+                type="button"
+                className="button-auditor button-auditor-verify"
+                onClick={() => onReview(finding, 'verified')}
+              >
+                <Icon name="check" size={14} /> Mark Verified
+              </button>
+              <button
+                type="button"
+                className="button-auditor button-auditor-resubmit"
+                onClick={() => onReview(finding, 'requested_resubmission')}
+              >
+                <Icon name="alert" size={14} /> Request Resubmission
+              </button>
+              <button
+                type="button"
+                className="button-auditor button-auditor-escalate"
+                onClick={() => onReview(finding, 'escalated')}
+              >
+                <Icon name="shield" size={14} /> Escalate
+              </button>
+            </>
+          )}
 
           {finding.document_id && (
             <button
@@ -829,7 +1104,47 @@ function Finding({ finding, index, onReview, onInspectDoc }) {
 function NotFound() { return <div className="not-found"><span className="eyebrow">404 · PAGE NOT FOUND</span><h1>This page isn’t<br/><em>in the file.</em></h1><ButtonLink to="/" icon="arrow">Return to overview</ButtonLink></div> }
 
 export default function App() {
-  return <><CustomCursor/><Shell><Routes><Route path="/" element={<Overview/>}/><Route path="/documents" element={<DocumentEntry/>}/><Route path="/applications/new" element={<CreateApplication/>}/><Route path="/applications/:id/documents" element={<ApplicationDocumentCentre/>}/><Route path="/applications/:id/audit" element={<AuditWorkspace/>}/><Route path="/applications/:id/report" element={<ValidationReport/>}/><Route path="*" element={<NotFound/>}/></Routes></Shell></>
+  return (
+    <>
+      <CustomCursor />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <Shell>
+                <Routes>
+                  <Route path="/" element={<Overview />} />
+                  <Route
+                    path="/documents"
+                    element={
+                      <ProtectedRoute allowedRoles={['INSTITUTION']}>
+                        <DocumentEntry />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/applications/new"
+                    element={
+                      <ProtectedRoute allowedRoles={['INSTITUTION']}>
+                        <CreateApplication />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/applications/:id/documents" element={<ApplicationDocumentCentre />} />
+                  <Route path="/applications/:id/audit" element={<AuditWorkspace />} />
+                  <Route path="/applications/:id/report" element={<ValidationReport />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Shell>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
+  )
 }
 
 function CustomCursor() {

@@ -9,18 +9,178 @@ const readStore = (key, fallback) => {
   catch { return structuredClone(fallback) }
 }
 const writeStore = (key, value) => localStorage.setItem(key, JSON.stringify(value))
-const errorMessage = async (response) => {
-  try { const payload = await response.json(); return payload?.error?.message || `Request failed (${response.status}).` }
-  catch { return `Request failed (${response.status}).` }
+let inMemoryAccessToken = null
+let refreshPromise = null
+
+export const setAccessToken = (token) => {
+  inMemoryAccessToken = token
 }
-async function request(path, options) {
+
+export const getAccessToken = () => inMemoryAccessToken
+
+const errorMessage = async (response) => {
+  try {
+    const payload = await response.json()
+    return payload?.error?.message || `Request failed (${response.status}).`
+  } catch {
+    return `Request failed (${response.status}).`
+  }
+}
+
+async function request(path, options = {}, isRetry = false) {
+  const headers = new Headers(options.headers || {})
+  if (inMemoryAccessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${inMemoryAccessToken}`)
+  }
+
+  const fetchOptions = {
+    ...options,
+    headers,
+    credentials: 'include',
+  }
+
   let response
-  try { response = await fetch(`${API_BASE_URL}/api${path}`, options) }
-  catch { throw new Error(`Could not reach the API at ${API_BASE_URL}. Check that the backend is running.`) }
+  try {
+    response = await fetch(`${API_BASE_URL}/api${path}`, fetchOptions)
+  } catch {
+    throw new Error(`Could not reach the API at ${API_BASE_URL}. Check that the backend is running.`)
+  }
+
+  // Handle 401: attempt single-flight token refresh if not already on auth path and not retry
+  if (response.status === 401 && !isRetry && !path.startsWith('/auth/')) {
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAuth().finally(() => {
+          refreshPromise = null
+        })
+      }
+      const refreshResult = await refreshPromise
+      if (refreshResult?.access_token) {
+        return request(path, options, true)
+      }
+    } catch {
+      inMemoryAccessToken = null
+      throw new Error(await errorMessage(response))
+    }
+  }
+
   if (!response.ok) throw new Error(await errorMessage(response))
   if (response.status === 204) return null
   return response.json()
 }
+
+// Authentication API methods
+export async function login(email, password) {
+  if (USE_MOCKS) {
+    await pause(350)
+    const isReviewer = email.toLowerCase().includes('reviewer')
+    const user = {
+      id: isReviewer ? 'rev_mock_1' : 'inst_mock_1',
+      email,
+      role: isReviewer ? 'REVIEWER' : 'INSTITUTION',
+      is_active: true,
+      institution_name: isReviewer ? null : 'Government Engineering College (Demo)',
+    }
+    const token = 'mock_jwt_access_token'
+    setAccessToken(token)
+    return { access_token: token, token_type: 'bearer', user }
+  }
+
+  const data = await request('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  setAccessToken(data.access_token)
+  return data
+}
+
+export async function register(email, password, institutionName) {
+  if (USE_MOCKS) {
+    await pause(450)
+    const user = {
+      id: `inst_mock_${Date.now()}`,
+      email,
+      role: 'INSTITUTION',
+      is_active: true,
+      institution_name: institutionName,
+    }
+    const token = 'mock_jwt_access_token'
+    setAccessToken(token)
+    return { access_token: token, token_type: 'bearer', user }
+  }
+
+  const data = await request('/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      institution_name: institutionName,
+    }),
+  })
+  setAccessToken(data.access_token)
+  return data
+}
+
+export async function refreshAuth() {
+  if (USE_MOCKS) {
+    await pause(200)
+    return { access_token: inMemoryAccessToken }
+  }
+
+  const data = await request('/auth/refresh', { method: 'POST' })
+  setAccessToken(data.access_token)
+  return data
+}
+
+export async function logout() {
+  if (USE_MOCKS) {
+    await pause(150)
+    setAccessToken(null)
+    return { message: 'Logged out' }
+  }
+
+  try {
+    await request('/auth/logout', { method: 'POST' })
+  } finally {
+    setAccessToken(null)
+  }
+}
+
+export async function getCurrentUser() {
+  if (USE_MOCKS) {
+    await pause(100)
+    if (!inMemoryAccessToken) return null
+    return {
+      id: 'mock_user_1',
+      email: 'institution@engg-college.edu.in',
+      role: 'INSTITUTION',
+      is_active: true,
+      institution_name: 'Government Engineering College (Demo)',
+    }
+  }
+
+  return request('/auth/me')
+}
+
+export async function submitApplication(applicationId) {
+  if (USE_MOCKS) {
+    await pause(350)
+    const apps = mockApplications()
+    const app = apps.find((a) => a.id === applicationId)
+    if (app) {
+      app.status = 'submitted'
+      writeStore(STORAGE_KEY, apps)
+    }
+    return app
+  }
+
+  return request(`/applications/${encodeURIComponent(applicationId)}/submit`, {
+    method: 'POST',
+  })
+}
+
 const mockApplications = () => readStore(STORAGE_KEY, seedApplications)
 const mockReports = () => readStore(REPORT_KEY, seedReports)
 

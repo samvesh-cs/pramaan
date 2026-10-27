@@ -30,7 +30,7 @@ async def upload_document(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a supporting document (PDF, JPG, or PNG) for the given application."""
-    if application.status == "submitted":
+    if application.status in ("submitted", "review_completed"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={

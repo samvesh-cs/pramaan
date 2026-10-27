@@ -51,11 +51,33 @@ async def test_auditor_review_finding_and_status_recalculation(institution_clien
     )
     app_id = app_res.json()["id"]
 
-    # Validate empty app -> produces missing findings
+    from app.models.document import Document
+    from tests.conftest import TestSessionLocal
+
+    async with TestSessionLocal() as db:
+        for index, document_type in enumerate((
+            "fire_safety_certificate",
+            "building_completion_certificate",
+            "affidavit_2",
+        )):
+            db.add(Document(
+                id=f"review-test-doc-{index}",
+                application_id=app_id,
+                document_type=document_type,
+                original_filename=f"synthetic-{document_type}.pdf",
+                stored_filename=f"synthetic-{document_type}.pdf",
+                mime_type="application/pdf",
+                file_size_bytes=100,
+                processing_status="uploaded",
+            ))
+        await db.commit()
+
+    # Validate the submitted file set -> produces reviewable findings
     val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
     report = val_res.json()
     assert report["overall_status"] == "processing_incomplete"
+    assert report["findings"]
     finding_id = report["findings"][0]["id"]
 
     # Institution submits application so reviewer can review it

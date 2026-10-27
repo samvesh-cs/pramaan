@@ -119,8 +119,8 @@ async def require_application_access(
                 },
             )
     elif current_user.role == "REVIEWER":
-        # Reviewer can only access submitted applications
-        if app_record.status != "submitted":
+        # Reviewers can access the queue and completed records, but not drafts.
+        if app_record.status not in ("submitted", "review_completed"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={

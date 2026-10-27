@@ -1,9 +1,12 @@
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
 from app.models.application import Application
+from app.models.document import Document
+from app.models.finding import Finding
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationDetailResponse,
@@ -68,6 +71,8 @@ class ApplicationService:
             document_response = DocumentResponse.model_validate(document)
             document_response.fields = latest_extraction.fields or {} if latest_extraction else {}
             response.documents.append(document_response)
+        if app_obj.status != "review_completed":
+            response.findings = []
         return response
 
     async def list_applications(
@@ -93,7 +98,9 @@ class ApplicationService:
         application_id: str,
         owner_id: str,
     ) -> ApplicationResponse:
-        app_obj = await db.scalar(select(Application).where(Application.id == application_id))
+        app_obj = await db.scalar(
+            select(Application).where(Application.id == application_id).with_for_update()
+        )
         if not app_obj:
             raise HTTPException(
                 status_code=404,
@@ -106,19 +113,93 @@ class ApplicationService:
                 detail={"code": "APPLICATION_NOT_FOUND", "message": f"Application '{application_id}' not found.", "details": None},
             )
 
+        if app_obj.status != "draft":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "APPLICATION_ALREADY_SUBMITTED",
+                    "message": "This application has already been submitted and is locked for review.",
+                    "details": None,
+                },
+            )
+
+        required_types = {
+            doc_type
+            for doc_type, info in EOA_DOCUMENT_CHECKLIST.items()
+            if info.get("applicability") == "required"
+        }
+        uploaded_types = set(
+            (await db.scalars(
+                select(Document.document_type).where(Document.application_id == app_obj.id)
+            )).all()
+        )
+        missing_types = sorted(required_types - uploaded_types)
+        if missing_types:
+            labels = [EOA_DOCUMENT_CHECKLIST[doc_type]["display_name"] for doc_type in missing_types]
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "REQUIRED_DOCUMENTS_MISSING",
+                    "message": f"Upload all required document types before submission: {', '.join(labels)}.",
+                    "details": {"missing_document_types": missing_types},
+                },
+            )
+
         app_obj.status = "submitted"
         await db.commit()
         await db.refresh(app_obj)
+        return ApplicationResponse.model_validate(app_obj)
 
-        from app.models.finding import Finding
-        existing_findings_count = await db.scalar(
-            select(func.count()).select_from(Finding).where(Finding.application_id == app_obj.id)
+    async def finalize_review(
+        self,
+        db: AsyncSession,
+        application_id: str,
+    ) -> ApplicationResponse:
+        app_obj = await db.scalar(
+            select(Application).where(Application.id == application_id).with_for_update()
         )
-        if not existing_findings_count:
-            from app.services.validation_engine import validation_engine
-            await validation_engine.validate_application(db, app_obj.id)
-            await db.refresh(app_obj)
+        if not app_obj:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "APPLICATION_NOT_FOUND", "message": f"Application '{application_id}' not found.", "details": None},
+            )
+        if app_obj.status != "submitted":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "APPLICATION_NOT_PENDING_REVIEW",
+                    "message": "Only an application pending review can be finalized.",
+                    "details": None,
+                },
+            )
 
+        findings = list((await db.scalars(
+            select(Finding).where(Finding.application_id == application_id)
+        )).all())
+        if not findings:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "SCRUTINY_NOT_RUN",
+                    "message": "Run scrutiny checks before finalizing this review.",
+                    "details": None,
+                },
+            )
+
+        pending_count = sum(1 for finding in findings if not finding.reviewer_decision or not finding.reviewed_at)
+        if pending_count:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "FINDINGS_PENDING_REVIEW",
+                    "message": f"Review all {pending_count} remaining finding{'s' if pending_count != 1 else ''} before finalizing.",
+                    "details": {"pending_findings": pending_count},
+                },
+            )
+
+        app_obj.status = "review_completed"
+        await db.commit()
+        await db.refresh(app_obj)
         return ApplicationResponse.model_validate(app_obj)
 
 

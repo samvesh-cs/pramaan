@@ -34,6 +34,16 @@ async def validate_application(
     db: AsyncSession = Depends(get_db),
 ):
     """Run all validation rules for an application and return the compliance report."""
+    if application.status == "review_completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "REVIEW_FINALIZED",
+                "message": "Scrutiny has been finalized. The report is read-only.",
+                "details": None,
+            },
+        )
+
     if current_user.role == "INSTITUTION" and application.status == "submitted":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -56,9 +66,19 @@ async def validate_application(
 async def get_application_report(
     application_id: str,
     application: Application = Depends(require_application_access),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve the current validation report for an application (scoped by ownership/role)."""
+    """Retrieve the reviewer workspace, or the finalized report for the owning institution."""
+    if current_user.role == "INSTITUTION" and application.status != "review_completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "SCRUTINY_PENDING",
+                "message": "The reviewer has not finalized scrutiny. The report will be available after review is complete.",
+                "details": None,
+            },
+        )
     return await validation_engine.get_report(db, application.id)
 
 
@@ -77,6 +97,11 @@ async def review_finding(
     db: AsyncSession = Depends(get_db),
 ):
     """Update finding with human reviewer verification or discrepancy confirmation (REVIEWER only)."""
+    if application.status == "review_completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "REVIEW_FINALIZED", "message": "Scrutiny has been finalized. Reviewer decisions are read-only.", "details": None},
+        )
     if not payload.reviewed_by:
         payload.reviewed_by = current_user.email
 
@@ -104,6 +129,11 @@ async def acknowledge_duplicate(
     """Record an authorized reviewer acknowledgment of a duplicate warning.
     After acknowledgment, the validation report can be generated and will still show the duplicate note.
     """
+    if application.status == "review_completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "REVIEW_FINALIZED", "message": "Scrutiny has been finalized. Reviewer decisions are read-only.", "details": None},
+        )
     return await validation_engine.acknowledge_duplicate(
         db=db,
         application_id=application.id,

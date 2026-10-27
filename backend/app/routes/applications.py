@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import (
@@ -81,4 +81,24 @@ async def submit_application(
     return await application_service.submit_application(
         db, application_id, owner_id=current_user.id
     )
+
+
+@router.post(
+    "/{application_id}/finalize-review",
+    response_model=ApplicationResponse,
+    summary="Finalize reviewer scrutiny",
+)
+async def finalize_application_review(
+    application_id: str,
+    current_user: User = Depends(require_role("REVIEWER")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Finalize a submitted application after every generated finding has a reviewer decision."""
+    application = await db.get(Application, application_id)
+    if not application or application.status not in ("submitted", "review_completed"):
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "APPLICATION_NOT_FOUND", "message": f"Application '{application_id}' not found or not submitted.", "details": None},
+        )
+    return await application_service.finalize_review(db, application_id)
 

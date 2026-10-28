@@ -90,7 +90,7 @@ rules:
     signal_type: "rule"
     advisory: true
     status: "unverified" # The 100000 INR target is unsupported by Table 2.1; §2.1(ii) specifies pay receipt "if any"
-    is_active: false
+    is_active: true
     condition:
       operator: "custom"
       field: "amount"

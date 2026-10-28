@@ -335,3 +335,32 @@ def test_honest_claims_language_in_rules():
         )
 
 
+def test_load_time_banned_terms_rejection_from_yaml(tmp_path: Path):
+    """Proves that DeclarativeRuleEngine rejects a YAML ruleset containing banned terms at load time."""
+    banned_yaml_content = """
+version: "1.0"
+category: "eoa"
+description: "Ruleset with banned terms"
+rules:
+  - rule_id: "BANNED_TEST_001"
+    title: "Document genuine check"
+    category: "eoa"
+    condition:
+      operator: "exists"
+      field: "doc"
+    pass_title: "Valid"
+    pass_reason_template: "Document is authentic"
+    flag_title: "Document forged or tampered"
+    flag_reason_template: "Possible fraud detected"
+    next_action: "Report fraud to authority"
+"""
+    yaml_file = tmp_path / "banned_rules.yaml"
+    yaml_file.write_text(banned_yaml_content, encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        DeclarativeRuleEngine(rules_path=yaml_file)
+
+    assert "contains forbidden claim term" in str(exc_info.value)
+
+
+

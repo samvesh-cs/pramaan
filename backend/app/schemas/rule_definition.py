@@ -18,9 +18,12 @@ class ClauseCitation(BaseModel):
     clause_number: str
     handbook_page: int
     pdf_page: int
+    verified: bool = True
     title: str
     summary: Optional[str] = None
+    notes: Optional[str] = None
     cross_reference_notes: Optional[str] = None
+    excerpt_type: Optional[str] = None
     excerpt: str
 
 
@@ -49,8 +52,10 @@ class DeclarativeRuleConfig(BaseModel):
     category: str = "eoa"
     document_type: Optional[str] = None
     clause_id: Optional[str] = None
+    clause_ids: Optional[list[str]] = Field(default_factory=list)
     severity: SeverityLevel = "medium"
     signal_type: SignalType = "rule"
+    status: Optional[str] = None
     condition: RuleCondition
     pass_title: str
     pass_reason_template: str

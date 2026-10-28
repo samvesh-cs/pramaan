@@ -76,7 +76,8 @@ async def test_baseline_parity_scenario_3_expired(institution_client: AsyncClien
     ]:
         files = {"file": (filename, read_sample(filename), "application/pdf")}
         data = {"document_type": doc_type}
-        await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+        u_res = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+        assert u_res.status_code == 201
 
     val = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val.status_code == 200
@@ -119,8 +120,8 @@ def test_advanced_fixtures_generation_and_integrity():
     assert incremental_bytes.count(b"%%EOF") >= 3
 
     # 3. metadata_anomalous.pdf contains Canva in metadata
-    import fitz
-    doc_anomalous = fitz.open(fixtures["metadata_anomalous"])
+    import pymupdf
+    doc_anomalous = pymupdf.open(fixtures["metadata_anomalous"])
     meta = doc_anomalous.metadata
     assert "Canva" in meta.get("creator", "")
     assert "Photoshop" in meta.get("producer", "")

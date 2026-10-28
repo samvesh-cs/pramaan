@@ -132,11 +132,12 @@ async def test_ter_payment_check_underpaid_and_paid(institution_client: AsyncCli
         "Transaction Date: 15/01/2026",
         "Total Paid Amount: INR 1,00,000",
     ])
-    await institution_client.post(
+    u_ter_res = await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("ter_receipt_full.pdf", full_paid_pdf, "application/pdf")},
         data={"document_type": "ter_payment_receipt"},
     )
+    assert u_ter_res.status_code == 201
 
     val2_res = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val2_res.status_code == 200
@@ -163,11 +164,12 @@ async def test_building_age_structural_stability_rule(institution_client: AsyncC
         "Issue Date: 12/06/2018",
         "Issuing Authority: Municipal Corporation",
     ])
-    await institution_client.post(
+    u_new_res = await institution_client.post(
         f"/api/applications/{app_id}/documents",
         files={"file": ("new_building.pdf", new_building_pdf, "application/pdf")},
         data={"document_type": "building_completion_certificate"},
     )
+    assert u_new_res.status_code == 201
 
     val_res = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val_res.status_code == 200
@@ -190,11 +192,12 @@ async def test_building_age_structural_stability_rule(institution_client: AsyncC
         "Issue Date: 10/04/1985",
         "Issuing Authority: Town Planning Department",
     ])
-    await institution_client.post(
+    u_old_res = await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("old_building.pdf", old_building_pdf, "application/pdf")},
         data={"document_type": "building_completion_certificate"},
     )
+    assert u_old_res.status_code == 201
 
     val2_res = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val2_res.status_code == 200
@@ -212,11 +215,12 @@ async def test_building_age_structural_stability_rule(institution_client: AsyncC
         "Chartered Engineer Registration Number: CE-STR-99881",
         "Date of Inspection: 05/01/2026",
     ])
-    await institution_client.post(
+    u_struct_res = await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("structural_cert.pdf", structural_pdf, "application/pdf")},
         data={"document_type": "structural_stability_certificate"},
     )
+    assert u_struct_res.status_code == 201
 
     val3_res = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val3_res.status_code == 200

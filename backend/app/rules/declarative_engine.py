@@ -70,13 +70,20 @@ class DeclarativeRuleEngine:
         for idx, rule_dict in enumerate(raw_content["rules"]):
             try:
                 rule_cfg = DeclarativeRuleConfig(**rule_dict)
-                # Verify that clause_id exists in clause registry if specified
+                # Verify that clause_id / clause_ids exist in clause registry if specified
                 if rule_cfg.clause_id and not self.clause_registry.get(rule_cfg.clause_id):
                     logger.warning(
                         "Rule '%s' references unknown clause '%s'",
                         rule_cfg.rule_id,
                         rule_cfg.clause_id,
                     )
+                for cid in (rule_cfg.clause_ids or []):
+                    if not self.clause_registry.get(cid):
+                        logger.warning(
+                            "Rule '%s' references unknown clause '%s'",
+                            rule_cfg.rule_id,
+                            cid,
+                        )
                 parsed_rules.append(rule_cfg)
             except Exception as e:
                 raise ValueError(f"Schema validation failure for rule at index {idx} in {path}: {e}") from e

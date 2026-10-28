@@ -73,10 +73,12 @@ async def test_scenario_2_missing_document(institution_client: AsyncClient):
 
     # Upload only Fire Safety and Building Completion (Affidavit-2 missing)
     files = {"file": ("valid_fire_safety.pdf", read_sample("valid_fire_safety.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
     v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
@@ -102,14 +104,17 @@ async def test_scenario_3_expired_document(institution_client: AsyncClient):
 
     # Upload expired fire safety
     files = {"file": ("expired_fire_safety.pdf", read_sample("expired_fire_safety.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     # Upload other valid docs
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
     files = {"file": ("valid_affidavit_2.pdf", read_sample("valid_affidavit_2.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    u3 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    assert u3.status_code == 201
 
     v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
@@ -139,7 +144,8 @@ async def test_scenario_4_missing_fields(institution_client: AsyncClient):
 
     # Upload missing fields building cert
     files = {"file": ("missing_fields_building.pdf", read_sample("missing_fields_building.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u1.status_code == 201
 
     v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
@@ -165,13 +171,16 @@ async def test_scenario_5_name_mismatch(institution_client: AsyncClient):
 
     # Upload mismatched fire safety
     files = {"file": ("mismatched_fire_safety.pdf", read_sample("mismatched_fire_safety.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
     files = {"file": ("valid_affidavit_2.pdf", read_sample("valid_affidavit_2.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    u3 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    assert u3.status_code == 201
 
     v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200

@@ -72,6 +72,11 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "severity": "high",
         "signal_type": "rule",
     },
+    "STRUCTURAL_002": {
+        "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+        "severity": "high",
+        "signal_type": "rule",
+    },
     "STRUCTURAL_STABILITY_001": {
         "clause_id": "APH_2024_27_CLAUSE_6_17_H",
         "severity": "high",

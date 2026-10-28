@@ -4,25 +4,31 @@ description: "AICTE Approval Process Handbook (APH 2024-2027) Extension of Appro
 
 rules:
   - rule_id: "DOC_PRESENCE_001"
-    title: "Mandatory Document Presence Check"
+    title: "Presence of Documents in Scope for Prototype"
     category: "eoa"
     clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1"
+    clause_ids:
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1"
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_I"
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_III"
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
     severity: "critical"
     signal_type: "rule"
     condition:
       operator: "exists"
       field: "document_presence"
-    pass_title: "Mandatory Documents Uploaded"
-    pass_reason_template: "All statutory mandatory documents prescribed under APH Annexure-2 §2.1 are uploaded."
-    flag_title: "Missing Statutory Documents"
-    flag_reason_template: "One or more mandatory documents required under APH Annexure-2 §2.1 are missing: {missing_docs}."
-    next_action: "Upload all required statutory documents before submission."
+    pass_title: "Mandatory Prototype Documents Uploaded"
+    pass_reason_template: "All three AICTE handbook document types in scope for this prototype (Affidavit-2, Building Completion Certificate, and Fire Safety Certificate per DECISIONS.md Q-002 and Annexure-2 §2.1) are uploaded."
+    flag_title: "Missing Prototype Documents"
+    flag_reason_template: "One or more AICTE handbook documents in scope for this prototype (Affidavit-2, Building Completion Certificate, Fire Safety Certificate) are missing: {missing_docs}. Note: Annexure-2 §2.1(ii) pay receipt is 'if any' and is not treated as missing."
+    next_action: "Upload the required in-scope AICTE handbook documents before submission."
     is_active: true
 
   - rule_id: "FIELD_001"
     title: "Mandatory Field Completeness"
     category: "eoa"
     clause_id: null
+    clause_ids: []
     severity: "high"
     signal_type: "internal_check"
     condition:
@@ -40,22 +46,26 @@ rules:
     category: "eoa"
     document_type: "fire_safety_certificate"
     clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+    clause_ids:
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_V"
+      - "APH_2024_27_CLAUSE_6_17_I"
     severity: "critical"
     signal_type: "rule"
     condition:
       operator: "date_not_expired"
-      field: "valid_until"
-    pass_title: "Fire Safety Certificate Currently Valid"
-    pass_reason_template: "Certificate is valid until {valid_until}, satisfying APH 2024-2027 Clause 6.17(i) norms."
-    flag_title: "Fire Safety Certificate Expired"
-    flag_reason_template: "Certificate expired on {valid_until} and is not valid for academic session {academic_year} per APH Clause 6.17(i)."
-    next_action: "Obtain and upload a renewed Fire Safety Certificate from the state fire authority."
+      field: "expiry_date"
+    pass_title: "Fire Safety Certificate Currently Unexpired"
+    pass_reason_template: "Fire Safety Certificate shows expiry date {expiry_date}, which is unexpired per Annexure-2 §2.1(v) and Clause 6.17(i)."
+    flag_title: "Fire Safety Certificate Date Expired"
+    flag_reason_template: "Certificate expired on {expiry_date} per date recorded on document, and does not appear to satisfy Annexure-2 §2.1(v) and Clause 6.17(i)."
+    next_action: "Obtain and upload a renewed Fire Safety Certificate from the competent state fire authority."
     is_active: true
 
   - rule_id: "CONSISTENCY_001"
     title: "Cross-Document Institution Name Consistency"
     category: "eoa"
     clause_id: null
+    clause_ids: []
     severity: "critical"
     signal_type: "internal_check"
     condition:
@@ -69,38 +79,81 @@ rules:
     is_active: true
 
   - rule_id: "TER_PAYMENT_001"
-    title: "TER Charges Payment Compliance"
+    title: "AICTE Web-Portal Payment Receipt Verification"
     category: "eoa"
     document_type: "ter_payment_receipt"
     clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_II"
+    clause_ids:
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_II"
+      - "APH_2024_27_CHAP_2_TABLE_2_1"
     severity: "info"
     signal_type: "rule"
+    status: "unverified" # The 100000 INR target is unsupported by Table 2.1; §2.1(ii) specifies pay receipt "if any"
+    is_active: false
     condition:
       operator: "custom"
       field: "amount"
       target_value: null
-    pass_title: "TER Fee Receipt Submitted"
-    pass_reason_template: "Pay receipt from AICTE Web-Portal submitted per Annexure-2 §2.1(ii)."
-    flag_title: "TER Charges Payment Unverified"
-    flag_reason_template: "Annexure-2 §2.1(ii) specifies pay receipt 'if any'; amount check is inactive/unverified as Table 2.1 charges vary by institution category."
-    next_action: "Auditor discretion: verify portal payment receipt if applicable."
-    is_active: false
+    pass_title: "TER Fee Receipt Provided"
+    pass_reason_template: "Pay receipt from AICTE Web-Portal provided per Annexure-2 §2.1(ii)."
+    flag_title: "TER Fee Payment Unverified"
+    flag_reason_template: "Pay receipt verification is unverified. Annexure-2 §2.1(ii) specifies pay receipt 'if any', and Table 2.1 specifies charges varying by institution category rather than a uniform threshold."
+    next_action: "Auditor discretion: inspect payment receipt if applicable for this institution category."
 
   - rule_id: "STRUCTURAL_001"
-    title: "Building Age & Structural Stability Verification"
+    title: "Building Age & Structural Stability Verification (> 30 Years)"
     category: "eoa"
     document_type: "building_completion_certificate"
     clause_id: "APH_2024_27_CLAUSE_6_17_H"
+    clause_ids:
+      - "APH_2024_27_CLAUSE_6_17_H"
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_IV"
+      - "APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE"
     severity: "high"
     signal_type: "rule"
+    status: "unverified"
+    is_active: false
+    # Dependency: A Structural Stability Certificate and the Competent Authority letter are not Q-002 document types,
+    # and government-building status is not extracted. The engine cannot see them yet.
+    # Semantics of date_lte_years: "age in years at the reference date is at most N" (age <= N).
+    # Handbook treatment of 30 years: Clause 6.17(h) requires a certificate "After the expiry of a period of thirty years
+    # from the issue of Completion Certificate". Exactly 30 years (age <= 30) passes; age > 30 triggers the requirement.
+    # Pending compound condition (D-017):
+    # Pass condition: any_of [age <= 30, structural_stability_certificate present, competent_authority_letter present]
+    # Flag condition (negation): all_of [
+    #   (a) age > 30 from issue_date,
+    #   (b) no structural_stability_certificate uploaded,
+    #   (c) 50-year government-building letter exception does not apply
+    # ]
     condition:
       operator: "date_lte_years"
-      field: "completion_certificate_issue_date"
+      field: "issue_date"
       target_value: 30
       unit: "years"
-    pass_title: "Structural Stability Requirement Satisfied"
-    pass_reason_template: "Building completion certificate issue date {issue_date} (age {age_years} years <= 30 years); structural stability certificate not required."
+    pass_title: "Structural Stability Requirement Not Applicable or Exception Applied"
+    pass_reason_template: "Building Completion Certificate issue date is {issue_date} (age <= 30 years), or building is covered under the >50-year government-constructed building letter exception per Annexure-2 §2.1 preamble."
     flag_title: "Structural Stability Certificate Required (> 30 Years)"
-    flag_reason_template: "Building is {age_years} years old from Completion Certificate issue date {issue_date}. Clause 6.17(h) and Annexure-2 §2.1(iv) mandate a valid Structural Stability Certificate (5-year validity). Government buildings > 50 years are governed under the Government Building Act, 1899 exception."
-    next_action: "Upload valid Structural Stability Certificate (valid within 5 years) or government building authority letter."
-    is_active: true
+    flag_reason_template: "Building age exceeds 30 years from Completion Certificate issue date {issue_date}, no Structural Stability Certificate was uploaded, and the 50-year government-building letter exception does not apply. Per Clause 6.17(h) and Annexure-2 §2.1(iv), a Structural Stability Certificate is required."
+    next_action: "Upload a Structural Stability Certificate from a registered Structural Engineer, or a Competent Authority letter for government buildings older than 50 years."
+
+  - rule_id: "STRUCTURAL_002"
+    title: "Structural Stability Certificate Validity Check (5 Years)"
+    category: "eoa"
+    document_type: "structural_stability_certificate"
+    clause_id: "APH_2024_27_CLAUSE_6_17_H"
+    clause_ids:
+      - "APH_2024_27_CLAUSE_6_17_H"
+    severity: "high"
+    signal_type: "rule"
+    status: "unverified" # Outside Q-002 prototype document types (structural_stability_certificate); needs document type and extraction fields added first
+    is_active: false
+    condition:
+      operator: "date_lte_years"
+      field: "issue_date"
+      target_value: 5
+      unit: "years"
+    pass_title: "Structural Stability Certificate Within 5-Year Validity"
+    pass_reason_template: "Structural Stability Certificate issue date is {issue_date} (within 5-year validity period prescribed by Clause 6.17(h))."
+    flag_title: "Structural Stability Certificate Exceeded 5-Year Validity"
+    flag_reason_template: "Structural Stability Certificate was issued on {issue_date} and exceeds the 5-year validity period mandated by Clause 6.17(h)."
+    next_action: "Obtain and upload a renewed Structural Stability Certificate from a registered Structural Engineer."

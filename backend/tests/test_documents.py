@@ -84,8 +84,8 @@ async def test_list_documents(institution_client: AsyncClient):
     pdf_bytes = create_dummy_pdf("Building Certificate")
     files = {"file": ("bcc.pdf", pdf_bytes, "application/pdf")}
     data = {"document_type": "building_completion_certificate"}
-
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    u_res = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    assert u_res.status_code == 201
 
     list_res = await institution_client.get(f"/api/applications/{app_id}/documents")
     assert list_res.status_code == 200

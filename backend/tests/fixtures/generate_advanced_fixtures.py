@@ -15,7 +15,7 @@ Generates deterministic test PDFs in tests/fixtures/advanced/ for:
 import io
 import datetime
 from pathlib import Path
-import fitz  # PyMuPDF
+import pymupdf as fitz
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa

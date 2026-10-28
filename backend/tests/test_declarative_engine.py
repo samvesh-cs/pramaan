@@ -32,10 +32,12 @@ async def test_validation_engine_findings_have_statutory_citations(institution_c
 
     # Upload Fire Safety and Building Completion
     files = {"file": ("valid_fire_safety.pdf", read_sample("valid_fire_safety.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
     # Validate
     val = await institution_client.post(f"/api/applications/{app_id}/validate")
@@ -77,7 +79,8 @@ async def test_expiry_finding_statutory_grounding(institution_client: AsyncClien
 
     # Upload expired Fire Safety
     files = {"file": ("expired_fire_safety.pdf", read_sample("expired_fire_safety.pdf"), "application/pdf")}
-    await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u_exp = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u_exp.status_code == 201
 
     val = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert val.status_code == 200
@@ -140,11 +143,13 @@ async def test_doc_presence_and_internal_checks_metadata(institution_client: Asy
 
 
 @pytest.mark.asyncio
-async def test_structural_stability_5_year_expiry_and_government_exception(institution_client: AsyncClient):
+async def test_structural_stability_5_year_expiry_and_legacy_name_match_exemption(institution_client: AsyncClient):
     """
-    Tests:
-    1. Structural Stability Certificate expired (> 5 years old) flags per Clause 6.17(h).
-    2. Government building exception (> 50 years old, Government Building Act 1899) passes.
+    Validates structural stability rules under current live engine:
+    1. Case 1: Certificate expired (> 5 years) correctly flagged under Clause 6.17(h).
+    2. Case 2 (Legacy: exemption granted by name match; to be removed in Step A0b/F):
+       - Posting 'competent_authority_letter' currently returns HTTP 400 (not in EOA_MVP_DOCUMENT_TYPES).
+       - Live rule grants exemption solely because 'government' is in the institution name.
     """
     import pymupdf
 
@@ -164,6 +169,7 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
         "/api/applications",
         json={"institution_name": "Private Institute of Tech", "application_category": "eoa", "academic_year": "2026-27"},
     )
+    assert res1.status_code == 201
     app1_id = res1.json()["id"]
 
     bcc_bytes = make_pdf([
@@ -172,11 +178,12 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
         "Issue Date: 15/06/1980",
         "Certificate Number: BCC-1980-001",
     ])
-    await institution_client.post(
+    u1_res = await institution_client.post(
         f"/api/applications/{app1_id}/documents",
         files={"file": ("bcc.pdf", bcc_bytes, "application/pdf")},
         data={"document_type": "building_completion_certificate"},
     )
+    assert u1_res.status_code == 201
 
     expired_ssc_bytes = make_pdf([
         "Structural Stability Certificate",
@@ -185,11 +192,12 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
         "Chartered Engineer Registration Number: CE-STR-12345",
         "Issue Date: 10/01/2015",
     ])
-    await institution_client.post(
+    u2_res = await institution_client.post(
         f"/api/applications/{app1_id}/documents",
         files={"file": ("ssc.pdf", expired_ssc_bytes, "application/pdf")},
         data={"document_type": "structural_stability_certificate"},
     )
+    assert u2_res.status_code == 201
 
     val1 = await institution_client.post(f"/api/applications/{app1_id}/validate")
     assert val1.status_code == 200
@@ -206,6 +214,7 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
         "/api/applications",
         json={"institution_name": "Government Polytechnic College", "application_category": "eoa", "academic_year": "2026-27"},
     )
+    assert res2.status_code == 201
     app2_id = res2.json()["id"]
 
     old_govt_bcc = make_pdf([
@@ -214,11 +223,12 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
         "Issue Date: 12/03/1965",
         "Certificate Number: GOVT-BCC-1965",
     ])
-    await institution_client.post(
+    u3_res = await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("govt_bcc.pdf", old_govt_bcc, "application/pdf")},
         data={"document_type": "building_completion_certificate"},
     )
+    assert u3_res.status_code == 201
 
     govt_letter_bytes = make_pdf([
         "Letter from Competent Authority",
@@ -226,11 +236,14 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
         "Subject: AICTE Building Norms Compliance under Government Building Act 1899",
         "Reference: Annexure-2 Section 2.1 Government Building Exemption",
     ])
-    await institution_client.post(
+    govt_letter_res = await institution_client.post(
         f"/api/applications/{app2_id}/documents",
         files={"file": ("govt_letter.pdf", govt_letter_bytes, "application/pdf")},
         data={"document_type": "competent_authority_letter"},
     )
+    # Real current behavior: competent_authority_letter is rejected because it is not yet in EOA_MVP_DOCUMENT_TYPES
+    assert govt_letter_res.status_code == 400
+    assert govt_letter_res.json()["error"]["code"] == "INVALID_DOCUMENT_TYPE"
 
     val2 = await institution_client.post(f"/api/applications/{app2_id}/validate")
     assert val2.status_code == 200
@@ -238,6 +251,8 @@ async def test_structural_stability_5_year_expiry_and_government_exception(insti
 
     govt_struct_finding = next((f for f in report2["findings"] if f["rule_id"] == "STRUCTURAL_STABILITY_001"), None)
     assert govt_struct_finding is not None
+    # Real current behavior: pass is granted strictly via institution-name matching ('government' in name)
     assert govt_struct_finding["status"] == "pass"
     assert "Government Building Exemption" in govt_struct_finding["title"]
+
 

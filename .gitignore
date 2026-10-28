@@ -91,13 +91,11 @@ logs/
 ehthumbs.db
 $RECYCLE.BIN/
 
-# ----- Sensitive Documents -----
-# AICTE rulebook PDF (copyrighted regulatory document - do not commit)
-AICTE rulebook.pdf
-AICTE_rulebook.pdf
+# ----- PDF Documents -----
 *.pdf
 
-# If you need to commit specific PDFs, use git add -f <file>
+# Explicit reference rulebook unignore for CI validation (Option B)
+!docs/reference/AICTE_rulebook.pdf
 # But do NOT commit the AICTE rulebook or any real institutional documents.
 
 # ----- Misc -----

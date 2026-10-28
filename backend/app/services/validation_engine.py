@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
@@ -6,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
+from app.config import settings
 from app.models.application import Application
 from app.models.document import Document
 from app.models.extraction import ExtractionRun
@@ -20,10 +22,13 @@ from app.rules.legacy_adapter import is_advisory_rule, wrap_legacy_rules
 from app.rules.presence_check import DocumentPresenceRule
 from app.rules.shadow_runner import dispatch_shadow_evaluation
 from app.rules.ter_payment_check import TerPaymentRule
+from app.rules.declarative_engine import default_declarative_engine
 from app.schemas.application import OverallStatus
 from app.schemas.finding import FindingResponse, FindingReviewUpdate
 from app.schemas.report import ReportResponse
 from app.utils.id_generator import generate_id
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_overall_status(findings: list[Finding | Any], documents: list[Document]) -> OverallStatus:
@@ -141,32 +146,59 @@ class ValidationEngine:
             "all_system_documents": all_system_documents,
         }
 
-        generated_findings: list[Finding] = []
-        for rule in self.rules:
-            rule_findings = rule.evaluate(context)
-            for rf in rule_findings:
-                clause_data = None
-                if getattr(rf, "clause_ref", None):
-                    clause_data = rf.clause_ref.model_dump() if hasattr(rf.clause_ref, "model_dump") else rf.clause_ref
+        # Step B3: Inspect RULE_ENGINE_MODE per-request (default: "legacy")
+        # In declarative mode, if the declarative engine raises an unexpected error,
+        # fall back to legacy for that request, log DECLARATIVE_FALLBACK with application_id
+        # and rule_id (no document text), and return a normal response, never a 500.
+        engine_mode = getattr(settings, "RULE_ENGINE_MODE", "legacy")
+        raw_findings = []
+        effective_mode = engine_mode
 
-                finding_model = Finding(
-                    id=generate_id("finding"),
-                    application_id=application_id,
-                    document_id=rf.document_id,
-                    rule_id=rf.rule_id,
-                    status=rf.status,
-                    title=rf.title,
-                    reason=rf.reason,
-                    document_name=rf.document_name,
-                    evidence=rf.evidence,
-                    next_action=rf.next_action,
-                    clause_ref=clause_data,
-                    severity=getattr(rf, "severity", "medium"),
-                    signal_type=getattr(rf, "signal_type", "rule"),
+        if engine_mode == "declarative":
+            try:
+                raw_findings = default_declarative_engine.evaluate(context)
+            except Exception as exc:
+                failed_rule_id = getattr(exc, "rule_id", "DECLARATIVE_ENGINE")
+                logger.warning(
+                    "DECLARATIVE_FALLBACK: application_id=%s rule_id=%s error=%s",
+                    application_id,
+                    failed_rule_id,
+                    type(exc).__name__,
                 )
-                finding_model.advisory = getattr(rf, "advisory", False) or is_advisory_rule(rf.rule_id)
-                db.add(finding_model)
-                generated_findings.append(finding_model)
+                effective_mode = "legacy"
+                raw_findings = []
+                for rule in self.rules:
+                    raw_findings.extend(rule.evaluate(context))
+        else:
+            effective_mode = "legacy"
+            raw_findings = []
+            for rule in self.rules:
+                raw_findings.extend(rule.evaluate(context))
+
+        generated_findings: list[Finding] = []
+        for rf in raw_findings:
+            clause_data = None
+            if getattr(rf, "clause_ref", None):
+                clause_data = rf.clause_ref.model_dump() if hasattr(rf.clause_ref, "model_dump") else rf.clause_ref
+
+            finding_model = Finding(
+                id=generate_id("finding"),
+                application_id=application_id,
+                document_id=rf.document_id,
+                rule_id=rf.rule_id,
+                status=rf.status,
+                title=rf.title,
+                reason=rf.reason,
+                document_name=rf.document_name,
+                evidence=rf.evidence,
+                next_action=rf.next_action,
+                clause_ref=clause_data,
+                severity=getattr(rf, "severity", "medium"),
+                signal_type=getattr(rf, "signal_type", "rule"),
+            )
+            finding_model.advisory = getattr(rf, "advisory", False) or is_advisory_rule(rf.rule_id)
+            db.add(finding_model)
+            generated_findings.append(finding_model)
 
         # Flush to persist findings
         await db.flush()

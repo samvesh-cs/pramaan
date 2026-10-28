@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 venv/
 .env
+query
 # ----- Python -----
 __pycache__/
 *.py[cod]

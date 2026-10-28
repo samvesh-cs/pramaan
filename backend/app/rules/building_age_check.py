@@ -2,12 +2,13 @@ from datetime import datetime, timezone
 import re
 from typing import Any
 from app.rules.base import BaseRule, OCR_CONFIDENCE_REVIEW_THRESHOLD
+from app.rules.declarative_engine import default_clause_registry
 from app.schemas.finding import FindingCreate
 
 
 class BuildingAgeStructuralStabilityRule(BaseRule):
     rule_id = "STRUCTURAL_STABILITY_001"
-    title = "Building Age & Structural Stability Verification"
+    title = "Building Age & Structural Stability Check"
 
     def evaluate(self, context: dict[str, Any]) -> list[FindingCreate]:
         findings: list[FindingCreate] = []
@@ -101,43 +102,37 @@ class BuildingAgeStructuralStabilityRule(BaseRule):
         current_year = datetime.now(timezone.utc).year
         building_age = current_year - completion_year
 
-        # 2. Check >50-year government-building exception per Annexure-2 §2.1 & Clause 6.17(g) (Government Building Act, 1899)
-        application = context.get("application")
-        inst_name = (getattr(application, "institution_name", None) or "").lower()
-        is_govt_inst = any(k in inst_name for k in ["government", "govt", "national institute", "iit", "nit", "central university", "state university"])
-        govt_letter_doc = next(
-            (
-                d for d in uploaded_docs
-                if d.document_type in ("government_building_letter", "competent_authority_letter")
-                or "govt_letter" in (d.original_filename or "").lower()
-                or "competent_authority" in (d.original_filename or "").lower()
-            ),
+        # 2. Check >50-year exemption: requires age > 50 AND competent_authority_letter present (D-020)
+        # Note: No institution-name matching. Letter content is not assessed (presence-only).
+        competent_letter_doc = next(
+            (d for d in uploaded_docs if d.document_type == "competent_authority_letter"),
             None,
         )
 
-        if building_age > 50 and (is_govt_inst or govt_letter_doc is not None):
+        if building_age > 50 and competent_letter_doc is not None:
             findings.append(
                 FindingCreate(
                     rule_id=self.rule_id,
-                    status="pass",
-                    title="Government Building Exemption Verified (> 50 Years)",
+                    status="unresolved",
+                    title="Competent Authority letter uploaded: reviewer to confirm it applies",
                     reason=(
-                        f"Building completion certificate issue date is {date_str} (age {building_age} years > 50 years). "
-                        f"Per APH Annexure-2 §2.1 and Clause 6.17(g), Government Buildings governed under the "
-                        f"Government Building Act, 1899 are exempted from standard structural stability submission "
-                        f"with competent authority compliance."
+                        "The preamble allows a letter from the Competent Authority for "
+                        "government-constructed buildings older than 50 years where original documents "
+                        "cannot be submitted; Pramaan does not read the letter and does not know whether "
+                        "the building is government-constructed or whether the condition applies."
                     ),
-                    document_id=building_doc.id,
-                    document_name=building_doc.original_filename,
+                    document_id=competent_letter_doc.id,
+                    document_name=competent_letter_doc.original_filename,
                     evidence={
                         "completion_certificate_issue_date": date_str,
                         "completion_year": completion_year,
                         "building_age_years": building_age,
-                        "is_government_institution": is_govt_inst,
-                        "has_competent_authority_letter": govt_letter_doc is not None,
-                        "statutory_exception": "APH Annexure-2 §2.1 / Clause 6.17(g) (Government Building Act, 1899)",
+                        "has_competent_authority_letter": True,
+                        "letter_filename": competent_letter_doc.original_filename,
+                        "rule_reference": "APH 2024-2027 Annexure-2 Section 2.1 (Preamble)",
                     },
-                    next_action="No action required.",
+                    clause_ref=default_clause_registry.get("APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE"),
+                    next_action="Reviewer to open the letter and confirm it applies.",
                 )
             )
             return findings
@@ -192,6 +187,7 @@ class BuildingAgeStructuralStabilityRule(BaseRule):
                         "threshold_years": 30,
                         "rule_reference": "APH 2024-2027 Clause 6.17(h) & Annexure-2 §2.1(iv)",
                     },
+                    clause_ref=default_clause_registry.get("APH_2024_27_CLAUSE_6_17_H"),
                     next_action="Engage an empanelled/registered Structural Engineer and submit a Structural Stability Certificate.",
                 )
             )
@@ -270,11 +266,11 @@ class BuildingAgeStructuralStabilityRule(BaseRule):
                 FindingCreate(
                     rule_id=self.rule_id,
                     status="pass",
-                    title="Structural Stability Certificate Verified (> 30 Years)",
+                    title="Structural Stability Certificate Provided (> 30 Years)",
                     reason=(
-                        f"Building age ({building_age} years from Completion Certificate issue date) is supported by a valid "
-                        f"Structural Stability Certificate (Ref: {cert_num}, Engineer Reg: {license_num}) complying with "
-                        f"Clause 6.17(h) (valid within 5 years) and Annexure-2 §2.1(iv)."
+                        f"Building age ({building_age} years from Completion Certificate issue date) is supported by a "
+                        f"Structural Stability Certificate (Ref: {cert_num}, Engineer Reg: {license_num}) consistent with "
+                        f"Clause 6.17(h) (within 5-year validity period) and Annexure-2 §2.1(iv)."
                     ),
                     document_id=structural_doc.id,
                     document_name=structural_doc.original_filename,

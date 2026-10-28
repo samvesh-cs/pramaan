@@ -32,6 +32,9 @@ class FieldCompletenessRule(BaseRule):
             )
             checklist_info = EOA_DOCUMENT_CHECKLIST[doc_type]
             required_fields = checklist_info.get("required_fields", [])
+            if not required_fields:
+                continue
+
             is_ter = (doc_type == "ter_payment_receipt")
             ter_kwargs: dict[str, Any] = {"severity": "info"} if is_ter else {}
 

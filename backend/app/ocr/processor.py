@@ -39,7 +39,7 @@ def process_document(
 ) -> ExtractionResult:
     """Process a document file (PDF, JPG, PNG) and return structured ExtractionResult.
 
-    Complies with docs/API_CONTRACT.md section 5.
+    Conforms to docs/API_CONTRACT.md section 5.
     Never crashes on invalid, corrupt, or unsupported files; returns
     processing_status="processing_failed" with error description.
     """
@@ -62,6 +62,19 @@ def process_document(
             document_type=document_type,
             processing_status="processing_failed",
             error=f"Unsupported file type '{ext}'. Supported types: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+        )
+
+    # 2b. Skip OCR processing for presence-only document types (no required extraction fields)
+    from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
+    chk_entry = EOA_DOCUMENT_CHECKLIST.get(document_type or "")
+    if chk_entry and chk_entry.get("required_fields") == []:
+        return ExtractionResult(
+            document_id=document_id,
+            document_type=document_type,
+            processing_status="processed",
+            pages=[],
+            fields={},
+            error=None,
         )
 
     # 3. Process pages

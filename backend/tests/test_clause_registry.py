@@ -276,6 +276,8 @@ def test_honest_claims_language_in_rules():
         "tampered",
         "forged",
         "authentic",
+        "complies",
+        "complying",
     ]
 
     def validate_text(text: str, context_label: str, enforce_verified_statutory_ban: bool = True):
@@ -326,11 +328,10 @@ def test_honest_claims_language_in_rules():
                                 legacy_snippets.append((py_file.name, kw.arg, "".join(parts)))
 
     for file_name, field, text in legacy_snippets:
-        is_pending_a0_neutralization = file_name in ("building_age_check.py",)
         validate_text(
             text,
             f"Legacy rule '{file_name}' [{field}]",
-            enforce_verified_statutory_ban=not is_pending_a0_neutralization,
+            enforce_verified_statutory_ban=True,
         )
 
 

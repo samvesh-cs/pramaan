@@ -31,8 +31,11 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
     processing_incomplete > missing_documents > discrepancies_found > unresolved_checks > checks_passed / ready_for_review
     Accounts for human reviewer verification overrides per D-002, D-011, and APH 2024-2027 Scrutiny Desk.
     """
-    # 1. Any mandatory document not processed? (Optional TER receipt does not block application per D-019)
-    mandatory_docs = [d for d in documents if getattr(d, "document_type", None) != "ter_payment_receipt"]
+    # 1. Any mandatory document not processed? (Optional TER receipt & presence-only exemption letter do not block application per D-019/D-020)
+    mandatory_docs = [
+        d for d in documents
+        if getattr(d, "document_type", None) not in ("ter_payment_receipt", "competent_authority_letter")
+    ]
     if not mandatory_docs or any(getattr(d, "processing_status", None) != "processed" for d in mandatory_docs):
         return "processing_incomplete"
 
@@ -68,7 +71,7 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
     if "unresolved" in effective_statuses:
         return "unresolved_checks"
     if findings and all(s in ("pass", "not_applicable") for s in effective_statuses):
-        return "ready_for_review" if has_reviewer_override else "checks_passed"
+        return "checks_passed"
 
     return "processing_incomplete"
 

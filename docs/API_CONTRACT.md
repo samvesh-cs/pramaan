@@ -92,7 +92,13 @@ Response: `200 OK`, an array of the application response objects above, ordered 
 
 Request: `multipart/form-data`
 - `file`: required PDF, JPG, or PNG file.
-- `document_type`: required stable document-type code, selected from the configured checklist. Example: `fire_safety_certificate`.
+- `document_type`: required stable document-type code, selected from the configured checklist:
+  - `fire_safety_certificate` (mandatory)
+  - `building_completion_certificate` (mandatory)
+  - `affidavit_2` (mandatory)
+  - `structural_stability_certificate` (conditional: required if building age > 30 years)
+  - `ter_payment_receipt` (advisory/optional per D-019; does not block validation)
+  - `competent_authority_letter` (presence-only, no required extraction fields; optional exemption for buildings > 50 years where original documents cannot be submitted per Annexure-2 §2.1 preamble and D-020; does not block validation when omitted or processing)
 - `issued_date` and `expiry_date` are not supplied by the client as authoritative data; they must be extracted or entered through an explicitly marked reviewer correction flow, if such a flow is implemented.
 
 Response: `201 Created`

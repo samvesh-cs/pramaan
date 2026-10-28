@@ -69,6 +69,15 @@ EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
         ],
         "description": "Certificate from registered Structural Engineer regarding building stability (> 30 yrs)",
     },
+    "competent_authority_letter": {
+        "display_name": "Letter from Competent Authority (>50 Years Old Building)",
+        "applicability": "required_if_applicable",
+        "source": "APH 2024-2027, Annexure-2 §2.1 (Preamble)",
+        "condition": "Optional exemption document for buildings > 50 years where original documents cannot be submitted",
+        "has_expiry": False,
+        "required_fields": [],
+        "description": "Letter from the Competent Authority for buildings older than 50 years where original completion documents cannot be submitted (presence-only)",
+    },
 }
 
 # Supported document types for upload

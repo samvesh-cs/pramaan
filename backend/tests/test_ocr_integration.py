@@ -5,9 +5,8 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_e2e_real_sample_fire_safety(institution_client: AsyncClient):
-    sample_path = Path("tests/samples/clean_fire_safety.pdf")
-    if not sample_path.exists():
-        pytest.skip("Synthetic sample not found")
+    sample_path = Path(__file__).parent / "samples" / "clean_fire_safety.pdf"
+    assert sample_path.exists(), f"Synthetic sample not found at {sample_path}"
 
     with open(sample_path, "rb") as f:
         pdf_bytes = f.read()

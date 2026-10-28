@@ -175,6 +175,9 @@ class ValidationEngine:
             for rule in self.rules:
                 raw_findings.extend(rule.evaluate(context))
 
+        # Stamping ruleset_version and engine_mode per Step B4
+        stamped_ruleset_ver = getattr(default_declarative_engine, "ruleset_version", None) if effective_mode == "declarative" else None
+
         generated_findings: list[Finding] = []
         for rf in raw_findings:
             clause_data = None
@@ -195,8 +198,10 @@ class ValidationEngine:
                 clause_ref=clause_data,
                 severity=getattr(rf, "severity", "medium"),
                 signal_type=getattr(rf, "signal_type", "rule"),
+                advisory=getattr(rf, "advisory", False) or is_advisory_rule(rf.rule_id),
+                ruleset_version=stamped_ruleset_ver,
+                rule_engine_mode=effective_mode,
             )
-            finding_model.advisory = getattr(rf, "advisory", False) or is_advisory_rule(rf.rule_id)
             db.add(finding_model)
             generated_findings.append(finding_model)
 
@@ -206,6 +211,8 @@ class ValidationEngine:
         # 6. Calculate overall status
         new_status = calculate_overall_status(generated_findings, documents)
         application.overall_status = new_status
+        application.ruleset_version = stamped_ruleset_ver
+        application.rule_engine_mode = effective_mode
         await db.commit()
 
         # Step A: Dispatch asynchronous shadow evaluation if enabled (zero request impact)
@@ -219,7 +226,7 @@ class ValidationEngine:
         )
 
         # 7. Generate report response
-        return self._build_report(application_id, new_status, generated_findings, documents)
+        return self._build_report(application_id, new_status, generated_findings, documents, application)
 
     async def get_report(self, db: AsyncSession, application_id: str) -> ReportResponse:
         """Retrieve existing validation report."""
@@ -245,7 +252,7 @@ class ValidationEngine:
         findings_res = await db.execute(findings_stmt)
         findings = list(findings_res.scalars().all())
 
-        return self._build_report(application_id, application.overall_status, findings, documents)
+        return self._build_report(application_id, application.overall_status, findings, documents, application)
 
     async def review_finding(
         self,
@@ -358,6 +365,7 @@ class ValidationEngine:
         overall_status: str,
         findings: list[Finding],
         documents: list[Document],
+        application: Any = None,
     ) -> ReportResponse:
         # Check for unresolved duplicate warnings that block report generation
         unresolved_duplicates = [
@@ -443,12 +451,21 @@ class ValidationEngine:
 
         finding_responses = [FindingResponse.model_validate(f) for f in findings]
 
+        ruleset_ver = getattr(application, "ruleset_version", None)
+        engine_mode = getattr(application, "rule_engine_mode", None)
+        if not ruleset_ver and findings:
+            ruleset_ver = getattr(findings[0], "ruleset_version", None)
+        if not engine_mode and findings:
+            engine_mode = getattr(findings[0], "rule_engine_mode", None)
+
         return ReportResponse(
             application_id=application_id,
             overall_status=overall_status,
             summary=summary_counts,
             missing_document_types=missing_doc_types,
             findings=finding_responses,
+            ruleset_version=ruleset_ver,
+            rule_engine_mode=engine_mode,
             generated_at=datetime.now(timezone.utc),
         )
 

@@ -1,5 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from typing import Optional
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.schemas.application import OverallStatus
 from app.schemas.finding import FindingResponse
@@ -27,4 +28,16 @@ class ReportResponse(BaseModel):
     summary: dict[str, int]
     missing_document_types: list[str] = []
     findings: list[FindingResponse] = []
+    ruleset_version: Optional[str] = None
+    rule_engine_mode: Optional[str] = None
+    ruleset_display_name: str = "Legacy ruleset"
     generated_at: datetime
+
+    @model_validator(mode="after")
+    def resolve_display_ruleset(self) -> "ReportResponse":
+        if self.ruleset_version:
+            self.ruleset_display_name = self.ruleset_version
+        else:
+            self.ruleset_display_name = "Legacy ruleset"
+        return self
+

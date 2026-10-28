@@ -73,6 +73,9 @@ class FindingResponse(BaseModel):
     severity: Optional[str] = "medium"
     signal_type: Optional[str] = "rule"
     advisory: Optional[bool] = False
+    ruleset_version: Optional[str] = None
+    rule_engine_mode: Optional[str] = None
+    ruleset_display_name: Optional[str] = None
     reviewer_decision: Optional[str] = None
     reviewer_notes: Optional[str] = None
     reviewed_by: Optional[str] = None
@@ -87,5 +90,7 @@ class FindingResponse(BaseModel):
                     self.advisory = True
             except Exception:
                 pass
+        if not self.ruleset_display_name:
+            self.ruleset_display_name = self.ruleset_version if self.ruleset_version else "Legacy ruleset"
         return self
 

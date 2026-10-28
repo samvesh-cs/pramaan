@@ -217,13 +217,19 @@ Each rule returns one finding in this format:
     "value": "2025-12-31",
     "bbox": [100, 240, 330, 270]
   },
-  "next_action": "Request a current document or have a reviewer confirm the extracted date."
+  "next_action": "Request a current document or have a reviewer confirm the extracted date.",
+  "advisory": false,
+  "ruleset_version": "2024-2027.1.0+abcdef01",
+  "rule_engine_mode": "declarative",
+  "ruleset_display_name": "2024-2027.1.0+abcdef01"
 }
 ```
 
 Rules:
 - `document_id` may be `null` for an application-level finding such as a missing document type.
 - `evidence` may be `null` if no reliable evidence is available; explain why in `reason`.
+- `advisory` is an additive boolean persisting whether the finding is informational/advisory.
+- `ruleset_version` and `rule_engine_mode` are additive traceability fields. Legacy runs have `null` for `ruleset_version` and serialize `ruleset_display_name` as `"Legacy ruleset"`.
 - Never say that a document is forged based only on OCR or a mismatch.
 - The rule engine must not silently treat missing extracted values as passing checks.
 
@@ -244,6 +250,9 @@ Response:
   },
   "missing_document_types": ["affidavit_2"],
   "findings": [],
+  "ruleset_version": "2024-2027.1.0+abcdef01",
+  "rule_engine_mode": "declarative",
+  "ruleset_display_name": "2024-2027.1.0+abcdef01",
   "generated_at": "2026-10-24T12:05:00Z"
 }
 ```

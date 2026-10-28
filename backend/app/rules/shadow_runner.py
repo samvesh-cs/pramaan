@@ -15,6 +15,9 @@ from app.rules.declarative_engine import default_declarative_engine
 
 logger = logging.getLogger(__name__)
 
+# Strong reference retention for background shadow tasks to prevent premature garbage collection
+_BACKGROUND_SHADOW_TASKS: set[asyncio.Task] = set()
+
 
 def create_shadow_context(
     application_id: str,
@@ -177,7 +180,9 @@ async def dispatch_shadow_evaluation(
                     e,
                 )
 
-        asyncio.create_task(_safe_run())
+        task = asyncio.create_task(_safe_run())
+        _BACKGROUND_SHADOW_TASKS.add(task)
+        task.add_done_callback(_BACKGROUND_SHADOW_TASKS.discard)
     except Exception as e:
         logger.warning(
             "SHADOW_FAILURE: Failed to dispatch shadow evaluation for application %s: %s",

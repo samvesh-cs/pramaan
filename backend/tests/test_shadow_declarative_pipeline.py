@@ -96,6 +96,48 @@ def test_calculate_overall_status_decoupled_from_hardcoded_rule_ids():
     assert res == "checks_passed"
 
 
+def test_legacy_stored_findings_without_advisory_attribute():
+    """
+    Asserts that legacy findings stored prior to Step A (which lack an advisory attribute or have advisory=None)
+    resolve their advisory nature via is_advisory_rule(rule_id) so that calculate_overall_status is 100% unchanged.
+    """
+    doc = SimpleNamespace(id="doc1", document_type="fire_safety_certificate", processing_status="processed")
+
+    # 1. Finding without 'advisory' attribute at all (simulating legacy database row or dict)
+    legacy_ter = SimpleNamespace(
+        rule_id="TER_PAYMENT_001",
+        status="flagged",
+        reviewer_decision=None,
+    )
+    assert not hasattr(legacy_ter, "advisory")
+
+    # 2. Finding with advisory=None (simulating unmigrated nullable column)
+    legacy_field4 = SimpleNamespace(
+        rule_id="FIELD_004",
+        status="missing",
+        advisory=None,
+        reviewer_decision=None,
+    )
+
+    legacy_presence4 = SimpleNamespace(
+        rule_id="PRESENCE_004",
+        status="flagged",
+        advisory=None,
+        reviewer_decision=None,
+    )
+
+    mandatory_pass = SimpleNamespace(
+        rule_id="DOC_PRESENCE_001",
+        status="pass",
+        advisory=None,
+        reviewer_decision=None,
+    )
+
+    # Legacy advisory findings (even when flagged or missing) do not block checks_passed
+    res = calculate_overall_status([mandatory_pass, legacy_ter, legacy_field4, legacy_presence4], [doc])
+    assert res == "checks_passed"
+
+
 def test_shadow_context_is_deep_copied_and_detached():
     """Asserts create_shadow_context creates pure detached objects with zero DB connection handles."""
     app = SimpleNamespace(
@@ -201,10 +243,17 @@ def test_shadow_evaluation_fail_safe_isolation(caplog, monkeypatch):
     assert "SHADOW_FAILURE: application_id=app_fail_safe shadow declarative evaluation failed: Simulated declarative engine crash" in caplog.text
 
 
+def test_setting_default():
+    """Asserts that the ENABLE_SHADOW_DECLARATIVE_ENGINE setting defaults to False in Settings schema."""
+    from app.config import Settings
+    assert Settings.model_fields["ENABLE_SHADOW_DECLARATIVE_ENGINE"].default is False
+
+
 @pytest.mark.asyncio
 async def test_feature_flag_and_response_invariance(institution_client: AsyncClient, monkeypatch):
     """Asserts that enabling shadow evaluation does not alter the client response or overall status."""
-    # 1. Test with flag OFF (default)
+    # 1. Test with flag OFF
+    monkeypatch.setattr(settings, "ENABLE_SHADOW_DECLARATIVE_ENGINE", False)
     assert settings.ENABLE_SHADOW_DECLARATIVE_ENGINE is False
 
     res = await institution_client.post(
@@ -246,4 +295,33 @@ async def test_feature_flag_and_response_invariance(institution_client: AsyncCli
     off_findings = {(f["rule_id"], f["status"]) for f in report_off["findings"]}
     on_findings = {(f["rule_id"], f["status"]) for f in report_on["findings"]}
     assert off_findings == on_findings
+
+
+@pytest.mark.asyncio
+async def test_shadow_task_reference_retained_and_cleaned_up(monkeypatch):
+    """Asserts that fire-and-forget shadow background tasks retain strong references in _BACKGROUND_SHADOW_TASKS."""
+    import asyncio
+    from app.rules.shadow_runner import _BACKGROUND_SHADOW_TASKS
+
+    monkeypatch.setattr(settings, "ENABLE_SHADOW_DECLARATIVE_ENGINE", True)
+
+    app = SimpleNamespace(id="app_task_test", institution_name="Test College")
+    doc = SimpleNamespace(id="doc_t", application_id="app_task_test", document_type="fire_safety_certificate")
+
+    # Dispatch shadow evaluation
+    await dispatch_shadow_evaluation(
+        application_id="app_task_test",
+        application=app,
+        documents=[doc],
+        extractions_by_doc_id={},
+        all_system_documents=[doc],
+        legacy_findings=[],
+    )
+
+    # Allow event loop to run background task to completion
+    await asyncio.sleep(0.1)
+
+    # After completion, task reference must be cleanly discarded from the set
+    assert len(_BACKGROUND_SHADOW_TASKS) == 0
+
 

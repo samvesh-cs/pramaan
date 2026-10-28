@@ -110,7 +110,16 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
 
 def is_advisory_rule(rule_id: str) -> bool:
     """Returns True if the rule is registered as advisory/informational."""
-    return bool(RULE_STATUTORY_METADATA.get(rule_id, {}).get("advisory", False))
+    if RULE_STATUTORY_METADATA.get(rule_id, {}).get("advisory", False):
+        return True
+    try:
+        from app.rules.declarative_engine import default_declarative_engine
+        dec_rule = default_declarative_engine.get_rule(rule_id)
+        if dec_rule and dec_rule.advisory:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 class EnhancedRuleWrapper(BaseRule):

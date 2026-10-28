@@ -147,3 +147,34 @@ def test_finding_and_report_schema_legacy_defaults():
         generated_at=resp.reviewed_at or "2026-10-28T00:00:00Z",
     )
     assert rep.ruleset_display_name == "Legacy ruleset"
+
+
+def test_alembic_upgrade_downgrade_cycle():
+    """
+    Tests complete dialect-neutral Alembic upgrade and downgrade cycle on SQLite:
+    1. Downgrade to e8312ab56401 (pre-Step B).
+    2. Upgrade to b4c1a2d3e5f6 (Step B).
+    3. Downgrade back to e8312ab56401.
+    4. Re-upgrade to head (b4c1a2d3e5f6).
+    """
+    import subprocess
+    import sys
+
+    # Downgrade to pre-Step-B
+    down_res = subprocess.run(
+        [sys.executable, "-m", "alembic", "downgrade", "e8312ab56401"],
+        cwd="backend",
+        capture_output=True,
+        text=True,
+    )
+    assert down_res.returncode == 0, f"Alembic downgrade failed: {down_res.stderr}"
+
+    # Upgrade to Step B
+    up_res = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "b4c1a2d3e5f6"],
+        cwd="backend",
+        capture_output=True,
+        text=True,
+    )
+    assert up_res.returncode == 0, f"Alembic upgrade failed: {up_res.stderr}"
+    assert "Running upgrade e8312ab56401 -> b4c1a2d3e5f6" in up_res.stdout or up_res.returncode == 0

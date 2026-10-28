@@ -52,10 +52,17 @@ class ParityReport:
 
     @property
     def unallowed_discrepancies(self) -> list[Discrepancy]:
-        return [
-            d for d in self.discrepancies
-            if (d.context_id, d.rule_id) not in ALLOW_LIST
-        ]
+        unallowed: list[Discrepancy] = []
+        for d in self.discrepancies:
+            key = (d.context_id, d.rule_id)
+            if key not in ALLOW_LIST:
+                unallowed.append(d)
+            else:
+                justification = ALLOW_LIST.get(key, "")
+                if not justification or len(justification.strip()) < 10:
+                    d.reason_code = "ALLOW_LIST_MISSING_JUSTIFICATION"
+                    unallowed.append(d)
+        return unallowed
 
 
 def get_legacy_engine_rules() -> list[BaseRule]:

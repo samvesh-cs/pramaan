@@ -9,6 +9,7 @@ Validates:
 """
 
 from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
@@ -236,4 +237,103 @@ def test_fuzzy_name_matching_threshold_from_config(monkeypatch):
 
     # Low match evaluates to FALSE
     assert engine._compare_values(name3, "fuzzy_similarity", None, None, ctx_high) == EvaluationResult.FALSE
+
+
+def test_startup_validation_duplicate_rule_id_rejection(tmp_path: Path):
+    """Asserts that duplicate rule IDs in a ruleset cause startup failure."""
+    content = """
+version: "1.0"
+category: "eoa"
+rules:
+  - rule_id: "DUP_RULE_001"
+    title: "Rule 1"
+    condition:
+      operator: "exists"
+      field: "doc"
+    pass_title: "P"
+    pass_reason_template: "PR"
+    flag_title: "F"
+    flag_reason_template: "FR"
+  - rule_id: "DUP_RULE_001"
+    title: "Rule 2"
+    condition:
+      operator: "exists"
+      field: "doc"
+    pass_title: "P"
+    pass_reason_template: "PR"
+    flag_title: "F"
+    flag_reason_template: "FR"
+"""
+    yaml_file = tmp_path / "dup_rules.yaml"
+    yaml_file.write_text(content, encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        DeclarativeRuleEngine(rules_path=yaml_file)
+    assert "Duplicate rule_id 'DUP_RULE_001'" in str(exc.value)
+
+
+def test_startup_validation_invalid_clause_id_rejection(tmp_path: Path):
+    """Asserts that unknown clause IDs cause startup failure."""
+    content = """
+version: "1.0"
+category: "eoa"
+rules:
+  - rule_id: "INVALID_CLAUSE_RULE"
+    title: "Rule with bogus clause"
+    clause_id: "NON_EXISTENT_CLAUSE_9999"
+    condition:
+      operator: "exists"
+      field: "doc"
+    pass_title: "P"
+    pass_reason_template: "PR"
+    flag_title: "F"
+    flag_reason_template: "FR"
+"""
+    yaml_file = tmp_path / "invalid_clause.yaml"
+    yaml_file.write_text(content, encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        DeclarativeRuleEngine(rules_path=yaml_file)
+    assert "references unknown clause 'NON_EXISTENT_CLAUSE_9999'" in str(exc.value)
+
+
+def test_startup_validation_unknown_operator_rejection():
+    """Asserts that an unrecognized operator fails Pydantic schema validation."""
+    with pytest.raises(ValidationError) as exc:
+        RuleCondition(operator="bogus_dynamic_eval_operator", field="doc")
+    assert "operator" in str(exc.value)
+
+
+def test_security_no_eval_or_exec_in_declarative_engine():
+    """Security verification: ensures no eval, exec, or dynamic code execution exists in engine modules."""
+    import ast
+    engine_file = Path(__file__).resolve().parent.parent / "app" / "rules" / "declarative_engine.py"
+    schema_file = Path(__file__).resolve().parent.parent / "app" / "schemas" / "rule_definition.py"
+
+    for file_path in [engine_file, schema_file]:
+        tree = ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func_name = getattr(node.func, "id", None)
+                assert func_name not in ("eval", "exec"), (
+                    f"Forbidden dynamic execution call '{func_name}' found at line {node.lineno} in {file_path}"
+                )
+
+
+def test_load_once_caching_declarative_engine():
+    """Confirms default_declarative_engine is loaded once and cached as a module-level singleton."""
+    from app.rules.declarative_engine import default_declarative_engine as e1
+    from app.rules.declarative_engine import default_declarative_engine as e2
+    assert e1 is e2
+    assert len(e1.rules) > 0
+
+
+def test_startup_failure_on_invalid_ruleset_outside_dev_mode(tmp_path: Path, monkeypatch):
+    """Verifies that outside dev mode (DEBUG=False), an invalid ruleset stops engine initialization."""
+    monkeypatch.setattr(settings, "DEBUG", False)
+    bad_yaml = tmp_path / "corrupted_rules.yaml"
+    bad_yaml.write_text("invalid: yaml: [syntax", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc:
+        DeclarativeRuleEngine(rules_path=bad_yaml)
+    assert "Invalid YAML syntax" in str(exc.value)
+
 

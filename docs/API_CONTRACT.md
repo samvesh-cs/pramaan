@@ -229,7 +229,7 @@ Rules:
 - `document_id` may be `null` for an application-level finding such as a missing document type.
 - `evidence` may be `null` if no reliable evidence is available; explain why in `reason`.
 - `advisory` is an additive boolean persisting whether the finding is informational/advisory.
-- `ruleset_version` and `rule_engine_mode` are additive traceability fields. Legacy runs have `null` for `ruleset_version` and serialize `ruleset_display_name` as `"Legacy ruleset"`.
+- `ruleset_version` and `rule_engine_mode` are additive traceability fields. Legacy runs have `null` for `ruleset_version` and serialize `ruleset_display_name` as `"Legacy ruleset"`. Database migration is verified on SQLite; PostgreSQL dialect execution is untested in this environment.
 - Never say that a document is forged based only on OCR or a mismatch.
 - The rule engine must not silently treat missing extracted values as passing checks.
 

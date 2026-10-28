@@ -112,30 +112,62 @@ rules:
       - "APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE"
     severity: "high"
     signal_type: "rule"
-    status: "unverified"
-    is_active: false
-    # Dependency: A Structural Stability Certificate and the Competent Authority letter are not Q-002 document types,
-    # and government-building status is not extracted. The engine cannot see them yet.
-    # Semantics of date_lte_years: "age in years at the reference date is at most N" (age <= N).
-    # Handbook treatment of 30 years: Clause 6.17(h) requires a certificate "After the expiry of a period of thirty years
-    # from the issue of Completion Certificate". Exactly 30 years (age <= 30) passes; age > 30 triggers the requirement.
-    # Pending compound condition (D-017):
-    # Pass condition: any_of [age <= 30, structural_stability_certificate present, all_of(age > 50, competent_authority_letter present)]
-    # Flag condition (negation): all_of [
-    #   (a) age > 30 from issue_date,
-    #   (b) no structural_stability_certificate uploaded,
-    #   (c) 50-year government-building letter exception does not apply
-    # ]
-    condition:
-      operator: "date_lte_years"
-      field: "issue_date"
-      target_value: 30
-      unit: "years"
-    pass_title: "Structural Stability Requirement Not Applicable or Exception Applied"
-    pass_reason_template: "Building Completion Certificate issue date is {issue_date} (age <= 30 years), or building is covered under the >50-year government-constructed building letter exception per Annexure-2 §2.1 preamble."
+    is_active: true
+    branches:
+      - branch_id: "age_lte_30"
+        condition:
+          operator: "date_lte_years"
+          field: "issue_date"
+          document_type: "building_completion_certificate"
+          target_value: 30
+          unit: "years"
+        outcome: "pass"
+        title: "Building Age Within 30-Year Threshold"
+        reason_template: "Building Completion Certificate issue date indicates building age <= 30 years; Structural Stability Certificate is not required under Clause 6.17(h)."
+        clause_id: "APH_2024_27_CLAUSE_6_17_H"
+
+      - branch_id: "age_gt_30_with_valid_certificate"
+        condition:
+          all_of:
+            - operator: "date_gte_years"
+              field: "issue_date"
+              document_type: "building_completion_certificate"
+              target_value: 31
+              unit: "years"
+            - operator: "exists"
+              document_type: "structural_stability_certificate"
+              field: "document_presence"
+            - operator: "date_lte_years"
+              document_type: "structural_stability_certificate"
+              field: "issue_date"
+              target_value: 5
+              unit: "years"
+        outcome: "pass"
+        title: "Structural Stability Certificate Within 5-Year Validity Provided"
+        reason_template: "Building age exceeds 30 years and a valid Structural Stability Certificate issued within 5 years is provided per Clause 6.17(h)."
+        clause_id: "APH_2024_27_CLAUSE_6_17_H"
+
+      - branch_id: "age_gt_50_with_competent_authority_letter"
+        condition:
+          all_of:
+            - operator: "date_gte_years"
+              field: "issue_date"
+              document_type: "building_completion_certificate"
+              target_value: 51
+              unit: "years"
+            - operator: "exists"
+              document_type: "competent_authority_letter"
+              field: "document_presence"
+        outcome: "unresolved"
+        title: "Competent Authority letter uploaded: reviewer to confirm it applies"
+        reason_template: "The preamble allows a letter from the Competent Authority for government-constructed buildings older than 50 years where original documents cannot be submitted; Pramaan does not read the letter and does not know whether the building is government-constructed or whether the condition applies."
+        next_action: "Reviewer to open the letter and confirm it applies."
+        clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE"
+
     flag_title: "Structural Stability Certificate Required (> 30 Years)"
-    flag_reason_template: "Building age exceeds 30 years from Completion Certificate issue date {issue_date}, no Structural Stability Certificate was uploaded, and the 50-year government-building letter exception does not apply. Per Clause 6.17(h) and Annexure-2 §2.1(iv), a Structural Stability Certificate is required."
+    flag_reason_template: "Building age exceeds 30 years from Completion Certificate issue date, no Structural Stability Certificate was uploaded, and the 50-year government-building letter condition does not apply. Per Clause 6.17(h) and Annexure-2 §2.1(iv), a Structural Stability Certificate is required."
     next_action: "Upload a Structural Stability Certificate from a registered Structural Engineer, or a Competent Authority letter for government buildings older than 50 years."
+
 
   - rule_id: "STRUCTURAL_002"
     title: "Structural Stability Certificate Validity Check (5 Years)"

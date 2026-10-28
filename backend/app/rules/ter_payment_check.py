@@ -6,6 +6,7 @@ from app.schemas.finding import FindingCreate
 class TerPaymentRule(BaseRule):
     rule_id = "TER_PAYMENT_001"
     title = "TER Payment Receipt Information Check"
+    advisory = True
 
     def evaluate(self, context: dict[str, Any]) -> list[FindingCreate]:
         findings: list[FindingCreate] = []

@@ -16,8 +16,9 @@ from app.rules.cross_document_check import InstitutionNameConsistencyRule
 from app.rules.duplicate_check import DuplicateDocumentRule
 from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
-from app.rules.legacy_adapter import wrap_legacy_rules
+from app.rules.legacy_adapter import is_advisory_rule, wrap_legacy_rules
 from app.rules.presence_check import DocumentPresenceRule
+from app.rules.shadow_runner import dispatch_shadow_evaluation
 from app.rules.ter_payment_check import TerPaymentRule
 from app.schemas.application import OverallStatus
 from app.schemas.finding import FindingResponse, FindingReviewUpdate
@@ -47,9 +48,9 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
         status = f.status
         rule_id = getattr(f, "rule_id", "")
 
-        # D-019: TER payment receipt checks (TER_PAYMENT_001, FIELD_004) are advisory/informational
-        # and do not block application approval even if missing, uncertain, or extraction failed.
-        if rule_id in ("TER_PAYMENT_001", "FIELD_004", "PRESENCE_004"):
+        # Step A: Advisory / informational rules (e.g. TER payment receipt checks per D-019)
+        # do not block application approval even if missing, uncertain, or extraction failed.
+        if getattr(f, "advisory", False) or is_advisory_rule(rule_id):
             effective_statuses.append("pass" if status == "pass" else "not_applicable")
             continue
 
@@ -163,6 +164,7 @@ class ValidationEngine:
                     severity=getattr(rf, "severity", "medium"),
                     signal_type=getattr(rf, "signal_type", "rule"),
                 )
+                finding_model.advisory = getattr(rf, "advisory", False) or is_advisory_rule(rf.rule_id)
                 db.add(finding_model)
                 generated_findings.append(finding_model)
 
@@ -173,6 +175,16 @@ class ValidationEngine:
         new_status = calculate_overall_status(generated_findings, documents)
         application.overall_status = new_status
         await db.commit()
+
+        # Step A: Dispatch asynchronous shadow evaluation if enabled (zero request impact)
+        await dispatch_shadow_evaluation(
+            application_id=application_id,
+            application=application,
+            documents=documents,
+            extractions_by_doc_id=extractions_by_doc_id,
+            all_system_documents=all_system_documents,
+            legacy_findings=generated_findings,
+        )
 
         # 7. Generate report response
         return self._build_report(application_id, new_status, generated_findings, documents)

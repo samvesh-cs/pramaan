@@ -88,6 +88,7 @@ rules:
       - "APH_2024_27_CHAP_2_TABLE_2_1"
     severity: "info"
     signal_type: "rule"
+    advisory: true
     status: "unverified" # The 100000 INR target is unsupported by Table 2.1; §2.1(ii) specifies pay receipt "if any"
     is_active: false
     condition:

@@ -56,6 +56,7 @@ class DeclarativeRuleConfig(BaseModel):
     severity: SeverityLevel = "medium"
     signal_type: SignalType = "rule"
     status: Optional[str] = None
+    advisory: bool = False
     condition: RuleCondition
     pass_title: str
     pass_reason_template: str

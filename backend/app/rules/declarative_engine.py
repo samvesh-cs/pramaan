@@ -96,6 +96,15 @@ class DeclarativeRuleEngine:
                 return r
         return None
 
+    def evaluate(self, context: dict[str, Any]) -> list[FindingCreate]:
+        """Evaluates all active declarative rules against the validation context."""
+        findings: list[FindingCreate] = []
+        for rule_cfg in self.rules:
+            if rule_cfg.is_active:
+                rule_findings = self.evaluate_rule(rule_cfg, context)
+                findings.extend(rule_findings)
+        return findings
+
     def evaluate_rule(
         self,
         rule_cfg: DeclarativeRuleConfig,
@@ -108,9 +117,224 @@ class DeclarativeRuleEngine:
         clause_ref = self.clause_registry.get(rule_cfg.clause_id) if rule_cfg.clause_id else None
         findings: list[FindingCreate] = []
 
-        # Example operator evaluation
-        # Note: Detailed operators delegate to specialized condition handlers
-        # For legacy parity, full pipeline runs via legacy_adapter
+        docs = context.get("documents", [])
+        extractions = context.get("extractions", {})
+        app = context.get("application")
+
+        def _get_v(obj: Any, attr: str, default: Any = None) -> Any:
+            if obj is None:
+                return default
+            if isinstance(obj, dict):
+                return obj.get(attr, default)
+            return getattr(obj, attr, default)
+
+        # 1. DOC_PRESENCE_001
+        if rule_cfg.rule_id == "DOC_PRESENCE_001":
+            required_types = ["fire_safety_certificate", "building_completion_certificate", "affidavit_2"]
+            present_types = {_get_v(d, "document_type") for d in docs if _get_v(d, "document_type")}
+            missing = [t for t in required_types if t not in present_types]
+            if not missing:
+                findings.append(
+                    FindingCreate(
+                        rule_id=rule_cfg.rule_id,
+                        status="pass",
+                        title=rule_cfg.pass_title,
+                        reason=rule_cfg.pass_reason_template,
+                        clause_ref=clause_ref,
+                        severity=rule_cfg.severity,
+                        signal_type=rule_cfg.signal_type,
+                        advisory=rule_cfg.advisory,
+                        next_action=rule_cfg.next_action,
+                    )
+                )
+            else:
+                findings.append(
+                    FindingCreate(
+                        rule_id=rule_cfg.rule_id,
+                        status="missing",
+                        title=rule_cfg.flag_title,
+                        reason=rule_cfg.flag_reason_template.format(missing_docs=", ".join(missing)),
+                        evidence={"missing_document_types": missing},
+                        clause_ref=clause_ref,
+                        severity=rule_cfg.severity,
+                        signal_type=rule_cfg.signal_type,
+                        advisory=rule_cfg.advisory,
+                        next_action=rule_cfg.next_action,
+                    )
+                )
+            return findings
+
+        # 2. FIELD_001
+        if rule_cfg.rule_id == "FIELD_001":
+            from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
+            for doc in docs:
+                dtype = _get_v(doc, "document_type")
+                if dtype not in EOA_DOCUMENT_CHECKLIST:
+                    continue
+                req_fields = EOA_DOCUMENT_CHECKLIST[dtype].get("required_fields", [])
+                if not req_fields:
+                    continue
+                ext = extractions.get(_get_v(doc, "id"))
+                ext_fields = _get_v(ext, "fields", {}) if ext else {}
+                extracted_keys = set()
+                if isinstance(ext_fields, dict):
+                    for k, f_val in ext_fields.items():
+                        if isinstance(f_val, dict) and f_val.get("value") is not None:
+                            extracted_keys.add(k)
+                        elif f_val is not None and not isinstance(f_val, dict):
+                            extracted_keys.add(k)
+                missing_fields = [f for f in req_fields if f not in extracted_keys]
+                doc_name = _get_v(doc, "original_filename", dtype)
+                if not missing_fields:
+                    findings.append(
+                        FindingCreate(
+                            rule_id=rule_cfg.rule_id,
+                            status="pass",
+                            title=rule_cfg.pass_title,
+                            reason=rule_cfg.pass_reason_template.format(
+                                extracted_count=len(extracted_keys),
+                                total_count=len(req_fields),
+                                document_type=dtype,
+                            ),
+                            document_id=_get_v(doc, "id"),
+                            document_name=doc_name,
+                            clause_ref=clause_ref,
+                            severity=rule_cfg.severity,
+                            signal_type=rule_cfg.signal_type,
+                            advisory=rule_cfg.advisory,
+                        )
+                    )
+                else:
+                    findings.append(
+                        FindingCreate(
+                            rule_id=rule_cfg.rule_id,
+                            status="flagged",
+                            title=rule_cfg.flag_title,
+                            reason=rule_cfg.flag_reason_template.format(
+                                document_name=doc_name,
+                                missing_fields=", ".join(missing_fields),
+                            ),
+                            document_id=_get_v(doc, "id"),
+                            document_name=doc_name,
+                            evidence={"missing_fields": missing_fields},
+                            clause_ref=clause_ref,
+                            severity=rule_cfg.severity,
+                            signal_type=rule_cfg.signal_type,
+                            advisory=rule_cfg.advisory,
+                            next_action=rule_cfg.next_action,
+                        )
+                    )
+            return findings
+
+        # 3. EXPIRY_001
+        if rule_cfg.rule_id == "EXPIRY_001":
+            target_doc = next((d for d in docs if _get_v(d, "document_type") == "fire_safety_certificate"), None)
+            if target_doc:
+                ext = extractions.get(_get_v(target_doc, "id"))
+                ext_fields = _get_v(ext, "fields", {}) if ext else {}
+                expiry_val = None
+                if isinstance(ext_fields, dict) and "expiry_date" in ext_fields:
+                    fld = ext_fields["expiry_date"]
+                    expiry_val = fld.get("value") if isinstance(fld, dict) else fld
+                doc_name = _get_v(target_doc, "original_filename", "fire_safety_certificate.pdf")
+                if expiry_val:
+                    try:
+                        exp_date = date.fromisoformat(str(expiry_val).strip()[:10])
+                        today = date.today()
+                        if exp_date >= today:
+                            findings.append(
+                                FindingCreate(
+                                    rule_id=rule_cfg.rule_id,
+                                    status="pass",
+                                    title=rule_cfg.pass_title,
+                                    reason=rule_cfg.pass_reason_template.format(expiry_date=str(exp_date)),
+                                    document_id=_get_v(target_doc, "id"),
+                                    document_name=doc_name,
+                                    clause_ref=clause_ref,
+                                    severity=rule_cfg.severity,
+                                    signal_type=rule_cfg.signal_type,
+                                    advisory=rule_cfg.advisory,
+                                )
+                            )
+                        else:
+                            findings.append(
+                                FindingCreate(
+                                    rule_id=rule_cfg.rule_id,
+                                    status="flagged",
+                                    title=rule_cfg.flag_title,
+                                    reason=rule_cfg.flag_reason_template.format(expiry_date=str(exp_date)),
+                                    document_id=_get_v(target_doc, "id"),
+                                    document_name=doc_name,
+                                    clause_ref=clause_ref,
+                                    severity=rule_cfg.severity,
+                                    signal_type=rule_cfg.signal_type,
+                                    advisory=rule_cfg.advisory,
+                                    next_action=rule_cfg.next_action,
+                                )
+                            )
+                    except Exception:
+                        findings.append(
+                            FindingCreate(
+                                rule_id=rule_cfg.rule_id,
+                                status="unresolved",
+                                title="Unresolved Fire Safety Certificate Expiry Date",
+                                reason=f"Expiry date value '{expiry_val}' is unparseable for document '{doc_name}'.",
+                                document_id=_get_v(target_doc, "id"),
+                                document_name=doc_name,
+                                clause_ref=clause_ref,
+                                severity=rule_cfg.severity,
+                                signal_type=rule_cfg.signal_type,
+                                advisory=rule_cfg.advisory,
+                            )
+                        )
+            return findings
+
+        # 4. CONSISTENCY_001
+        if rule_cfg.rule_id == "CONSISTENCY_001":
+            app_inst_name = (_get_v(app, "institution_name") or "").strip().lower()
+            mismatches = []
+            for doc in docs:
+                ext = extractions.get(_get_v(doc, "id"))
+                ext_fields = _get_v(ext, "fields", {}) if ext else {}
+                doc_inst = None
+                if isinstance(ext_fields, dict) and "institution_name" in ext_fields:
+                    fld = ext_fields["institution_name"]
+                    doc_inst = fld.get("value") if isinstance(fld, dict) else fld
+                if doc_inst and str(doc_inst).strip().lower() != app_inst_name:
+                    mismatches.append((_get_v(doc, "original_filename", "document"), str(doc_inst)))
+            if not mismatches:
+                findings.append(
+                    FindingCreate(
+                        rule_id=rule_cfg.rule_id,
+                        status="pass",
+                        title=rule_cfg.pass_title,
+                        reason=rule_cfg.pass_reason_template.format(institution_name=_get_v(app, "institution_name", "Institution")),
+                        clause_ref=clause_ref,
+                        severity=rule_cfg.severity,
+                        signal_type=rule_cfg.signal_type,
+                        advisory=rule_cfg.advisory,
+                    )
+                )
+            else:
+                findings.append(
+                    FindingCreate(
+                        rule_id=rule_cfg.rule_id,
+                        status="flagged",
+                        title=rule_cfg.flag_title,
+                        reason=rule_cfg.flag_reason_template.format(
+                            document_name=mismatches[0][0],
+                            doc_institution_name=mismatches[0][1],
+                            app_institution_name=_get_v(app, "institution_name", "Application Name"),
+                        ),
+                        clause_ref=clause_ref,
+                        severity=rule_cfg.severity,
+                        signal_type=rule_cfg.signal_type,
+                        advisory=rule_cfg.advisory,
+                        next_action=rule_cfg.next_action,
+                    )
+                )
+            return findings
+
         return findings
 
 

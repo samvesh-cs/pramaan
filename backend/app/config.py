@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = False
     RATE_LIMIT_ENABLED: bool = True
 
+    # Feature flags
+    ENABLE_SHADOW_DECLARATIVE_ENGINE: bool = False
+
     # One-time admin setup token for reviewer account creation
     ADMIN_SETUP_TOKEN: str = "pramaan-admin-setup-secret-token-2026"
 

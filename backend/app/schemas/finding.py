@@ -26,6 +26,7 @@ class FindingCreate(BaseModel):
     clause_ref: Optional[Any] = None
     severity: Optional[str] = "medium"
     signal_type: Optional[str] = "rule"
+    advisory: Optional[bool] = False
 
 
 class FindingReviewUpdate(BaseModel):
@@ -71,6 +72,7 @@ class FindingResponse(BaseModel):
     clause_ref: Optional[Any] = None
     severity: Optional[str] = "medium"
     signal_type: Optional[str] = "rule"
+    advisory: Optional[bool] = False
     reviewer_decision: Optional[str] = None
     reviewer_notes: Optional[str] = None
     reviewed_by: Optional[str] = None

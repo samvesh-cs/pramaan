@@ -41,6 +41,7 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
         "severity": "info",
         "signal_type": "rule",
+        "advisory": True,
     },
     "FIELD_001": {
         "clause_id": None,
@@ -61,6 +62,7 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "clause_id": None,
         "severity": "info",
         "signal_type": "internal_check",
+        "advisory": True,
     },
     "FIELD_005": {
         "clause_id": None,
@@ -81,6 +83,7 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
         "severity": "info",
         "signal_type": "rule",
+        "advisory": True,
     },
     "STRUCTURAL_001": {
         "clause_id": "APH_2024_27_CLAUSE_6_17_H",
@@ -105,11 +108,16 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
 }
 
 
+def is_advisory_rule(rule_id: str) -> bool:
+    """Returns True if the rule is registered as advisory/informational."""
+    return bool(RULE_STATUTORY_METADATA.get(rule_id, {}).get("advisory", False))
+
+
 class EnhancedRuleWrapper(BaseRule):
     """
     Wraps an existing BaseRule.
     Evaluates the inner rule and decorates every generated FindingCreate
-    with statutory clause_ref, severity, and signal_type.
+    with statutory clause_ref, severity, signal_type, and advisory flag.
     """
 
     def __init__(self, inner_rule: BaseRule, registry: Optional[ClauseRegistry] = None):
@@ -117,6 +125,8 @@ class EnhancedRuleWrapper(BaseRule):
         self.rule_id = getattr(inner_rule, "rule_id", inner_rule.__class__.__name__)
         self.title = getattr(inner_rule, "title", self.rule_id)
         self.registry = registry or default_clause_registry
+        meta = RULE_STATUTORY_METADATA.get(self.rule_id, {})
+        self.advisory = getattr(inner_rule, "advisory", False) or meta.get("advisory", False)
 
     def evaluate(self, context: dict[str, Any]) -> list[FindingCreate]:
         raw_findings = self.inner_rule.evaluate(context)
@@ -129,6 +139,7 @@ class EnhancedRuleWrapper(BaseRule):
             clause_ref = self.registry.get(clause_id) if clause_id else None
             severity: SeverityLevel = meta.get("severity", "medium")
             signal_type: SignalType = meta.get("signal_type", "rule")
+            is_advisory: bool = meta.get("advisory", False) or getattr(self.inner_rule, "advisory", False)
 
             # Update finding with statutory citation
             if hasattr(f, "clause_ref") and getattr(f, "clause_ref", None) is None:
@@ -137,6 +148,8 @@ class EnhancedRuleWrapper(BaseRule):
                 f.severity = severity
             if hasattr(f, "signal_type"):
                 f.signal_type = signal_type
+            if hasattr(f, "advisory"):
+                f.advisory = is_advisory
 
             decorated_findings.append(f)
 

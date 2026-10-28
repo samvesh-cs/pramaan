@@ -209,14 +209,26 @@ timeline
 
 ### Phase 3: AICTE Rulebook Expansions
 1. **Update Checklist:** Add `ter_payment_receipt` and conditional `structural_stability_certificate` to `backend/app/checklist/eoa_checklist.py`.
-2. **TER Rule:** Implement `backend/app/rules/ter_payment_check.py` validating statutory fees against Table 2.1.
+2. **TER Rule:** Implement `backend/app/rules/ter_payment_check.py` as an advisory check per Annexure-2 §2.1(ii) ('if any') per D-019.
 3. **Age Trigger Rule:** Implement `backend/app/rules/building_age_check.py` checking the > 30 years threshold.
 4. **Generate Demo PDFs:** Create synthetic `valid_ter_receipt.pdf` and `aged_building_completion.pdf` for seamless demoing.
 
 ### Phase 4: Scrutiny Dossier PDF Export & Final Polish
 1. **Print Layout:** Add `@media print` CSS stylesheet formatting `/report` into a formal government-style AICTE Scrutiny Dossier.
 2. **Export Button:** Add "Export AICTE Scrutiny Dossier (PDF)" triggering `window.print()`.
-3. **Demo Script & Rehearsal:** Run all 5 test scenarios (clean pass, expired fire safety, name mismatch, underpaid TER fee, > 30-year building without structural certificate) and verify flawless execution.
+3. **Demo Script & Rehearsal:** Run all 5 test scenarios (clean pass, expired fire safety, name mismatch, advisory TER receipt, > 30-year building without structural certificate) and verify flawless execution.
+
+---
+
+## 5. Architectural Roadmap Notes (Phase 2)
+
+### Step A: Declarative Engine Shadow Pipeline & Advisory Attribute
+- **Advisory Attribute on Rules:** In Step A, add an explicit `advisory: true` attribute to rule definitions (legacy metadata in `legacy_adapter.py` and declarative YAML schema in `rules_eoa.yaml`). The overall-status logic (`calculate_overall_status`) will inspect `getattr(rule, "advisory", False)` rather than hardcoding rule names (`TER_PAYMENT_001`, `FIELD_004`, `PRESENCE_004`).
+- **Zero DB Access in Worker Thread:** `asyncio.to_thread` executes in a thread pool worker and must never touch an `AsyncSession` (`aiosqlite`). The request path must serialize/copy the in-memory validation context (`dict[str, Any]`), and `asyncio.to_thread` will execute `declarative_engine.evaluate(copied_context)` on that pure in-memory copy with zero DB access. Discrepancy logging is strictly limited to rule IDs, statuses, discrepancy codes, and application ID.
+
+### Step E: Reviewer Identity Schema Extension
+- `reviewed_by` currently stores the authenticated reviewer's email in `String(100)` per D-021.
+- In Step E, migrate to explicit dual actor fields: `actor_user_id: str` (UUID foreign key linking to `User.id`) plus `actor_display_name: str` (for human-readable scrutiny dossiers and exports).
 
 ---
 

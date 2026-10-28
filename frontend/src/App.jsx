@@ -658,16 +658,14 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
   const { user } = useAuth()
   const [decision, setDecision] = useState(initialDecision)
   const [notes, setNotes] = useState('')
-  const [reviewerName, setReviewerName] = useState(() => user?.email || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (finding) {
       setDecision(finding.reviewer_decision || initialDecision)
       setNotes(finding.reviewer_notes || '')
-      setReviewerName(finding.reviewed_by || user?.email || 'Dr. A. Sharma (AICTE Scrutiny Committee)')
     }
-  }, [finding, initialDecision, user?.email])
+  }, [finding, initialDecision])
 
   if (!isOpen || !finding) return null
 
@@ -678,8 +676,7 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
     try {
       await onSave(finding.id, {
         reviewer_decision: decision,
-        reviewer_notes: notes.trim() || 'Auditor verified against physical records and regulatory handbook.',
-        reviewed_by: reviewerName.trim() || 'AICTE Scrutiny Auditor',
+        reviewer_notes: notes.trim(),
       })
       onClose()
     } finally {
@@ -693,7 +690,7 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
         <div className="auditor-modal-head">
           <div>
             <span className="eyebrow">HUMAN-IN-THE-LOOP SCRUTINY DESK</span>
-            <h3>Reviewer Verification Decision</h3>
+            <h3>Reviewer Assessment Decision</h3>
           </div>
           <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={18}/></button>
         </div>
@@ -702,23 +699,24 @@ function AuditorReviewModal({ isOpen, onClose, finding, initialDecision = 'verif
           <div className="modal-field">
             <label>Auditor Decision</label>
             <select value={decision} onChange={(e) => setDecision(e.target.value)}>
-              <option value="verified">Mark Verified (Accept Discrepancy / Rule Satisfied)</option>
+              <option value="verified">Accepted by Auditor (Rule satisfied / Discrepancy accepted)</option>
               <option value="confirmed_discrepancy">Confirm Discrepancy (Enforce Flag)</option>
               <option value="requested_resubmission">Request Document Resubmission</option>
               <option value="escalated">Escalate to Appellate Committee</option>
             </select>
           </div>
           <div className="modal-field">
-            <label>Reviewer Identity</label>
-            <input type="text" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} required />
+            <label>Authenticated Reviewer</label>
+            <input type="text" value={user?.email || 'Authenticated Reviewer'} readOnly disabled style={{ opacity: 0.85, cursor: 'not-allowed' }} />
           </div>
           <div className="modal-field">
-            <label>Auditor Justification / Assessment Notes</label>
+            <label>Auditor Justification / Assessment Notes (min. 10 chars)</label>
             <textarea
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Provide regulatory justification or portal verification reference (e.g. Verified via state fire portal records)."
+              placeholder="Provide regulatory justification or portal verification reference (minimum 10 characters)."
+              minLength={10}
               required
             />
           </div>
@@ -1218,7 +1216,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
             <h3>{finding.title || 'Finding title not provided by the validation service'}</h3>
             {clauseRef && (
               <div className="statutory-clause-pill" title={`${clauseRef.title} (${clauseRef.summary || ''})`}>
-                <span className="pill-prefix">APH Statutory Reference</span>
+                <span className="pill-prefix">APH Handbook Reference</span>
                 <span className="pill-citation">
                   {clauseRef.chapter_or_annexure} §{clauseRef.clause_number} · Handbook p. {clauseRef.handbook_page} (PDF p. {clauseRef.pdf_page})
                 </span>
@@ -1323,7 +1321,7 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer }) {
                 className="button-auditor button-auditor-verify"
                 onClick={() => onReview(finding, 'verified')}
               >
-                <Icon name="check" size={14} /> Mark Verified
+                <Icon name="check" size={14} /> Accept Finding
               </button>
               <button
                 type="button"

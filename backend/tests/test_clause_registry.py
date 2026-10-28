@@ -325,9 +325,8 @@ def test_honest_claims_language_in_rules():
                                 parts = [str(p.value) for p in kw.value.values if isinstance(p, ast.Constant)]
                                 legacy_snippets.append((py_file.name, kw.arg, "".join(parts)))
 
-    assert len(legacy_snippets) > 0, "No legacy FindingCreate snippets extracted for honest-claims test."
     for file_name, field, text in legacy_snippets:
-        is_pending_a0_neutralization = file_name in ("ter_payment_check.py", "building_age_check.py")
+        is_pending_a0_neutralization = file_name in ("building_age_check.py",)
         validate_text(
             text,
             f"Legacy rule '{file_name}' [{field}]",

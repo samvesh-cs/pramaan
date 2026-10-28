@@ -77,8 +77,8 @@ async def review_finding(
     db: AsyncSession = Depends(get_db),
 ):
     """Update finding with human reviewer verification or discrepancy confirmation (REVIEWER only)."""
-    if not payload.reviewed_by:
-        payload.reviewed_by = current_user.email
+    # Actor is strictly the authenticated reviewer user, never a client-supplied reviewed_by (D-021)
+    payload.reviewed_by = current_user.email
 
     return await validation_engine.review_finding(
         db=db,
@@ -109,5 +109,5 @@ async def acknowledge_duplicate(
         application_id=application.id,
         finding_id=finding_id,
         reviewer_notes=payload.reviewer_notes,
-        reviewed_by=payload.reviewed_by or current_user.email,
+        reviewed_by=current_user.email,
     )

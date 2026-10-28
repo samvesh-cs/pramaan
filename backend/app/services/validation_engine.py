@@ -31,8 +31,9 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
     processing_incomplete > missing_documents > discrepancies_found > unresolved_checks > checks_passed / ready_for_review
     Accounts for human reviewer verification overrides per D-002, D-011, and APH 2024-2027 Scrutiny Desk.
     """
-    # 1. Any document not processed?
-    if not documents or any(d.processing_status != "processed" for d in documents):
+    # 1. Any mandatory document not processed? (Optional TER receipt does not block application per D-019)
+    mandatory_docs = [d for d in documents if getattr(d, "document_type", None) != "ter_payment_receipt"]
+    if not mandatory_docs or any(getattr(d, "processing_status", None) != "processed" for d in mandatory_docs):
         return "processing_incomplete"
 
     effective_statuses: list[str] = []
@@ -41,6 +42,13 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
     for f in findings:
         decision = getattr(f, "reviewer_decision", None)
         status = f.status
+        rule_id = getattr(f, "rule_id", "")
+
+        # D-019: TER payment receipt checks (TER_PAYMENT_001, FIELD_004) are advisory/informational
+        # and do not block application approval even if missing, uncertain, or extraction failed.
+        if rule_id in ("TER_PAYMENT_001", "FIELD_004", "PRESENCE_004"):
+            effective_statuses.append("pass" if status == "pass" else "not_applicable")
+            continue
 
         if decision == "verified":
             effective_statuses.append("pass")

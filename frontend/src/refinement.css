@@ -1064,7 +1064,7 @@ body { background: #c9c5ba; }
   .topbar-page-title { font-size: 14px; }
 }
 
-/* Phase 1: Statutory Clause & Severity Styling */
+/* Phase 1: Handbook Clause & Severity Styling */
 .statutory-clause-pill {
   display: inline-flex;
   flex-direction: column;

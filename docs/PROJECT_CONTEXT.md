@@ -15,7 +15,7 @@ Pramaan automates preliminary scrutiny by:
 1. Ingesting institutional applications and required compliance certificates (PDFs and images).
 2. Extracting structured key-value pairs using a hybrid OCR pipeline (PyMuPDF for digital text + PaddleOCR for scanned/sparse documents).
 3. Executing a deterministic, rule-based compliance engine mapped directly to AICTE APH clauses.
-4. Flagging missing documents, expired certificates, fuzzy name mismatches, building age violations, underpaid TER fees, and duplicate document submissions.
+4. Flagging missing documents, expired certificates, fuzzy name mismatches, building age violations, advisory TER fee payment receipts, and duplicate document submissions.
 5. Providing an evidence-linked audit dossier for AICTE human scrutiny committee reviewers.
 
 > [!IMPORTANT]

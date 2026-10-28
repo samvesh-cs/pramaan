@@ -32,19 +32,25 @@ class FieldCompletenessRule(BaseRule):
             )
             checklist_info = EOA_DOCUMENT_CHECKLIST[doc_type]
             required_fields = checklist_info.get("required_fields", [])
+            is_ter = (doc_type == "ter_payment_receipt")
+            ter_kwargs: dict[str, Any] = {"severity": "info"} if is_ter else {}
 
             extraction = extractions_by_doc_id.get(doc.id)
             if not extraction or extraction.processing_status != "processed":
                 findings.append(
                     FindingCreate(
                         rule_id=rule_id,
-                        status="unresolved",
+                        status="not_applicable" if is_ter else "unresolved",
                         title=f"{checklist_info['display_name']} extraction incomplete",
-                        reason=f"Fields could not be validated because document '{doc.original_filename}' has not been successfully processed.",
+                        reason=(
+                            f"Fields could not be validated because document '{doc.original_filename}' has not been successfully processed. "
+                            + ("(Advisory: TER receipt is optional 'if any')." if is_ter else "")
+                        ),
                         document_id=doc.id,
                         document_name=doc.original_filename,
                         evidence={"processing_status": getattr(extraction, "processing_status", "not_processed")},
-                        next_action="Wait for document OCR processing to complete or re-upload if processing failed.",
+                        next_action=None if is_ter else "Wait for document OCR processing to complete or re-upload if processing failed.",
+                        **ter_kwargs,
                     )
                 )
                 continue
@@ -70,22 +76,30 @@ class FieldCompletenessRule(BaseRule):
                 findings.append(
                     FindingCreate(
                         rule_id=rule_id,
-                        status="missing",
-                        title=f"Missing required fields in {checklist_info['display_name']}",
-                        reason=f"The following required fields could not be extracted from '{doc.original_filename}': {', '.join(missing_fields)}.",
+                        status="not_applicable" if is_ter else "missing",
+                        title=f"Optional fields in {checklist_info['display_name']}" if is_ter else f"Missing required fields in {checklist_info['display_name']}",
+                        reason=(
+                            f"The following fields were not detected in '{doc.original_filename}': {', '.join(missing_fields)}. (Advisory: TER receipt is optional 'if any')."
+                            if is_ter else
+                            f"The following required fields could not be extracted from '{doc.original_filename}': {', '.join(missing_fields)}."
+                        ),
                         document_id=doc.id,
                         document_name=doc.original_filename,
                         evidence={"missing_fields": missing_fields},
-                        next_action="Ensure the uploaded document contains clear text for all mandatory fields or manually review the file.",
+                        next_action=None if is_ter else "Ensure the uploaded document contains clear text for all mandatory fields or manually review the file.",
+                        **ter_kwargs,
                     )
                 )
             if uncertain_fields:
                 findings.append(
                     FindingCreate(
                         rule_id=rule_id,
-                        status="unresolved",
-                        title=f"Low-confidence fields in {checklist_info['display_name']}",
+                        status="not_applicable" if is_ter else "unresolved",
+                        title=f"Advisory: low-confidence fields in {checklist_info['display_name']}" if is_ter else f"Low-confidence fields in {checklist_info['display_name']}",
                         reason=(
+                            f"OCR confidence was below {OCR_CONFIDENCE_REVIEW_THRESHOLD:.0%} for: "
+                            f"{', '.join(uncertain_fields)}. (Advisory: TER receipt is optional 'if any')."
+                            if is_ter else
                             f"OCR confidence was below {OCR_CONFIDENCE_REVIEW_THRESHOLD:.0%} for: "
                             f"{', '.join(uncertain_fields)}. These values need human confirmation."
                         ),
@@ -97,7 +111,8 @@ class FieldCompletenessRule(BaseRule):
                                 for field_name in uncertain_fields
                             }
                         },
-                        next_action="Review the source page and confirm each low-confidence extracted value.",
+                        next_action=None if is_ter else "Review the source page and confirm each low-confidence extracted value.",
+                        **ter_kwargs,
                     )
                 )
             if not missing_fields and not uncertain_fields:
@@ -105,12 +120,13 @@ class FieldCompletenessRule(BaseRule):
                     FindingCreate(
                         rule_id=rule_id,
                         status="pass",
-                        title=f"All required fields extracted for {checklist_info['display_name']}",
+                        title=f"All fields extracted for {checklist_info['display_name']}",
                         reason=f"All {len(required_fields)} required fields were successfully extracted from '{doc.original_filename}'.",
                         document_id=doc.id,
                         document_name=doc.original_filename,
                         evidence={"extracted_fields": list(extracted_fields.keys())},
                         next_action=None,
+                        **ter_kwargs,
                     )
                 )
 

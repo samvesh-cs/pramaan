@@ -1,13 +1,6 @@
 from typing import Any
 
-# AICTE APH 2024-2027 Table 2.1 Statutory TER Charges for Extension of Approval (EoA)
-EOA_STATUTORY_TER_FEES: dict[str, int] = {
-    "government_aided": 50000,
-    "minority_unaided": 75000,
-    "private_unaided": 100000,
-    "standalone_pgdm": 150000,
-    "default": 100000,
-}
+# AICTE APH 2024-2027 Document Checklist for Extension of Approval (EoA)
 
 EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
     "fire_safety_certificate": {
@@ -52,7 +45,7 @@ EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
     "ter_payment_receipt": {
         "display_name": "TER Payment Receipt",
         "applicability": "required_if_applicable",
-        "source": "APH 2024-2027, Annexure-2, §2.1(ii) & Table 2.1",
+        "source": "APH 2024-2027, Annexure-2, §2.1(ii)",
         "has_expiry": False,
         "required_fields": [
             "institution_name",

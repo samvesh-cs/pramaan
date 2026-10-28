@@ -38,8 +38,8 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "signal_type": "rule",
     },
     "PRESENCE_004": {
-        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
-        "severity": "critical",
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
+        "severity": "info",
         "signal_type": "rule",
     },
     "FIELD_001": {
@@ -48,6 +48,21 @@ RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
         "signal_type": "internal_check",
     },
     "FIELD_002": {
+        "clause_id": None,
+        "severity": "high",
+        "signal_type": "internal_check",
+    },
+    "FIELD_003": {
+        "clause_id": None,
+        "severity": "high",
+        "signal_type": "internal_check",
+    },
+    "FIELD_004": {
+        "clause_id": None,
+        "severity": "info",
+        "signal_type": "internal_check",
+    },
+    "FIELD_005": {
         "clause_id": None,
         "severity": "high",
         "signal_type": "internal_check",

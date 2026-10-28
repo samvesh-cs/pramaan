@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 CheckStatus = Literal["pass", "flagged", "missing", "unresolved", "not_applicable"]
 ReviewerDecision = Literal["verified", "confirmed_discrepancy", "requested_resubmission", "escalated"]
@@ -30,14 +30,30 @@ class FindingCreate(BaseModel):
 
 class FindingReviewUpdate(BaseModel):
     reviewer_decision: ReviewerDecision
-    reviewer_notes: Optional[str] = None
+    reviewer_notes: str
     reviewed_by: Optional[str] = None
+
+    @field_validator("reviewer_notes")
+    @classmethod
+    def validate_reviewer_notes(cls, v: str) -> str:
+        trimmed = (v or "").strip()
+        if len(trimmed) < 10:
+            raise ValueError("Reviewer justification notes must be at least 10 characters after trimming whitespace.")
+        return trimmed
 
 
 
 class AcknowledgeDuplicateRequest(BaseModel):
     reviewer_notes: str
-    reviewed_by: Optional[str] = "AICTE Scrutiny Committee Auditor"
+    reviewed_by: Optional[str] = None
+
+    @field_validator("reviewer_notes")
+    @classmethod
+    def validate_reviewer_notes(cls, v: str) -> str:
+        trimmed = (v or "").strip()
+        if len(trimmed) < 10:
+            raise ValueError("Reviewer justification notes must be at least 10 characters after trimming whitespace.")
+        return trimmed
 
 
 class FindingResponse(BaseModel):

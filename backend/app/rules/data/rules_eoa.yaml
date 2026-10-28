@@ -119,7 +119,7 @@ rules:
     # Handbook treatment of 30 years: Clause 6.17(h) requires a certificate "After the expiry of a period of thirty years
     # from the issue of Completion Certificate". Exactly 30 years (age <= 30) passes; age > 30 triggers the requirement.
     # Pending compound condition (D-017):
-    # Pass condition: any_of [age <= 30, structural_stability_certificate present, competent_authority_letter present]
+    # Pass condition: any_of [age <= 30, structural_stability_certificate present, all_of(age > 50, competent_authority_letter present)]
     # Flag condition (negation): all_of [
     #   (a) age > 30 from issue_date,
     #   (b) no structural_stability_certificate uploaded,

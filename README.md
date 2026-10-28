@@ -1,4 +1,4 @@
-# Pramaan — Explainable document scrutiny for institutional applications
+# PRAMAAN - Intelligent Application & Document Validation
 
 ## 1. Project title and tagline
 

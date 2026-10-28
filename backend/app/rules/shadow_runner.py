@@ -5,6 +5,7 @@ with zero database access in the worker thread.
 """
 
 import asyncio
+import concurrent.futures
 import copy
 import logging
 from types import SimpleNamespace
@@ -14,6 +15,15 @@ from app.config import settings
 from app.rules.declarative_engine import default_declarative_engine
 
 logger = logging.getLogger(__name__)
+
+# Dedicated thread pool executor for shadow evaluation (isolated from asyncio default executor)
+_SHADOW_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="shadow_eval_worker",
+)
+
+# Concurrency limiter: max 2 concurrent shadow evaluations
+_shadow_concurrency_semaphore = asyncio.Semaphore(2)
 
 # Strong reference retention for background shadow tasks to prevent premature garbage collection
 _BACKGROUND_SHADOW_TASKS: set[asyncio.Task] = set()
@@ -28,7 +38,8 @@ def create_shadow_context(
 ) -> dict[str, Any]:
     """
     Creates a completely detached, deep-copied in-memory snapshot of the validation context.
-    Zero references to SQLAlchemy sessions or database connections.
+    Zero references to SQLAlchemy sessions or database connections. All scalar application,
+    document, and extraction attributes are copied as pure Python values.
     """
     detached_docs = [
         SimpleNamespace(
@@ -37,6 +48,8 @@ def create_shadow_context(
             document_type=getattr(d, "document_type", None),
             original_filename=getattr(d, "original_filename", None),
             processing_status=getattr(d, "processing_status", None),
+            file_hash=getattr(d, "file_hash", None),
+            created_at=str(getattr(d, "created_at", None)) if getattr(d, "created_at", None) else None,
         )
         for d in documents
     ]
@@ -58,10 +71,14 @@ def create_shadow_context(
 
     detached_app = SimpleNamespace(
         id=getattr(application, "id", application_id),
+        owner_id=getattr(application, "owner_id", None),
+        status=getattr(application, "status", None),
         institution_name=getattr(application, "institution_name", None),
         application_category=getattr(application, "application_category", None),
         academic_year=getattr(application, "academic_year", None),
         overall_status=getattr(application, "overall_status", None),
+        created_at=str(getattr(application, "created_at", None)) if getattr(application, "created_at", None) else None,
+        updated_at=str(getattr(application, "updated_at", None)) if getattr(application, "updated_at", None) else None,
     )
 
     detached_all_docs = [
@@ -70,6 +87,7 @@ def create_shadow_context(
             application_id=getattr(d, "application_id", None),
             document_type=getattr(d, "document_type", None),
             original_filename=getattr(d, "original_filename", None),
+            file_hash=getattr(d, "file_hash", None),
         )
         for d in all_system_documents
     ]
@@ -81,6 +99,7 @@ def create_shadow_context(
         "extractions": detached_extractions,
         "all_system_documents": detached_all_docs,
     }
+
 
 
 def run_shadow_evaluation_worker(
@@ -161,24 +180,35 @@ async def dispatch_shadow_evaluation(
             for f in legacy_findings
         ]
 
-        # Dispatch non-blocking in worker thread with timeout
+        # Dispatch non-blocking in worker thread with bounded concurrency and timeout
         async def _safe_run():
-            try:
-                await asyncio.wait_for(
-                    asyncio.to_thread(
-                        run_shadow_evaluation_worker,
-                        application_id,
-                        copied_context,
-                        legacy_summary,
-                    ),
-                    timeout=5.0,
+            if _shadow_concurrency_semaphore.locked():
+                logger.info(
+                    "SHADOW_SKIPPED_BUSY: application_id=%s shadow evaluation skipped due to concurrency limit",
+                    application_id,
                 )
+                return
+
+            try:
+                async with _shadow_concurrency_semaphore:
+                    loop = asyncio.get_running_loop()
+                    await asyncio.wait_for(
+                        loop.run_in_executor(
+                            _SHADOW_EXECUTOR,
+                            run_shadow_evaluation_worker,
+                            application_id,
+                            copied_context,
+                            legacy_summary,
+                        ),
+                        timeout=5.0,
+                    )
             except Exception as e:
                 logger.warning(
                     "SHADOW_FAILURE: application_id=%s shadow execution timed out or failed: %s",
                     application_id,
                     e,
                 )
+
 
         task = asyncio.create_task(_safe_run())
         _BACKGROUND_SHADOW_TASKS.add(task)

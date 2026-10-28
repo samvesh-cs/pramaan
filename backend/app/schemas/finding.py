@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 CheckStatus = Literal["pass", "flagged", "missing", "unresolved", "not_applicable"]
 ReviewerDecision = Literal["verified", "confirmed_discrepancy", "requested_resubmission", "escalated"]
@@ -77,3 +77,15 @@ class FindingResponse(BaseModel):
     reviewer_notes: Optional[str] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def resolve_advisory_status(self) -> "FindingResponse":
+        if not self.advisory:
+            try:
+                from app.rules.legacy_adapter import is_advisory_rule
+                if is_advisory_rule(self.rule_id):
+                    self.advisory = True
+            except Exception:
+                pass
+        return self
+

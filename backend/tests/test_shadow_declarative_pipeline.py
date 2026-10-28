@@ -325,3 +325,39 @@ async def test_shadow_task_reference_retained_and_cleaned_up(monkeypatch):
     assert len(_BACKGROUND_SHADOW_TASKS) == 0
 
 
+@pytest.mark.asyncio
+async def test_shadow_evaluation_concurrency_limit_skips_when_busy(caplog, monkeypatch):
+    """Asserts that when concurrency limit is saturated, new shadow evaluations are skipped and logged as SHADOW_SKIPPED_BUSY."""
+    import asyncio
+    from app.rules.shadow_runner import _shadow_concurrency_semaphore
+
+    monkeypatch.setattr(settings, "ENABLE_SHADOW_DECLARATIVE_ENGINE", True)
+
+    app = SimpleNamespace(id="app_busy_test", institution_name="Test College")
+    doc = SimpleNamespace(id="doc_b", application_id="app_busy_test", document_type="fire_safety_certificate")
+
+    # Acquire all permits to simulate saturated workers
+    await _shadow_concurrency_semaphore.acquire()
+    await _shadow_concurrency_semaphore.acquire()
+    assert _shadow_concurrency_semaphore.locked()
+
+    try:
+        with caplog.at_level(logging.INFO):
+            await dispatch_shadow_evaluation(
+                application_id="app_busy_test",
+                application=app,
+                documents=[doc],
+                extractions_by_doc_id={},
+                all_system_documents=[doc],
+                legacy_findings=[],
+            )
+            # Allow event loop to run _safe_run check
+            await asyncio.sleep(0.05)
+
+        assert "SHADOW_SKIPPED_BUSY: application_id=app_busy_test shadow evaluation skipped due to concurrency limit" in caplog.text
+    finally:
+        _shadow_concurrency_semaphore.release()
+        _shadow_concurrency_semaphore.release()
+
+
+

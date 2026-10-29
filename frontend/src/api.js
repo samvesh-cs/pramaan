@@ -1,5 +1,6 @@
 import { API_BASE_URL, DOCUMENT_TYPES, USE_MOCKS } from './config'
-import { seedApplications, seedReports } from './demoData'
+import { labelForDocument, seedApplications, seedReports } from './demoData'
+import { buildReviewerDecisionPayload, pendingReviewerFindings, requiresReviewerDecision } from './reviewWorkflow'
 
 const STORAGE_KEY = 'pramaan-demo-applications-v1'
 const REPORT_KEY = 'pramaan-demo-reports-v1'
@@ -175,6 +176,11 @@ export async function submitApplication(applicationId) {
     const apps = mockApplications()
     const app = apps.find((a) => a.id === applicationId)
     if (app) {
+      const requiredTypes = DOCUMENT_TYPES.filter((doc) => doc.applicability === 'required').map((doc) => doc.code)
+      const presentTypes = new Set((app.documents || []).map((doc) => doc.document_type))
+      const missing = requiredTypes.filter((type) => !presentTypes.has(type))
+      if (missing.length) throw new Error(`Upload all required document types before submission: ${missing.map((type) => labelForDocument(type)).join(', ')}.`)
+      if (app.status && app.status !== 'draft') throw new Error('This application has already been submitted and is locked for review.')
       app.status = 'submitted'
       writeStore(STORAGE_KEY, apps)
     }
@@ -184,6 +190,25 @@ export async function submitApplication(applicationId) {
   return request(`/applications/${encodeURIComponent(applicationId)}/submit`, {
     method: 'POST',
   })
+}
+
+export async function finalizeApplicationReview(applicationId) {
+  if (USE_MOCKS) {
+    await pause(350)
+    const apps = mockApplications()
+    const app = apps.find((item) => item.id === applicationId)
+    if (!app || app.status !== 'submitted') throw new Error('Only an application pending review can be finalized.')
+    const report = mockReports()[applicationId]
+    const findings = report?.findings || []
+    if (!findings.length) throw new Error('Run scrutiny checks before finalizing this review.')
+    const pending = pendingReviewerFindings(findings).length
+    if (pending) throw new Error(`Review all ${pending} remaining finding${pending === 1 ? '' : 's'} before finalizing.`)
+    app.status = 'review_completed'
+    writeStore(STORAGE_KEY, apps)
+    return app
+  }
+
+  return request(`/applications/${encodeURIComponent(applicationId)}/finalize-review`, { method: 'POST' })
 }
 
 const mockApplications = () => readStore(STORAGE_KEY, seedApplications)
@@ -226,7 +251,12 @@ export async function runValidation(applicationId) {
   if (USE_MOCKS) {
     await pause(1300)
     const reports = mockReports(); const report = reports[applicationId]
-    if (report) return report
+    if (report) {
+      if (report.findings?.some((finding) => finding.reviewer_decision || finding.reviewed_at)) {
+        throw new Error('Checks cannot be rerun after a reviewer decision is recorded because rerunning would replace the audit findings.')
+      }
+      return report
+    }
     const app = mockApplications().find((item) => item.id === applicationId)
     if (!app) throw new Error('Application not found in demonstration data.')
     const docs = app.documents || []
@@ -249,26 +279,28 @@ export async function getReport(applicationId) {
 }
 
 export async function reviewFinding(applicationId, findingId, payload) {
+  const decisionPayload = buildReviewerDecisionPayload(payload.reviewer_decision, payload.reviewer_notes)
   if (USE_MOCKS) {
     await pause(300)
     const reports = mockReports()
     const report = reports[applicationId]
     if (report && report.findings) {
       const finding = report.findings.find((f) => f.id === findingId)
-      if (finding) {
-        finding.reviewer_decision = payload.reviewer_decision
-        finding.reviewer_notes = payload.reviewer_notes
-        finding.reviewed_by = payload.reviewed_by
-        finding.reviewed_at = new Date().toISOString()
-      }
+      if (!finding) throw new Error('Finding not found in the demonstration report.')
+      if (!requiresReviewerDecision(finding)) throw new Error('This finding does not require a reviewer decision.')
+      finding.reviewer_decision = decisionPayload.reviewer_decision
+      finding.reviewer_notes = decisionPayload.reviewer_notes || null
+      finding.reviewed_by = payload.reviewed_by || 'Signed-in demonstration reviewer'
+      finding.reviewed_at = new Date().toISOString()
       writeStore(REPORT_KEY, reports)
+      return structuredClone(finding)
     }
-    return { ...payload, id: findingId, reviewed_at: new Date().toISOString() }
+    throw new Error('No demonstration report is available for this application.')
   }
   return request(`/applications/${encodeURIComponent(applicationId)}/findings/${encodeURIComponent(findingId)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...decisionPayload, reviewed_by: payload.reviewed_by }),
   })
 }
 

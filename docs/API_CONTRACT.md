@@ -39,6 +39,14 @@ Use one of:
 
 Priority when multiple conditions exist: `processing_incomplete` > `missing_documents` > `discrepancies_found` > `unresolved_checks` > `checks_passed`. `ready_for_review` is reserved for a complete application awaiting human review; do not use it as an approval status. The team may simplify the visible status labels, but keep the backend semantics consistent.
 
+### Application lifecycle status
+The `status` property tracks submission and human review separately from `overall_status`:
+- `draft` — editable by the owning institution.
+- `submitted` — submitted by the institution and pending reviewer scrutiny; edits are locked.
+- `review_completed` — a reviewer finalized scrutiny; the completed report is available to the owning institution and reviewer decisions are read-only.
+
+Submitting an application does not complete scrutiny. It does not generate or expose a final report. The current required checklist entries must be present before submission; entries marked `required_if_applicable` do not block submission by default.
+
 ## 3. Application schema
 ### Create application
 `POST /api/applications`
@@ -56,6 +64,7 @@ Response: `201 Created`
 ```json
 {
   "id": "app_001",
+  "status": "draft",
   "institution_name": "Synthetic ABC Engineering College",
   "application_category": "eoa",
   "academic_year": "2026-27",
@@ -73,6 +82,7 @@ Response:
 ```json
 {
   "id": "app_001",
+  "status": "draft",
   "institution_name": "Synthetic ABC Engineering College",
   "application_category": "eoa",
   "academic_year": "2026-27",
@@ -86,6 +96,23 @@ Response:
 `GET /api/applications`
 
 Response: `200 OK`, an array of the application response objects above, ordered newest first. This additive endpoint supports the reviewer queue used by the frontend.
+
+### Submit application for review
+`POST /api/applications/{application_id}/submit` is institution-only. It returns `409 REQUIRED_DOCUMENTS_MISSING` with `details.missing_document_types` when a required checklist type has no uploaded file. On success the application status becomes `submitted`; reviewer scrutiny remains pending. Repeated submissions return `409 APPLICATION_ALREADY_SUBMITTED`.
+
+### Finalize reviewer scrutiny
+`POST /api/applications/{application_id}/finalize-review` is reviewer-only. The application must be `submitted` and scrutiny checks must have produced findings. Only findings with status `flagged`, `missing`, or `unresolved` require a recorded reviewer decision and timestamp. `pass` and `not_applicable` findings do not block finalization. An incomplete response includes `details.pending_finding_ids`. On success the lifecycle status becomes `review_completed`; this closes reviewer scrutiny and does not change a resubmission or escalation outcome into compliance.
+
+### Record a reviewer action
+`PATCH /api/applications/{application_id}/findings/{finding_id}` is reviewer-only. The response includes `requires_reviewer_decision`, derived from the finding status. Review decisions are separate from validation status:
+- `verified` and `confirmed_discrepancy` may omit `reviewer_notes`.
+- `requested_resubmission` must include `reviewer_notes` describing the exact document, correction, or clarification requested from the institution.
+- `escalated` must include `reviewer_notes` describing the reason and additional review or authority needed.
+- `reviewed_by` is set from the authenticated reviewer account; any client-supplied value is ignored.
+- A finding with a recorded decision is read-only during the current scrutiny; attempts to replace it return `409 REVIEW_DECISION_ALREADY_RECORDED` so the audit record is not silently overwritten.
+- Reviewers may rerun checks only before the first reviewer decision. Later reruns return `409 SCRUTINY_HAS_REVIEW_DECISIONS`; the validation engine replaces previous findings when it reruns, so locking protects recorded decisions and timestamps.
+
+The server rejects decisions on `pass` or `not_applicable` findings with `409 REVIEW_NOT_REQUIRED`. Resubmission remains a missing/action-required outcome, and escalation retains the finding's underlying validation status.
 
 ## 4. Upload document
 `POST /api/applications/{application_id}/documents`
@@ -211,7 +238,12 @@ Each rule returns one finding in this format:
     "value": "2025-12-31",
     "bbox": [100, 240, 330, 270]
   },
-  "next_action": "Request a current document or have a reviewer confirm the extracted date."
+  "next_action": "Request a current document or have a reviewer confirm the extracted date.",
+  "requires_reviewer_decision": true,
+  "reviewer_decision": null,
+  "reviewer_notes": null,
+  "reviewed_by": null,
+  "reviewed_at": null
 }
 ```
 
@@ -223,6 +255,8 @@ Rules:
 
 ## 7. Report response
 `GET /api/applications/{application_id}/report`
+
+Reviewers may retrieve the reviewer workspace while an application is `submitted` and after finalization. The owning institution receives `409 SCRUTINY_PENDING` until the lifecycle status is `review_completed`. Once finalized, reviewer changes and validation reruns are rejected with `409 REVIEW_FINALIZED`.
 
 Response:
 ```json
@@ -242,7 +276,7 @@ Response:
 }
 ```
 
-The summary counts are illustrative. In implementation, calculate them from the actual current validation run. Decide and document whether summary counts include checklist items as well as field-level rules; use one consistent method throughout.
+The summary counts are illustrative. In implementation, calculate them from the actual current validation run. Decide and document whether summary counts include checklist items as well as field-level rules; use one consistent method throughout. The frontend uses each finding's `requires_reviewer_decision` field for its pending count; the finalization endpoint enforces the same status rule.
 
 ## 8. Error response format
 Use this shape for API errors:

@@ -231,7 +231,16 @@ async def test_duplicate_blocks_report_and_acknowledgment_resolves(
     assert report_after.status_code == 200
     report_data = report_after.json()
     assert report_data["application_id"] == app_id
-    assert any(f["id"] == "finding-dup-1" for f in report_data["findings"])
+    acknowledged = next(f for f in report_data["findings"] if f["id"] == "finding-dup-1")
+    assert acknowledged["reviewed_by"] == "reviewer@aicte-india.org"
+    assert acknowledged["reviewer_notes"] == "Verified against physical records and confirmed authentic."
+
+    repeated_ack = await reviewer_client.post(
+        f"/api/applications/{app_id}/duplicates/finding-dup-1/acknowledge",
+        json={"reviewer_notes": "Attempt to replace the audit note."},
+    )
+    assert repeated_ack.status_code == 409
+    assert repeated_ack.json()["error"]["code"] == "REVIEW_DECISION_ALREADY_RECORDED"
 
 
 

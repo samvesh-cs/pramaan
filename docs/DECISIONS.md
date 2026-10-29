@@ -5,7 +5,7 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 ## Accepted decisions
 
 ### D-001 — Prototype scope
-**Status:** Accepted  
+**Status:** Accepted
 **Decision:** Implement only the Basic MVP for one institutional application category and two or three representative document types.  
 **Reason:** Keeps the prototype achievable and allows meaningful end-to-end testing.
 
@@ -70,12 +70,24 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 **Reason:** Low-confidence OCR values should be confirmed by a reviewer instead of producing a pass or discrepancy finding. This is an implementation threshold, not an AICTE requirement.
 **Date / Owner:** 2026-10-26 / Integration
 
+### D-015 — Separate institute submission from completed scrutiny
+**Status:** Accepted
+**Decision:** Application lifecycle status moves from `draft` to `submitted` when the institution submits, then to `review_completed` only when an authenticated reviewer explicitly finalizes scrutiny. Submission does not create a final report. Institutions may retrieve the report only after `review_completed`; reviewer decisions and validation reruns are read-only after finalization. Required checklist document types must be present before submission.
+**Reason:** Submission queues an application for human review; it is not itself a scrutiny decision. Persisting the distinction prevents premature report disclosure and duplicate submissions.
+**Date / Owner:** 2026-10-27 / Integration
+
+### D-016 — Require reviewer actions only for open findings
+**Status:** Accepted
+**Decision:** `flagged`, `missing`, and `unresolved` findings require a recorded reviewer action before scrutiny can be finalized. `pass` and `not_applicable` findings do not. Resubmission requests and escalations require action-specific notes; those decisions do not turn the underlying validation outcome into a pass. A recorded finding decision cannot be overwritten, and scrutiny cannot be rerun after a reviewer action because a rerun replaces findings.
+**Reason:** Informational checks should not create false pending work. The API exposes the requirement on each finding and the finalization endpoint enforces the same rule.
+**Date / Owner:** 2026-10-28 / Integration
+
 ### D-014 — Authentication and role-based access control
 **Status:** Accepted  
 **Decision:** Implement authentication and role-based authorization with two explicit roles:
-1. `INSTITUTION`: Self-registers, manages own applications, uploads documents to draft applications, runs preliminary validation on drafts, submits applications to AICTE, and views their validation reports. 1:1 institution per user account.
-2. `REVIEWER`: AICTE scrutiny committee auditor. Read-only access to all *submitted* applications, documents, and reports; can audit findings and record verification determinations. Reviewers cannot self-register; they are provisioned via CLI seed script or one-time admin setup route (`POST /api/auth/admin/setup`) protected by `X-Admin-Setup-Token`.
-3. Application lifecycle locking: Once submitted to AICTE, an application is locked (`status = 'submitted'`). Uploads and re-validation reject with 409 `APPLICATION_LOCKED`. Based on the report, institutions can initiate a new application revision prefilled from prior findings.
+1. `INSTITUTION`: Self-registers, manages own applications, uploads documents to draft applications, runs preliminary validation on drafts, submits applications to AICTE, and views the completed scrutiny report after reviewer finalization. 1:1 institution per user account.
+2. `REVIEWER`: AICTE scrutiny committee auditor. Can access submitted applications, inspect documents, run checks, record finding decisions, and finalize scrutiny. Completed applications are read-only. Reviewers cannot self-register; they are provisioned via CLI seed script or one-time admin setup route (`POST /api/auth/admin/setup`) protected by `X-Admin-Setup-Token`.
+3. Application lifecycle locking: Once submitted to AICTE, an application is locked (`status = 'submitted'`). Uploads and institution re-validation reject with 409 `APPLICATION_LOCKED`. Finalization changes the lifecycle status to `review_completed`; the institution can then view the report. Based on the report, institutions can initiate a new application revision prefilled from prior findings.
 4. Security & Tokens: Stateless JWT access tokens (60 min default for demo UX) with rotating HTTP-only refresh tokens. Cross-tenant draft access returns 404 to prevent IDOR enumeration. Fail-fast validation enforces production secrets when `DEBUG=false`.  
 **Reason:** Satisfies multi-tenant security requirements, human-in-the-loop review boundaries, and seamless demo UX without requiring external SSO infrastructure.  
 **Date / Owner:** 2026-10-27 / Integration

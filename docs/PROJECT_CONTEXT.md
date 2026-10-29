@@ -54,7 +54,7 @@ main (stable upstream baseline)
         ├── Alembic migrations (001_baseline_schema, 002_auth_tables)
         ├── User, Institution, RefreshToken models
         ├── Complete Auth & RBAC (INSTITUTION vs REVIEWER roles)
-        ├── IDOR tenant protection & Application locking (status = 'submitted')
+        ├── IDOR tenant protection & lifecycle locking (draft → submitted → review_completed)
         ├── Authenticated document viewer drawer (Blob URLs + ?token= support)
         ├── Scrutiny desk & Reviewer audit workflow
         └── Synchronized merge with origin/aditya-work (all tests 100% passing)
@@ -112,7 +112,7 @@ erDiagram
 - `institution_name` (VARCHAR): College name matching applicant institution.
 - `application_category` (VARCHAR): Default `"eoa"` (Extension of Approval).
 - `academic_year` (VARCHAR): Default `"2026-27"`.
-- `status` (VARCHAR): Lifecycle state: `"draft"` | `"submitted"`.
+- `status` (VARCHAR): Lifecycle state: `"draft"` | `"submitted"` | `"review_completed"`. Institution submission queues the application; only reviewer finalization marks scrutiny complete.
 - `overall_status` (VARCHAR): Scrutiny summary: `"valid"` | `"action_required"` | `"missing_documents"` | `"processing_incomplete"`.
 - `created_at`, `updated_at` (TIMESTAMPTZ).
 
@@ -151,6 +151,7 @@ erDiagram
 - `reviewer_notes` (VARCHAR Nullable): Human auditor notes.
 - `reviewed_by` (VARCHAR Nullable): Auditor email or name.
 - `reviewed_at` (TIMESTAMPTZ Nullable).
+- `requires_reviewer_decision` (computed API field): `true` for `flagged`, `missing`, or `unresolved`; `false` for `pass` and `not_applicable`.
 
 ---
 
@@ -291,7 +292,7 @@ All test suites are active and passing with 100% success rate:
 When picking up development in this repository:
 1. **Branch Hygiene:** Always develop on or merge into `jay-backend`. Keep commits clean and focused.
 2. **Role Awareness:** Any new endpoint must explicitly declare access dependencies (`require_role("INSTITUTION")`, `require_role("REVIEWER")`, or `require_application_access`). Never leave institutional endpoints unscoped.
-3. **Application Locking:** Never allow modifications to an application in `submitted` status by an `INSTITUTION` user.
+3. **Application Locking:** Never allow modifications to an application in `submitted` or `review_completed` status by an `INSTITUTION` user. The institute may retrieve the completed scrutiny report only after `review_completed`.
 4. **Evidence-Linked Philosophy:** Every validation check must provide raw text, page numbers, and bounding box evidence whenever possible. Low confidence (< 0.70) must become `unresolved`, never a pass.
 5. **Running Tests:**
    - Backend: `.\.venv\Scripts\python.exe -m pytest tests/test_auth_enforcement.py tests/test_features_1_to_3.py tests/test_duplicate_detection.py`

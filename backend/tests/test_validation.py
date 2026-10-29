@@ -174,11 +174,8 @@ async def test_get_report_endpoint(institution_client: AsyncClient):
     # Validate first
     await institution_client.post(f"/api/applications/{app_id}/validate")
 
-    # Fetch report
+    # Institution report access is gated until reviewer finalization.
     report_res = await institution_client.get(f"/api/applications/{app_id}/report")
-    assert report_res.status_code == 200
-    report = report_res.json()
-    assert report["application_id"] == app_id
-    assert "summary" in report
-    assert "findings" in report
+    assert report_res.status_code == 409
+    assert report_res.json()["error"]["code"] == "SCRUTINY_PENDING"
 

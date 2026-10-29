@@ -22,6 +22,7 @@ from app.schemas.application import OverallStatus
 from app.schemas.finding import FindingResponse, FindingReviewUpdate
 from app.schemas.report import ReportResponse
 from app.utils.id_generator import generate_id
+from app.utils.review_policy import finding_has_recorded_decision, finding_requires_reviewer_decision
 
 
 def calculate_overall_status(findings: list[Finding | Any], documents: list[Document]) -> OverallStatus:
@@ -201,6 +202,26 @@ class ValidationEngine:
                 detail={"code": "FINDING_NOT_FOUND", "message": f"Finding '{finding_id}' not found for application '{application_id}'.", "details": None},
             )
 
+        if not finding_requires_reviewer_decision(finding):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "REVIEW_NOT_REQUIRED",
+                    "message": "This finding does not require a reviewer decision.",
+                    "details": None,
+                },
+            )
+
+        if finding_has_recorded_decision(finding):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "REVIEW_DECISION_ALREADY_RECORDED",
+                    "message": "A reviewer decision is already recorded for this finding.",
+                    "details": None,
+                },
+            )
+
         finding.reviewer_decision = review_data.reviewer_decision
         finding.reviewer_notes = review_data.reviewer_notes
         finding.reviewed_by = review_data.reviewed_by
@@ -254,6 +275,16 @@ class ValidationEngine:
             raise HTTPException(
                 status_code=400,
                 detail={"code": "INVALID_FINDING_TYPE", "message": f"Finding '{finding_id}' is not a duplicate check.", "details": None},
+            )
+
+        if finding_has_recorded_decision(finding):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "REVIEW_DECISION_ALREADY_RECORDED",
+                    "message": "A reviewer decision is already recorded for this finding.",
+                    "details": None,
+                },
             )
 
         # Record the acknowledgment

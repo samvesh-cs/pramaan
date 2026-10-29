@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
-import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, finalizeApplicationReview, getDocumentFileUrl, fetchDocumentBlob, fetchDocumentPageImageBlob, submitApplication } from './api'
+import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, finalizeApplicationReview, getDocumentFileUrl, fetchDocumentBlob, fetchDocumentPageImageBlob, fetchDocumentPagesInfo, submitApplication } from './api'
 import { useAuth } from './auth/useAuth'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -28,6 +28,9 @@ const iconPaths = {
   file: <><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></>,
   printer: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
   search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
+  chevronLeft: <path d="m15 18-6-6 6-6"/>,
+  chevronRight: <path d="m9 18 6-6-6-6"/>,
+  layers: <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
 }
 function Icon({ name, size = 20 }) { return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{iconPaths[name] || iconPaths.documents}</svg> }
 function Status({ value }) { return <span className={`status status-${value || 'unknown'}`}><i />{STATUS_LABELS[value] || value?.replaceAll('_', ' ') || 'Not available'}</span> }
@@ -755,7 +758,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
   const {
     documentId,
     documentName,
-    pageNumber = 1,
+    pageNumber: rawPageNumber = 1,
     bbox,
     evidenceText,
     field,
@@ -765,19 +768,23 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
     findingStatus,
   } = docInfo || {}
 
+  const targetEvidencePage = Math.max(1, Number(rawPageNumber) || 1)
   const fileUrl = applicationId && documentId ? getDocumentFileUrl(applicationId, documentId) : ''
   const [blobUrl, setBlobUrl] = useState(null)
-  const [pageImageUrl, setPageImageUrl] = useState(null)
-  const [pageMeta, setPageMeta] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [highlightVisible, setHighlightVisible] = useState(true)
-  const [viewMode, setViewMode] = useState('inspector')
+  const [viewMode, setViewMode] = useState('inspector') // 'inspector' | 'pdf'
+  const [layoutMode, setLayoutMode] = useState('continuous') // 'continuous' | 'single'
   const [zoomLevel, setZoomLevel] = useState(1.0)
-  const [imgLoaded, setImgLoaded] = useState(false)
+  const [activePage, setActivePage] = useState(targetEvidencePage)
+  const [totalPages, setTotalPages] = useState(1)
+  const [pagesList, setPagesList] = useState([])
+  const [pageCache, setPageCache] = useState({})
+  const [loadingPages, setLoadingPages] = useState({})
   const targetBoxRef = useRef(null)
 
-  // Compute percentage coordinates with precision
+  // Compute percentage coordinates with precision for the target evidence bounding box
   const bboxOverlay = useMemo(() => {
     if (!bbox || !Array.isArray(bbox) || bbox.length < 4) return null
     const [x0, y0, x1, y1] = bbox.map(Number)
@@ -793,11 +800,11 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
       }
     }
 
-    // PDF Points (standard 72 DPI, A4 is 595.3 x 841.9)
-    const pw = pageMeta?.pageWidth || 595.3
-    const ph = pageMeta?.pageHeight || 841.9
-    const iw = pageMeta?.imageWidth || 1240
-    const ih = pageMeta?.imageHeight || 1754
+    const targetMeta = pageCache[targetEvidencePage]
+    const pw = targetMeta?.pageWidth || 595.3
+    const ph = targetMeta?.pageHeight || 841.9
+    const iw = targetMeta?.imageWidth || 1240
+    const ih = targetMeta?.imageHeight || 1754
 
     let baseW = pw
     let baseH = ph
@@ -819,49 +826,106 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
       width: `${widthPct.toFixed(2)}%`,
       height: `${heightPct.toFixed(2)}%`,
     }
-  }, [bbox, pageMeta])
+  }, [bbox, pageCache, targetEvidencePage])
 
-  // Smooth scroll into target evidence bounding box when canvas is ready
+  // Scroll to target evidence bounding box
+  const scrollToTargetBox = useCallback(() => {
+    if (targetBoxRef.current) {
+      targetBoxRef.current.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+    }
+  }, [])
+
+  // Auto-scroll when the target page image is ready in pageCache
   useEffect(() => {
-    if (imgLoaded && bboxOverlay && targetBoxRef.current) {
+    if (pageCache[targetEvidencePage] && bboxOverlay) {
       const timer = setTimeout(() => {
-        targetBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
-      }, 150)
+        scrollToTargetBox()
+      }, 160)
       return () => clearTimeout(timer)
     }
-  }, [imgLoaded, bboxOverlay])
+  }, [pageCache, targetEvidencePage, bboxOverlay, scrollToTargetBox])
 
+  // Function to load a specific page's high-res image
+  const loadPageImage = useCallback(async (pageNum) => {
+    if (pageCache[pageNum] || loadingPages[pageNum]) return
+    setLoadingPages((prev) => ({ ...prev, [pageNum]: true }))
+    try {
+      const res = await fetchDocumentPageImageBlob(applicationId, documentId, pageNum)
+      const blobUrl = URL.createObjectURL(res.blob)
+      setPageCache((prev) => ({
+        ...prev,
+        [pageNum]: {
+          blobUrl,
+          pageWidth: res.pageWidth,
+          pageHeight: res.pageHeight,
+          imageWidth: res.imageWidth,
+          imageHeight: res.imageHeight,
+        },
+      }))
+      if (res.totalPages && res.totalPages > 1) {
+        setTotalPages((prev) => Math.max(prev, res.totalPages))
+      }
+    } catch (err) {
+      console.warn(`Failed to render high-res page ${pageNum}:`, err)
+    } finally {
+      setLoadingPages((prev) => {
+        const next = { ...prev }
+        delete next[pageNum]
+        return next
+      })
+    }
+  }, [applicationId, documentId, pageCache, loadingPages])
+
+  // Initialize and load document metadata & target page
   useEffect(() => {
     if (!isOpen || !applicationId || !documentId) {
       setBlobUrl(null)
-      setPageImageUrl(null)
-      setPageMeta(null)
-      setImgLoaded(false)
+      setPageCache({})
+      setTotalPages(1)
+      setPagesList([])
       setZoomLevel(1.0)
       return undefined
     }
 
     let active = true
     let createdPdfUrl = null
-    let createdImgUrl = null
+    const initialTarget = Math.max(1, Number(targetEvidencePage) || 1)
+    setActivePage(initialTarget)
     setLoading(true)
     setLoadError('')
-    setBlobUrl(null)
-    setPageImageUrl(null)
-    setImgLoaded(false)
+    setPageCache({})
 
-    // Load rendered page image & raw PDF simultaneously
+    // Parallel fetch: Pages info + target page image + raw PDF
     Promise.allSettled([
-      fetchDocumentPageImageBlob(applicationId, documentId, pageNumber || 1),
+      fetchDocumentPagesInfo(applicationId, documentId),
+      fetchDocumentPageImageBlob(applicationId, documentId, initialTarget),
       fetchDocumentBlob(applicationId, documentId),
-    ]).then(([imgRes, pdfRes]) => {
+    ]).then(([pagesRes, targetImgRes, pdfRes]) => {
       if (!active) return
 
-      if (imgRes.status === 'fulfilled') {
-        const { blob, pageWidth, pageHeight, imageWidth, imageHeight } = imgRes.value
-        createdImgUrl = URL.createObjectURL(blob)
-        setPageImageUrl(createdImgUrl)
-        setPageMeta({ pageWidth, pageHeight, imageWidth, imageHeight })
+      let detectedTotal = 1
+      if (pagesRes.status === 'fulfilled' && pagesRes.value) {
+        const info = pagesRes.value
+        detectedTotal = info.total_pages || 1
+        setTotalPages(detectedTotal)
+        setPagesList(info.pages || [])
+      }
+
+      if (targetImgRes.status === 'fulfilled') {
+        const res = targetImgRes.value
+        const imgUrl = URL.createObjectURL(res.blob)
+        detectedTotal = Math.max(detectedTotal, res.totalPages || 1)
+        setTotalPages(detectedTotal)
+        setPageCache((prev) => ({
+          ...prev,
+          [initialTarget]: {
+            blobUrl: imgUrl,
+            pageWidth: res.pageWidth,
+            pageHeight: res.pageHeight,
+            imageWidth: res.imageWidth,
+            imageHeight: res.imageHeight,
+          },
+        }))
         setViewMode('inspector')
       } else {
         setViewMode('pdf')
@@ -872,7 +936,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
         setBlobUrl(createdPdfUrl)
       }
 
-      if (imgRes.status === 'rejected' && pdfRes.status === 'rejected') {
+      if (targetImgRes.status === 'rejected' && pdfRes.status === 'rejected') {
         setLoadError(pdfRes.reason?.message || 'Could not load document preview.')
       }
     }).finally(() => {
@@ -882,14 +946,74 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
     return () => {
       active = false
       if (createdPdfUrl) URL.revokeObjectURL(createdPdfUrl)
-      if (createdImgUrl) URL.revokeObjectURL(createdImgUrl)
     }
-  }, [isOpen, applicationId, documentId, pageNumber])
+  }, [isOpen, applicationId, documentId, targetEvidencePage])
+
+  // Clean up cached blob URLs on unmount or document change
+  useEffect(() => {
+    return () => {
+      Object.values(pageCache).forEach((p) => {
+        if (p?.blobUrl) URL.revokeObjectURL(p.blobUrl)
+      })
+    }
+  }, [documentId])
+
+  // Prefetch pages for continuous scrolling or paging
+  useEffect(() => {
+    if (!isOpen || !applicationId || !documentId || totalPages <= 1) return
+    if (layoutMode === 'continuous') {
+      for (let p = 1; p <= Math.min(totalPages, 10); p++) {
+        if (!pageCache[p] && !loadingPages[p]) {
+          loadPageImage(p)
+        }
+      }
+    } else {
+      if (!pageCache[activePage] && !loadingPages[activePage]) {
+        loadPageImage(activePage)
+      }
+      if (activePage > 1 && !pageCache[activePage - 1] && !loadingPages[activePage - 1]) {
+        loadPageImage(activePage - 1)
+      }
+      if (activePage < totalPages && !pageCache[activePage + 1] && !loadingPages[activePage + 1]) {
+        loadPageImage(activePage + 1)
+      }
+    }
+  }, [isOpen, applicationId, documentId, totalPages, layoutMode, activePage, pageCache, loadingPages, loadPageImage])
+
+  const goToPage = (p) => {
+    const target = Math.max(1, Math.min(totalPages, p))
+    setActivePage(target)
+    if (!pageCache[target]) {
+      loadPageImage(target)
+    }
+    if (layoutMode === 'continuous') {
+      const el = document.getElementById(`page-card-${target}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }
+
+  // Keyboard navigation for page flip
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        goToPage(activePage - 1)
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        goToPage(activePage + 1)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, activePage, totalPages])
 
   if (!isOpen || !docInfo) return null
 
   const hasMissingFields = missingFields && missingFields.length > 0
   const isDeficiency = hasMissingFields || findingStatus === 'missing'
+  const isTargetEvidenceOnCurrentPage = activePage === targetEvidencePage
 
   return (
     <div className="viewer-drawer-backdrop" onClick={onClose}>
@@ -899,27 +1023,16 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
             <span className="eyebrow">DOCUMENT EVIDENCE VIEWER</span>
             <h3>{documentName || 'Document Preview'}</h3>
             <div className="viewer-meta">
-              <span>Page {pageNumber || 1}</span>
+              <span>{totalPages > 1 ? `Multi-page (${totalPages} Pages)` : 'Page 1'}</span>
               {bbox && (
                 <span className="bbox-pill">
-                  BBox: [{bbox.map((v) => (typeof v === 'number' ? v.toFixed(1) : v)).join(', ')}]
+                  BBox (Pg {targetEvidencePage}): [{bbox.map((v) => (typeof v === 'number' ? v.toFixed(1) : v)).join(', ')}]
                 </span>
-              )}
-              {bbox && (
-                <button
-                  type="button"
-                  className={`button-toggle-highlight ${highlightVisible ? 'is-active' : ''}`}
-                  onClick={() => setHighlightVisible(!highlightVisible)}
-                  title="Toggle evidence overlay"
-                >
-                  <Icon name="check" size={13} />
-                  <span>Overlay: {highlightVisible ? 'ON' : 'OFF'}</span>
-                </button>
               )}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {pageImageUrl && blobUrl && (
+            {blobUrl && (
               <div className="viewer-mode-tabs">
                 <button
                   type="button"
@@ -947,6 +1060,96 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
           </div>
         </div>
 
+        {/* Multi-Page Navigation & Mode Toolbar */}
+        {viewMode === 'inspector' && (
+          <div className="viewer-multipage-toolbar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {totalPages > 1 && (
+                <div className="viewer-layout-tabs">
+                  <button
+                    type="button"
+                    className={`viewer-layout-btn ${layoutMode === 'continuous' ? 'is-active' : ''}`}
+                    onClick={() => setLayoutMode('continuous')}
+                    title="Scroll through all pages vertically"
+                  >
+                    <Icon name="layers" size={13} />
+                    <span>Continuous Scroll</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`viewer-layout-btn ${layoutMode === 'single' ? 'is-active' : ''}`}
+                    onClick={() => setLayoutMode('single')}
+                    title="View one page at a time"
+                  >
+                    <Icon name="file" size={13} />
+                    <span>Single Page</span>
+                  </button>
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="viewer-pager">
+                  <button
+                    type="button"
+                    className="viewer-page-btn"
+                    disabled={activePage <= 1}
+                    onClick={() => goToPage(activePage - 1)}
+                    title="Previous Page (Left Arrow)"
+                  >
+                    <Icon name="chevronLeft" size={11} /> Prev
+                  </button>
+                  <select
+                    className="viewer-page-select"
+                    value={activePage}
+                    onChange={(e) => goToPage(Number(e.target.value))}
+                    title="Jump to Page"
+                  >
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                      <option key={p} value={p}>
+                        Page {p} of {totalPages} {p === targetEvidencePage ? '✦ Evidence' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="viewer-page-btn"
+                    disabled={activePage >= totalPages}
+                    onClick={() => goToPage(activePage + 1)}
+                    title="Next Page (Right Arrow)"
+                  >
+                    Next <Icon name="chevronRight" size={11} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {totalPages > 1 && !isTargetEvidenceOnCurrentPage && bbox && (
+                <button
+                  type="button"
+                  className="evidence-jump-pill"
+                  onClick={() => goToPage(targetEvidencePage)}
+                  title="Jump directly to the target evidence page"
+                >
+                  <span>📍 Target Evidence on Pg {targetEvidencePage}</span>
+                  <b>Jump ➔</b>
+                </button>
+              )}
+              {bbox && (
+                <button
+                  type="button"
+                  className={`button-toggle-highlight ${highlightVisible ? 'is-active' : ''}`}
+                  onClick={() => setHighlightVisible(!highlightVisible)}
+                  title="Toggle evidence overlay"
+                >
+                  <Icon name="check" size={13} />
+                  <span>Overlay: {highlightVisible ? 'ON' : 'OFF'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Missing Field / Regulatory Deficiency Banner */}
         {isDeficiency && (
           <div className="viewer-deficiency-banner" role="alert">
@@ -959,7 +1162,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
                   : findingReason || 'A required regulatory clause is missing from this document.'}
               </p>
               <span className="deficiency-guide">
-                The OCR engine scanned all pages. Because the mandatory clause is absent, no localized bounding box exists. Scrutinize the document below to confirm if the clause is omitted or requires re-submission.
+                The OCR engine scanned all {totalPages} page{totalPages === 1 ? '' : 's'}. Because the mandatory clause is absent, no localized bounding box exists. Scrutinize the document below to confirm if the clause is omitted or requires re-submission.
               </span>
             </div>
           </div>
@@ -967,7 +1170,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
 
         {evidenceText && (
           <div className="viewer-evidence-snippet">
-            <span className="snippet-label">TARGET EVIDENCE SNIPPET</span>
+            <span className="snippet-label">TARGET EVIDENCE SNIPPET (PAGE {targetEvidencePage})</span>
             <blockquote>{evidenceText}</blockquote>
           </div>
         )}
@@ -986,45 +1189,150 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
             </div>
           )}
 
-          {/* AI Inspector Canvas Mode (Page Image with Pixel-Perfect Overlays) */}
-          {viewMode === 'inspector' && pageImageUrl && (
+          {/* AI Inspector Canvas Mode */}
+          {viewMode === 'inspector' && (
             <div className="evidence-inspector-scrollarea">
-              <div className="evidence-page-wrapper" style={{ width: `${Math.round(zoomLevel * 100)}%` }}>
-                <img
-                  src={pageImageUrl}
-                  alt={`Document Page ${pageNumber || 1}`}
-                  className="evidence-page-img"
-                  onLoad={() => setImgLoaded(true)}
-                />
-                {bboxOverlay && highlightVisible && (
-                  <div
-                    ref={targetBoxRef}
-                    className="bbox-interactive-overlay"
-                    style={{
-                      left: bboxOverlay.left,
-                      top: bboxOverlay.top,
-                      width: bboxOverlay.width,
-                      height: bboxOverlay.height,
-                    }}
-                  >
-                    <div className="bbox-target-badge">
-                      <span className="bbox-pulse-dot" />
-                      <span>{field ? displayFieldName(field).toUpperCase() : 'TARGET EVIDENCE REGION'}</span>
+              {layoutMode === 'continuous' ? (
+                /* Continuous Scroll Mode across all pages */
+                <div className="evidence-pages-stream">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                    const pageData = pageCache[pageNum]
+                    const isEvidencePage = pageNum === targetEvidencePage
+                    return (
+                      <div
+                        key={pageNum}
+                        id={`page-card-${pageNum}`}
+                        className="evidence-page-card"
+                        style={{ width: `${Math.round(zoomLevel * 100)}%` }}
+                      >
+                        <div className={`page-header-ribbon ${isEvidencePage ? 'is-evidence-page' : ''}`}>
+                          <div className="ribbon-page-title">
+                            <span>PAGE {pageNum} OF {totalPages}</span>
+                            {isEvidencePage && (
+                              <span className="badge-target-evidence">✦ TARGET EVIDENCE</span>
+                            )}
+                          </div>
+                          {!isEvidencePage && bbox && (
+                            <button
+                              type="button"
+                              className="ribbon-jump-btn"
+                              onClick={() => goToPage(targetEvidencePage)}
+                            >
+                              Jump to Evidence (Pg {targetEvidencePage}) ➔
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="evidence-page-wrapper">
+                          {pageData ? (
+                            <img
+                              src={pageData.blobUrl}
+                              alt={`Document Page ${pageNum}`}
+                              className="evidence-page-img"
+                            />
+                          ) : (
+                            <div className="page-loading-placeholder">
+                              <span className="spinner spinner-small" />
+                              <span>Rendering high-resolution Page {pageNum}…</span>
+                            </div>
+                          )}
+
+                          {isEvidencePage && bboxOverlay && highlightVisible && (
+                            <div
+                              ref={targetBoxRef}
+                              className="bbox-interactive-overlay"
+                              style={{
+                                left: bboxOverlay.left,
+                                top: bboxOverlay.top,
+                                width: bboxOverlay.width,
+                                height: bboxOverlay.height,
+                              }}
+                            >
+                              <div className="bbox-target-badge">
+                                <span className="bbox-pulse-dot" />
+                                <span>{field ? displayFieldName(field).toUpperCase() : 'TARGET EVIDENCE REGION'}</span>
+                              </div>
+                              <div className="bbox-corner ch-tl" />
+                              <div className="bbox-corner ch-tr" />
+                              <div className="bbox-corner ch-bl" />
+                              <div className="bbox-corner ch-br" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                /* Single Page Mode */
+                <div
+                  id={`page-card-${activePage}`}
+                  className="evidence-page-card"
+                  style={{ width: `${Math.round(zoomLevel * 100)}%` }}
+                >
+                  <div className={`page-header-ribbon ${activePage === targetEvidencePage ? 'is-evidence-page' : ''}`}>
+                    <div className="ribbon-page-title">
+                      <span>PAGE {activePage} OF {totalPages}</span>
+                      {activePage === targetEvidencePage && (
+                        <span className="badge-target-evidence">✦ TARGET EVIDENCE</span>
+                      )}
                     </div>
-                    <div className="bbox-corner ch-tl" />
-                    <div className="bbox-corner ch-tr" />
-                    <div className="bbox-corner ch-bl" />
-                    <div className="bbox-corner ch-br" />
+                    {activePage !== targetEvidencePage && bbox && (
+                      <button
+                        type="button"
+                        className="ribbon-jump-btn"
+                        onClick={() => goToPage(targetEvidencePage)}
+                      >
+                        Jump to Evidence (Pg {targetEvidencePage}) ➔
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  <div className="evidence-page-wrapper">
+                    {pageCache[activePage] ? (
+                      <img
+                        src={pageCache[activePage].blobUrl}
+                        alt={`Document Page ${activePage}`}
+                        className="evidence-page-img"
+                      />
+                    ) : (
+                      <div className="page-loading-placeholder">
+                        <span className="spinner spinner-small" />
+                        <span>Rendering high-resolution Page {activePage}…</span>
+                      </div>
+                    )}
+
+                    {activePage === targetEvidencePage && bboxOverlay && highlightVisible && (
+                      <div
+                        ref={targetBoxRef}
+                        className="bbox-interactive-overlay"
+                        style={{
+                          left: bboxOverlay.left,
+                          top: bboxOverlay.top,
+                          width: bboxOverlay.width,
+                          height: bboxOverlay.height,
+                        }}
+                      >
+                        <div className="bbox-target-badge">
+                          <span className="bbox-pulse-dot" />
+                          <span>{field ? displayFieldName(field).toUpperCase() : 'TARGET EVIDENCE REGION'}</span>
+                        </div>
+                        <div className="bbox-corner ch-tl" />
+                        <div className="bbox-corner ch-tr" />
+                        <div className="bbox-corner ch-bl" />
+                        <div className="bbox-corner ch-br" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Raw Full PDF Mode (Native Iframe) */}
-          {(viewMode === 'pdf' || (!pageImageUrl && blobUrl)) && blobUrl && (
+          {(viewMode === 'pdf' || (!pageCache[activePage] && blobUrl)) && blobUrl && (
             <iframe
-              src={`${blobUrl}#page=${pageNumber || 1}`}
+              src={`${blobUrl}#page=${activePage}`}
               title="Document Viewer"
               className="viewer-iframe"
             />
@@ -1033,7 +1341,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
 
         <div className="viewer-footer">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {viewMode === 'inspector' && pageImageUrl && (
+            {viewMode === 'inspector' && (
               <div className="viewer-zoom-controls">
                 <button
                   type="button"
@@ -1059,7 +1367,13 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
             </a>
           </div>
           <span style={{ fontSize: '11px', color: '#889290' }}>
-            {viewMode === 'inspector' ? '✦ AI Pinpoint Visual Scrutiny' : '📄 Full Document Browser View'}
+            {viewMode === 'inspector' ? (
+              layoutMode === 'continuous'
+                ? `✦ Continuous High-Res Scroll · ${totalPages} Page${totalPages === 1 ? '' : 's'}`
+                : `✦ Paged High-Res Inspector · Page ${activePage} of ${totalPages}`
+            ) : (
+              `📄 Full Document Browser View · Page ${activePage}`
+            )}
           </span>
         </div>
       </div>

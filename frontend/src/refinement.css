@@ -1066,6 +1066,199 @@ body { background: #c9c5ba; }
 
 /* Interactive Bounding Box Evidence Overlay & Canvas (Pillars 1, 3 & 5) */
 
+/* Evidence Inspector Canvas Container & Multi-Page Layout */
+.evidence-inspector-scrollarea {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+  background: #232c2e;
+  min-height: 480px;
+}
+
+/* Multi-Page Navigation Toolbar */
+.viewer-multipage-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  background: #192224;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.viewer-layout-tabs {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px;
+  border-radius: 5px;
+  gap: 3px;
+}
+
+.viewer-layout-btn {
+  border: 0;
+  background: transparent;
+  font: 600 11px var(--display, sans-serif);
+  color: #a4b5b2;
+  padding: 4px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.viewer-layout-btn.is-active {
+  background: #009387;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.viewer-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.viewer-page-btn {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e2edea;
+  border-radius: 4px;
+  padding: 4px 9px;
+  font: 600 11px var(--display, sans-serif);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.viewer-page-btn:hover:not(:disabled) {
+  background: #009387;
+  color: #fff;
+  border-color: #009387;
+}
+
+.viewer-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.viewer-page-select {
+  background: #111a1c;
+  color: #e2edea;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font: 600 11px var(--mono, monospace);
+  cursor: pointer;
+}
+
+.evidence-jump-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(216, 166, 108, 0.18);
+  border: 1px solid #d8a66c;
+  color: #ffca8b;
+  padding: 4px 11px;
+  border-radius: 14px;
+  font: 600 11px var(--mono, monospace);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.evidence-jump-pill:hover {
+  background: #d8a66c;
+  color: #1a1a1a;
+  box-shadow: 0 0 10px rgba(216, 166, 108, 0.4);
+}
+
+/* Continuous Multi-Page Stream & Cards */
+.evidence-pages-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  align-items: center;
+  width: 100%;
+}
+
+.evidence-page-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+  transition: width 0.2s ease;
+}
+
+.page-header-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 12px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  font: 600 10px var(--mono, monospace);
+  color: #a0b2ae;
+}
+
+.page-header-ribbon.is-evidence-page {
+  background: rgba(0, 147, 135, 0.2);
+  border: 1px solid rgba(0, 201, 183, 0.45);
+  color: #5cf0dd;
+}
+
+.ribbon-page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge-target-evidence {
+  background: #009387;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font: 700 9px var(--mono, monospace);
+  letter-spacing: 0.05em;
+}
+
+.ribbon-jump-btn {
+  background: transparent;
+  border: 0;
+  color: #d8a66c;
+  font: 600 10px var(--mono, monospace);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.ribbon-jump-btn:hover {
+  color: #ffca8b;
+}
+
+.page-loading-placeholder {
+  min-height: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #1f2729;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #9cb0ac;
+  font: 600 12px var(--display, sans-serif);
+}
+
 /* Evidence Inspector Canvas Container */
 .evidence-inspector-scrollarea {
   flex: 1;

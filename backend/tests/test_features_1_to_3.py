@@ -47,7 +47,41 @@ async def test_document_file_streaming(institution_client: AsyncClient):
     assert img_res.headers["content-type"] == "image/png"
     assert "x-page-width" in img_res.headers
     assert "x-page-height" in img_res.headers
+    assert img_res.headers.get("x-total-pages") == "1"
+    assert img_res.headers.get("x-current-page") == "1"
     assert len(img_res.content) > 100
+
+    # Multi-page PDF test: 3-page document
+    import pymupdf as fitz
+    multi_doc = fitz.open()
+    for p_num in range(3):
+        p = multi_doc.new_page()
+        p.insert_text((50, 50), f"Multipage Document - Page {p_num + 1} clause verification")
+    multi_bytes = multi_doc.tobytes()
+    multi_doc.close()
+
+    upload_multi_res = await institution_client.post(
+        f"/api/applications/{app_id}/documents",
+        files={"file": ("affidavit_three_pages.pdf", multi_bytes, "application/pdf")},
+        data={"document_type": "affidavit_2"},
+    )
+    assert upload_multi_res.status_code == 201
+    multi_doc_id = upload_multi_res.json()["id"]
+
+    # Test GET /pages-info
+    info_res = await institution_client.get(f"/api/applications/{app_id}/documents/{multi_doc_id}/pages-info")
+    assert info_res.status_code == 200
+    info_data = info_res.json()
+    assert info_data["total_pages"] == 3
+    assert len(info_data["pages"]) == 3
+    assert info_data["pages"][1]["page_number"] == 2
+
+    # Test GET /page-image for Page 2
+    img_p2_res = await institution_client.get(f"/api/applications/{app_id}/documents/{multi_doc_id}/page-image?page=2")
+    assert img_p2_res.status_code == 200
+    assert img_p2_res.headers["x-total-pages"] == "3"
+    assert img_p2_res.headers["x-current-page"] == "2"
+    assert len(img_p2_res.content) > 100
 
 
 @pytest.mark.asyncio

@@ -85,21 +85,20 @@ rules:
     clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_II"
     clause_ids:
       - "APH_2024_27_ANNEX_2_CLAUSE_2_1_II"
-      - "APH_2024_27_CHAP_2_TABLE_2_1"
     severity: "info"
     signal_type: "rule"
     advisory: true
-    status: "unverified" # The 100000 INR target is unsupported by Table 2.1; §2.1(ii) specifies pay receipt "if any"
+    status: "pending_review" # Advisory-only rule per APH 2024-27 Annexure-2 §2.1(ii) ("if any"); fee amounts are not validated
     is_active: true
     condition:
-      operator: "custom"
-      field: "amount"
-      target_value: null
-    pass_title: "TER Fee Receipt Provided"
-    pass_reason_template: "Pay receipt from AICTE Web-Portal provided per Annexure-2 §2.1(ii)."
-    flag_title: "TER Fee Payment Unverified"
-    flag_reason_template: "Pay receipt verification is unverified. Annexure-2 §2.1(ii) specifies pay receipt 'if any', and Table 2.1 specifies charges varying by institution category rather than a uniform threshold."
-    next_action: "Auditor discretion: inspect payment receipt if applicable for this institution category."
+      operator: "exists"
+      document_type: "ter_payment_receipt"
+      field: "document_presence"
+    pass_title: "TER Payment Receipt Provided"
+    pass_reason_template: "Payment receipt provided per Annexure-2 §2.1(ii) ('if any'). This check is advisory/informational; fee amounts are not validated against AICTE portal records."
+    flag_title: "TER Payment Receipt Advisory"
+    flag_reason_template: "TER payment receipt is optional 'if any' under Annexure-2 §2.1(ii); absence does not trigger a requirement."
+    next_action: null
 
   - rule_id: "STRUCTURAL_001"
     title: "Building Age & Structural Stability Verification (> 30 Years)"
@@ -112,6 +111,7 @@ rules:
       - "APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE"
     severity: "high"
     signal_type: "rule"
+    status: "pending_review"
     is_active: true
     branches:
       - branch_id: "age_lte_30"
@@ -122,17 +122,18 @@ rules:
           target_value: 30
           unit: "years"
         outcome: "pass"
-        title: "Building Age Within 30-Year Threshold"
-        reason_template: "Building Completion Certificate issue date indicates building age <= 30 years; Structural Stability Certificate is not required under Clause 6.17(h)."
+        title: "Structural Stability Certificate Not Applicable (<= 30 Years)"
+        reason_template: "Completion Certificate issue date is {issue_date} (building age <= 30 years). Per Clause 6.17(h) and Annexure-2 §2.1(iv), a Structural Stability Certificate is required only after expiry of thirty years from the issue of Completion Certificate."
+        next_action: "No action required. Building is within the 30-year threshold from Completion Certificate issue date."
         clause_id: "APH_2024_27_CLAUSE_6_17_H"
 
       - branch_id: "age_gt_30_with_valid_certificate"
         condition:
           all_of:
-            - operator: "date_gte_years"
+            - operator: "date_gt_years"
               field: "issue_date"
               document_type: "building_completion_certificate"
-              target_value: 31
+              target_value: 30
               unit: "years"
             - operator: "exists"
               document_type: "structural_stability_certificate"
@@ -143,17 +144,18 @@ rules:
               target_value: 5
               unit: "years"
         outcome: "pass"
-        title: "Structural Stability Certificate Within 5-Year Validity Provided"
-        reason_template: "Building age exceeds 30 years and a valid Structural Stability Certificate issued within 5 years is provided per Clause 6.17(h)."
+        title: "Structural Stability Certificate Provided (> 30 Years)"
+        reason_template: "Building age exceeds 30 years from Completion Certificate issue date and a valid Structural Stability Certificate issued within 5 years is provided per Clause 6.17(h) and Annexure-2 §2.1(iv)."
+        next_action: "No action required."
         clause_id: "APH_2024_27_CLAUSE_6_17_H"
 
       - branch_id: "age_gt_50_with_competent_authority_letter"
         condition:
           all_of:
-            - operator: "date_gte_years"
+            - operator: "date_gt_years"
               field: "issue_date"
               document_type: "building_completion_certificate"
-              target_value: 51
+              target_value: 50
               unit: "years"
             - operator: "exists"
               document_type: "competent_authority_letter"
@@ -164,9 +166,9 @@ rules:
         next_action: "Reviewer to open the letter and confirm it applies."
         clause_id: "APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE"
 
-    flag_title: "Structural Stability Certificate Required (> 30 Years)"
-    flag_reason_template: "Building age exceeds 30 years from Completion Certificate issue date, no Structural Stability Certificate was uploaded, and the 50-year government-building letter condition does not apply. Per Clause 6.17(h) and Annexure-2 §2.1(iv), a Structural Stability Certificate is required."
-    next_action: "Upload a Structural Stability Certificate from a registered Structural Engineer, or a Competent Authority letter for government buildings older than 50 years."
+    flag_title: "Valid Structural Stability Certificate Required (> 30 Years)"
+    flag_reason_template: "Building age exceeds 30 years from Completion Certificate issue date, and no valid Structural Stability Certificate issued within the past 5 years is available, nor does the 50-year government-building letter condition apply. Per Clause 6.17(h) and Annexure-2 §2.1(iv), a valid Structural Stability Certificate is required."
+    next_action: "Upload a valid Structural Stability Certificate issued within 5 years by a registered Structural Engineer, or a Competent Authority letter for government buildings older than 50 years."
 
 
   - rule_id: "STRUCTURAL_002"

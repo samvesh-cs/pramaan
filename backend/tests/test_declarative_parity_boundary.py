@@ -378,3 +378,65 @@ def test_advisory_rules_parity_and_overall_status_invariance():
     status_with_pres4 = calculate_overall_status(dec_findings + [legacy_pres4], ctx["documents"])
     assert status_with_pres4 == "checks_passed"
 
+def test_non_iso_expiry_date_format_unresolved_in_both_engines():
+    """Asserts exact parity with legacy multi-format loop (%d/%m/%Y accepted, unparseable yields unresolved)."""
+    doc_fire = SimpleNamespace(
+        id="d_f",
+        document_type="fire_safety_certificate",
+        original_filename="fire_cert.pdf",
+        processing_status="processed",
+    )
+
+    # 1. Non-ISO slash format '15/08/2026' supported by legacy loop (%d/%m/%Y)
+    ext_dmy = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Pramaan College", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": "FS-123", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "2024-01-01", "confidence": 0.95, "status": "extracted"},
+            "expiry_date": {"value": "15/08/2026", "confidence": 0.95, "status": "extracted"},
+            "issuing_authority": {"value": "Fire Dept", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_dmy = make_context(
+        documents=[doc_fire],
+        extractions={"d_f": ext_dmy},
+        cutoff_date=date(2024, 5, 15),
+    )
+
+    leg_dmy = evaluate_legacy_rules(ctx_dmy)
+    dec_dmy = default_declarative_engine.evaluate(ctx_dmy)
+
+    leg_f = next(f for f in leg_dmy if f.rule_id == "EXPIRY_001")
+    dec_f = next(f for f in dec_dmy if f.rule_id == "EXPIRY_001")
+
+    assert leg_f.status == dec_f.status == "pass"
+    assert leg_f.title == dec_f.title
+    assert leg_f.reason == dec_f.reason
+
+    # 2. Truly unparseable date format gives unresolved in both engines
+    ext_unparseable = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Pramaan College", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": "FS-123", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "2024-01-01", "confidence": 0.95, "status": "extracted"},
+            "expiry_date": {"value": "not-a-valid-date", "confidence": 0.95, "status": "extracted"},
+            "issuing_authority": {"value": "Fire Dept", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_unres = make_context(
+        documents=[doc_fire],
+        extractions={"d_f": ext_unparseable},
+    )
+
+    leg_unres = evaluate_legacy_rules(ctx_unres)
+    dec_unres = default_declarative_engine.evaluate(ctx_unres)
+
+    leg_u = next(f for f in leg_unres if f.rule_id == "EXPIRY_001")
+    dec_u = next(f for f in dec_unres if f.rule_id == "EXPIRY_001")
+
+    assert leg_u.status == dec_u.status == "unresolved"
+    assert "Unparseable expiry date" in leg_u.title
+    assert leg_u.title == dec_u.title
+    assert leg_u.reason == dec_u.reason

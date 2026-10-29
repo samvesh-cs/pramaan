@@ -61,25 +61,31 @@ def calculate_text_similarity(str1: str, str2: str) -> float:
 
 
 def parse_iso_date(value: Any) -> Optional[date]:
-    """Safely parses an ISO date string (YYYY-MM-DD), returning None if unparseable."""
+    """Safely parses a date string supporting ISO YYYY-MM-DD and legacy formats (%d-%m-%Y, %d/%m/%Y, %Y/%m/%d)."""
     if not value:
         return None
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
     if isinstance(value, datetime):
         return value.date()
-    val_str = str(value).strip()[:10]
+    val_str = str(value).strip()
     try:
-        return date.fromisoformat(val_str)
+        return date.fromisoformat(val_str[:10])
     except Exception:
-        # Attempt regex fallback for 4-digit year if YYYY-MM-DD parsing fails
-        match = re.search(r"(\d{4})-(\d{2})-(\d{2})", str(value))
-        if match:
-            try:
-                return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
-            except Exception:
-                return None
-        return None
+        pass
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(val_str, fmt).date()
+        except ValueError:
+            continue
+    # Attempt regex fallback for 4-digit year if YYYY-MM-DD parsing fails
+    match = re.search(r"(\d{4})-(\d{2})-(\d{2})", str(value))
+    if match:
+        try:
+            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except Exception:
+            return None
+    return None
 
 
 class ClauseRegistry:
@@ -388,6 +394,20 @@ class DeclarativeRuleEngine:
                 return EvaluationResult.UNKNOWN
             years = calculate_calendar_years_between(act_date, ref_date)
             return EvaluationResult.TRUE if years >= int(target_value) else EvaluationResult.FALSE
+
+        if operator in ("date_gt_years", "greater_than") and unit == "years":
+            act_date = parse_iso_date(actual)
+            if not act_date:
+                return EvaluationResult.UNKNOWN
+            years = calculate_calendar_years_between(act_date, ref_date)
+            return EvaluationResult.TRUE if years > int(target_value) else EvaluationResult.FALSE
+
+        if operator in ("date_lt_years", "less_than") and unit == "years":
+            act_date = parse_iso_date(actual)
+            if not act_date:
+                return EvaluationResult.UNKNOWN
+            years = calculate_calendar_years_between(act_date, ref_date)
+            return EvaluationResult.TRUE if years < int(target_value) else EvaluationResult.FALSE
 
         if operator == "greater_or_equal":
             try:

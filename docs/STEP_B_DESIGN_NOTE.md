@@ -7,7 +7,7 @@ This design note documents the architecture, logic semantics, schema migration, 
 
 ## 2. Condition Grammar and Schema
 Rule conditions are declarative ASTs validated via Pydantic models in `backend/app/schemas/rule_definition.py`:
-- **Recursive Nesting Depth:** Restricted to $\le 5$ levels (`get_depth()` validator).
+- **Recursive Nesting Depth:** Restricted to $\le 3$ levels (`get_depth()` validator per D-017).
 - **Compound Operators:**
   - `all_of: list[RuleCondition]` (Kleene AND)
   - `any_of: list[RuleCondition]` (Kleene OR)

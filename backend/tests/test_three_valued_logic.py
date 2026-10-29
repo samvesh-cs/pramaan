@@ -191,12 +191,12 @@ def test_leap_year_calendar_date_arithmetic():
 
 
 def test_startup_validation_max_nesting_depth_rejection():
-    """Asserts that conditions nested deeper than 5 levels fail loudly at Pydantic validation."""
+    """Asserts that conditions nested deeper than 3 levels fail loudly at Pydantic validation."""
     with pytest.raises(ValidationError) as exc_info:
-        deep_cond = RuleCondition(operator="exists", field="level6")
-        for i in range(5, 0, -1):
+        deep_cond = RuleCondition(operator="exists", field="level4")
+        for i in range(3, 0, -1):
             deep_cond = RuleCondition(all_of=[deep_cond])
-    assert "depth exceeds maximum allowed depth of 5" in str(exc_info.value)
+    assert "depth exceeds maximum allowed depth of 3" in str(exc_info.value)
 
 
 def test_startup_validation_banned_terms_rejection():

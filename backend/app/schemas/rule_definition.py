@@ -82,8 +82,8 @@ class RuleCondition(BaseModel):
     @model_validator(mode="after")
     def validate_condition_structure(self) -> "RuleCondition":
         depth = self.get_depth()
-        if depth > 5:
-            raise ValueError(f"Condition nesting depth exceeds maximum allowed depth of 5 (got {depth})")
+        if depth > 3:
+            raise ValueError(f"Condition nesting depth exceeds maximum allowed depth of 3 (got {depth})")
 
         has_compound = bool(self.all_of is not None or self.any_of is not None or self.not_ is not None)
         has_operator = bool(self.operator is not None)

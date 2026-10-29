@@ -32,13 +32,16 @@
   - Verified non-advisory rules persist `advisory=False` and TER rules persist `advisory=True` through `/validate`.
   - Full suite passing: **139 passed, 5 warnings** in legacy mode and declarative mode.
 
-### 1.2 Implemented Features on `aditya-backend` Branch
-Inspection of `origin/aditya-backend` confirms several major prototype features are already implemented:
+### 1.2 Unified Integration Baseline (Commit `156d358`)
+The `aditya-backend` branch and active feature branch have been formally integrated via merge commit `156d358` (`merge: integrate feat/f1-evidence-highlighting with aditya-backend features`).
+
+The integrated baseline unifies:
 1. **High-Resolution Page Image Rendering Endpoint (`backend/app/routes/documents.py`):**
-   - `GET /api/applications/{id}/documents/{doc_id}/page-image?page={page_num}`: Renders document pages to PNG via PyMuPDF (150 DPI) and exposes page width/height in response headers (`X-Page-Width`, `X-Page-Height`, `X-Image-Width`, `X-Image-Height`).
+   - `GET /api/applications/{id}/documents/{doc_id}/page-image?page={page_num}&dpi={dpi}`: Renders document pages to PNG via PyMuPDF (150 DPI) and exposes page width/height in response headers (`X-Page-Width`, `X-Page-Height`, `X-Image-Width`, `X-Image-Height`).
+   - `GET /api/applications/{id}/documents/{doc_id}/pages-info`: Returns total page count and individual page dimensions for multi-page document navigation.
 2. **Visual Evidence Inspector & Bounding Box Overlays (`frontend/src/App.jsx`):**
    - Interactive `DocumentViewerDrawer` with animated glowing bounding boxes (`bboxOverlay`), percentage coordinate mapping, line-level search rects (`page.search_for`), multi-page continuous scrolling, zoom controls (in/out/fit), inspector vs PDF toggle, and deficiency callouts for missing fields.
-   - **Action Item:** Step C / F1 (Bounding Box Implementation) is **superseded and removed from pending to-do list** because it is already operational on `aditya-backend`.
+   - **Step C / F1 (Bounding Box Implementation) is complete and integrated.**
 3. **Perceptual Image Hashing for Visual Duplicate Detection (`backend/app/ocr/perceptual_hash.py`):**
    - Implements difference hash (dHash) and perceptual hash (pHash) on rendered document pages to detect image reuse and duplicate diagrams across applications.
 4. **Local QR Code Extraction & Verification (`backend/app/ocr/qr_processor.py`, `backend/app/rules/qr_verification_check.py`):**
@@ -46,13 +49,13 @@ Inspection of `origin/aditya-backend` confirms several major prototype features 
 5. **Issuing Authority Verification (`backend/app/services/authority_verification.py`):**
    - Rule-based verification of issuing authorities against designated state authorities.
 6. **Reviewer Scrutiny Lifecycle & Finalization:**
-   - Reviewer decision payload builder, review status transitions (`review_completed`), and scrutiny finalization endpoint.
+   - Reviewer decision payload builder, review status transitions (`review_completed`), and scrutiny finalization endpoint (`POST /api/applications/{id}/finalize-review`).
 7. **Showcase Demo Seeder (`backend/scripts/seed_demo_showcase.py`):**
    - Complete synthetic dataset seeding script for demo walkthroughs.
 
 ---
 
-## 2. Feature Flags, Ruleset Versioning & Consolidated Roadmap
+## 2. Feature Flags, Ruleset Versioning & Workload Division
 
 ### 2.1 Per-Step Feature Flags & Ruleset Versioning
 To maintain zero-risk incremental merges, each feature is guarded by explicit feature flags configured in `backend/app/config.py`:
@@ -61,12 +64,62 @@ To maintain zero-risk incremental merges, each feature is guarded by explicit fe
 | :--- | :--- | :--- | :--- | :--- |
 | `ENABLE_SHADOW_DECLARATIVE_ENGINE` | `False` | Step A | Merged (`main`) | Default OFF. When True, runs DeclarativeRuleEngine asynchronously in-memory. |
 | `RULE_ENGINE_MODE` | `"legacy"` | Step B | Merged (`main`) | `"legacy" \| "declarative"`. Kept as `"legacy"` for current demo stability. |
-| `ENABLE_PAGE_IMAGE_RENDER` | `True` | Step C / F1 | Implemented (`aditya-backend`) | High-res PNG page rendering via PyMuPDF for visual bounding box overlay. |
-| `ENABLE_PERCEPTUAL_HASHING` | `True` | Step D | Implemented (`aditya-backend`) | Detects re-used diagrams and cropped certificates via dHash / pHash. |
-| `ENABLE_QR_VERIFICATION` | `True` | Step D | Implemented (`aditya-backend`) | Local QR decoding across query params, key-value, and JSON without SSRF. |
+| `ENABLE_PAGE_IMAGE_RENDER` | `True` | Step C / F1 | Merged (`156d358`) | High-res PNG page rendering via PyMuPDF for visual bounding box overlay. |
+| `ENABLE_PERCEPTUAL_HASHING` | `True` | Step D | Merged (`156d358`) | Detects re-used diagrams and cropped certificates via dHash / pHash. |
+| `ENABLE_QR_VERIFICATION` | `True` | Step D | Merged (`156d358`) | Local QR decoding across query params, key-value, and JSON without SSRF. |
 | `ENABLE_TAMPER_SIGNALS` | `True` | Step D | In Progress | Metadata forensics (producer strings, non-signature incremental update counts). |
 | `ENABLE_RAG_ASSISTANT` | `True` | Step G / F2 | **ACTIVE PRIORITY** | Offline Policy Q&A Assistant over `clauses.json` with strict allow-list. |
 | `ENABLE_PRELIMINARY_SCRUTINY_REPORT`| `True` | Step H | In Progress | PyMuPDF Preliminary Scrutiny Report PDF export. |
+
+---
+
+### 2.2 Two-Person Workload Division (Sprint to Demo)
+
+The remaining demo tasks are cleanly divided across two engineering roles to ensure parallel execution without merge conflicts:
+
+```
+┌────────────────────────────────────────────────────────┐
+│               PERSON 1: Backend & Policy               │
+│               Intelligence Engineer                    │
+├────────────────────────────────────────────────────────┤
+│ 1. Offline Policy Retrieval & Search Engine            │
+│    (BM25/token scoring over clauses.json)              │
+│ 2. Policy Query API Endpoints                          │
+│    (POST /api/policy/query, GET /api/policy/clauses)   │
+│ 3. Citation Guardrail & Post-Validation Filter         │
+│    (Zero hallucinated citations)                       │
+│ 4. PDF Metadata Forensics                              │
+│    (app/tamper/metadata_forensics.py)                  │
+│ 5. Preliminary Scrutiny Report PDF Generator           │
+│    (PyMuPDF binary report export endpoint)             │
+└────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│               PERSON 2: Frontend & Demo                │
+│               Experience Engineer                      │
+├────────────────────────────────────────────────────────┤
+│ 1. Policy Assistant Chatbot UI Drawer                  │
+│    (Slide-out drawer with chips, search, citations)   │
+│ 2. Contextual "Ask Policy" Triggers on Finding Cards   │
+│    (Pre-loading finding clause references)             │
+│ 3. Tamper Signals & Forensic Badges in Inspector       │
+│    (Visual metadata & QR status displays)              │
+│ 4. Reviewer Duplicate Acknowledgment Modal             │
+│    (Handling POST /duplicates/{id}/acknowledge)        │
+│ 5. Demo Showcase Seeding & Walkthrough Script          │
+│    (docs/DEMO_SCRIPT.md & click-by-click demo run)     │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Detailed Assignment Matrix:
+| Component | Person 1 (Backend & Policy) | Person 2 (Frontend & Demo) | Shared Contract |
+| :--- | :--- | :--- | :--- |
+| **RAG Policy Assistant** | Implements `backend/app/policy/retrieval.py`, `llm_explainer.py`, and `backend/app/routes/policy.py`. | Implements `frontend/src/components/PolicyAssistantDrawer.jsx` and connects to `/api/policy/query`. | Schema defined in `docs/AGENT_INTEGRATION_GUIDE.md`. |
+| **Tamper Signals** | Implements `backend/app/tamper/metadata_forensics.py` (producer, %%EOF counts). | Renders low-severity tamper signal cards with `"signal, not proof"` in findings. | Signal schema in `docs/API_CONTRACT.md`. |
+| **Duplicate Handling** | Enforces server-side masking in `validation_engine.py` for applicant vs reviewer views. | Builds reviewer duplicate acknowledgment UI and notes modal. | `POST /duplicates/{finding_id}/acknowledge`. |
+| **Scrutiny Report PDF** | Implements `dossier_generator.py` streaming downloadable PDF via PyMuPDF. | Adds "Download Scrutiny Dossier" button on finalized report view. | `GET /applications/{id}/scrutiny-report`. |
+| **Demo Walkthrough** | Maintains synthetic datasets in `backend/scripts/seed_demo_showcase.py`. | Writes `docs/DEMO_SCRIPT.md` and tests end-to-end presentation flow. | Synthetic scenarios matching handbook. |
 
 ```mermaid
 graph TD

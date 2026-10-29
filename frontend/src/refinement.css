@@ -345,10 +345,9 @@ body { background: #c9c5ba; }
 .cursor-interactive { filter: drop-shadow(0 1px 2px rgba(38, 59, 66, .32)); }
 .cursor-interactive .cursor-tail { stroke: var(--copper); stroke-dashoffset: 0; }
 @media (hover: hover) and (pointer: fine) {
-  body, a, button, label[for='file-input'] { cursor: none; }
-  input, select, textarea, [contenteditable='true'], .dropzone, .browse-button { cursor: auto !important; }
-  .dropzone { cursor: pointer !important; }
-  .browse-button { cursor: pointer !important; }
+  body { cursor: default; }
+  a, button, label[for='file-input'], .dropzone, .browse-button { cursor: pointer !important; }
+  input, select, textarea, [contenteditable='true'] { cursor: auto !important; }
 }
 
 @keyframes contour-drift { from { transform: translate3d(0, 0, 0) rotate(-3deg); } to { transform: translate3d(-18px, 9px, 0) rotate(1deg); } }
@@ -592,9 +591,9 @@ body { background: #c9c5ba; }
 .cursor-document .cursor-scan-mark { stroke-width: 1.4; }
 .cursor-pressed .cursor-shape { fill: var(--copper); stroke: var(--carbon-deep); }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  body, a, button, label[for='file-input'] { cursor: none; }
-  input, select, textarea, [contenteditable='true'], .dropzone, .browse-button { cursor: auto !important; }
-  .dropzone, .browse-button { cursor: pointer !important; }
+  body { cursor: default; }
+  a, button, label[for='file-input'], .dropzone, .browse-button { cursor: pointer !important; }
+  input, select, textarea, [contenteditable='true'] { cursor: auto !important; }
   p, h1, h2, h3, h4, blockquote, code, td, th, li { cursor: text; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1105,7 +1104,7 @@ body { background: #c9c5ba; }
   background: rgba(0, 201, 183, 0.22);
   box-shadow: 0 0 0 1px rgba(0, 201, 183, 0.7), 0 0 20px rgba(0, 201, 183, 0.6), inset 0 0 14px rgba(0, 201, 183, 0.3);
   border-radius: 4px;
-  pointer-events: auto;
+  pointer-events: none;
   animation: bbox-glow-pulse 2s infinite ease-in-out;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
@@ -1138,6 +1137,7 @@ body { background: #c9c5ba; }
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(92, 240, 221, 0.5);
   z-index: 30;
+  pointer-events: none;
 }
 
 .bbox-pulse-dot {

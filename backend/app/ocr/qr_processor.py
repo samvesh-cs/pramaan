@@ -177,6 +177,14 @@ def extract_qr_from_document(file_path: Union[str, Path]) -> Optional[Dict[str, 
                 if res:
                     doc.close()
                     res["page_number"] = page_idx + 1
+                    if res.get("bbox"):
+                        scale = 72.0 / 150.0
+                        res["bbox"] = [
+                            round(res["bbox"][0] * scale, 2),
+                            round(res["bbox"][1] * scale, 2),
+                            round(res["bbox"][2] * scale, 2),
+                            round(res["bbox"][3] * scale, 2),
+                        ]
                     return res
 
             doc.close()

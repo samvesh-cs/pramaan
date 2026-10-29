@@ -41,6 +41,14 @@ async def test_document_file_streaming(institution_client: AsyncClient):
     assert "inline" in stream_res.headers.get("content-disposition", "")
     assert stream_res.content == pdf_bytes
 
+    # Render page image for visual evidence overlay
+    img_res = await institution_client.get(f"/api/applications/{app_id}/documents/{doc_id}/page-image?page=1")
+    assert img_res.status_code == 200
+    assert img_res.headers["content-type"] == "image/png"
+    assert "x-page-width" in img_res.headers
+    assert "x-page-height" in img_res.headers
+    assert len(img_res.content) > 100
+
 
 @pytest.mark.asyncio
 async def test_auditor_review_finding_and_status_recalculation(institution_client: AsyncClient):
@@ -208,11 +216,17 @@ async def test_building_age_structural_stability_rule(institution_client: AsyncC
     app2_id = app2_res.json()["id"]
 
     old_building_pdf = create_pdf([
-        "Building Completion Certificate",
-        "Institution Name: Heritage Engineering College",
+        "Building Completion Certificate - Heritage Engineering College",
+        "Town Planning Authority - Historical Structure Scrutiny Division",
         "Certificate Number: BCC-1985-001",
         "Issue Date: 10/04/1985",
         "Issuing Authority: Town Planning Department",
+        "Approved Construction Plan Reference: TPD/85/0984/C",
+        "Total Built Up Area Approved: 12,450 Square Metres",
+        "Number of Floors: Ground Plus Three Floors",
+        "Architect In-Charge: Somnath & Associates Reg No CA/82/1004",
+        "Structural Engineer: P. K. Sharma & Partners Consulting",
+        "Occupancy Sanctioned Under Section 45(1) Municipal Act",
     ])
     await institution_client.post(
         f"/api/applications/{app2_id}/documents",
@@ -230,11 +244,15 @@ async def test_building_age_structural_stability_rule(institution_client: AsyncC
 
     # 3. Upload Structural Stability Certificate -> now passes!
     structural_pdf = create_pdf([
-        "Structural Stability Certificate",
+        "Structural Stability & Soundness Audit Certificate",
         "Institution Name: Heritage Engineering College",
         "Certificate Number: SSC-2026-ENG-44",
         "Chartered Engineer Registration Number: CE-STR-99881",
         "Date of Inspection: 05/01/2026",
+        "Building Foundation & Reinforced Concrete Column Inspection Completed",
+        "Non-Destructive Testing (NDT) Rebound Hammer Value: Adequate",
+        "Structure is Certified Safe and Fit for Educational Occupancy",
+        "Empanelled Structural Auditor: Dr. V. R. Deshmukh M.Tech Ph.D FIE",
     ])
     await institution_client.post(
         f"/api/applications/{app2_id}/documents",

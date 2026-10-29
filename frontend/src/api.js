@@ -344,5 +344,46 @@ export async function fetchDocumentBlob(applicationId, documentId) {
   return response.blob()
 }
 
+export async function fetchDocumentPageImageBlob(applicationId, documentId, page = 1) {
+  let token = inMemoryAccessToken
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  const url = `${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(documentId)}/page-image?page=${page}`
+  let response = await fetch(url, { headers, credentials: 'include' })
+
+  if (response.status === 401) {
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAuth().finally(() => {
+          refreshPromise = null
+        })
+      }
+      const refreshResult = await refreshPromise
+      if (refreshResult?.access_token) {
+        token = refreshResult.access_token
+        headers['Authorization'] = `Bearer ${token}`
+        response = await fetch(url, { headers, credentials: 'include' })
+      }
+    } catch {
+      inMemoryAccessToken = null
+      throw new Error('Authentication expired. Please log in again.')
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  const pageWidth = parseFloat(response.headers.get('X-Page-Width')) || 595.3
+  const pageHeight = parseFloat(response.headers.get('X-Page-Height')) || 841.9
+  const imageWidth = parseFloat(response.headers.get('X-Image-Width')) || 1240
+  const imageHeight = parseFloat(response.headers.get('X-Image-Height')) || 1754
+  const blob = await response.blob()
+
+  return { blob, pageWidth, pageHeight, imageWidth, imageHeight }
+}
+
 export function getChecklist() { return DOCUMENT_TYPES }
 

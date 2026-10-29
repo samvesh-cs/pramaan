@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def extract_selectable_text(page: fitz.Page) -> Tuple[str, List[Region]]:
-    """Extract selectable text and word/block bounding boxes from a digital PDF page using PyMuPDF.
+    """Extract selectable text and line/word bounding boxes from a digital PDF page using PyMuPDF.
 
     Coordinates from PyMuPDF are in PDF points (72 DPI).
+    Extracts block-level and line-level regions for pinpoint evidence highlighting.
     Confidence is set to None since PyMuPDF extracts exact digital text (not OCR).
     """
     blocks = page.get_text("blocks")
@@ -27,14 +28,32 @@ def extract_selectable_text(page: fitz.Page) -> Tuple[str, List[Region]]:
             text = block[4].strip()
             if text:
                 lines.append(text)
-                bbox = [round(block[0], 2), round(block[1], 2), round(block[2], 2), round(block[3], 2)]
+                block_bbox = [round(block[0], 2), round(block[1], 2), round(block[2], 2), round(block[3], 2)]
+                # Add block-level region
                 regions.append(
                     Region(
                         text=text,
-                        confidence=None,  # API contract rule: Do not fabricate confidence for digital PDF text
-                        bbox=bbox
+                        confidence=None,
+                        bbox=block_bbox,
                     )
                 )
+                # Split multi-line blocks into lines for pinpoint line-level bounding box resolution
+                block_lines = [l.strip() for l in text.splitlines() if l.strip()]
+                if len(block_lines) > 1:
+                    for bl in block_lines:
+                        line_rects = page.search_for(bl)
+                        if line_rects:
+                            r = line_rects[0]
+                            line_bbox = [round(r.x0, 2), round(r.y0, 2), round(r.x1, 2), round(r.y1, 2)]
+                        else:
+                            line_bbox = block_bbox
+                        regions.append(
+                            Region(
+                                text=bl,
+                                confidence=None,
+                                bbox=line_bbox,
+                            )
+                        )
 
     full_text = "\n".join(lines)
     return full_text, regions
@@ -75,7 +94,6 @@ def process_pdf(file_path: Path) -> List[PageResult]:
                     regions = ocr_regions
             except Exception as e:
                 logger.warning("OCR fallback on page %d encountered error: %s", page_num, e)
-                # Keep whatever digital text was extracted if OCR failed
 
         pages.append(
             PageResult(

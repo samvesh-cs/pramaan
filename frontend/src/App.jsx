@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_CATEGORIES, CHECK_STATUSES, STATUS_LABELS, USE_MOCKS } from './config'
 import { labelForDocument } from './demoData'
-import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, finalizeApplicationReview, getDocumentFileUrl, fetchDocumentBlob, submitApplication } from './api'
+import { createApplication, getApplication, getChecklist, getReport, listApplications, runValidation, uploadDocument, reviewFinding, finalizeApplicationReview, getDocumentFileUrl, fetchDocumentBlob, fetchDocumentPageImageBlob, submitApplication } from './api'
 import { useAuth } from './auth/useAuth'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -27,6 +27,7 @@ const iconPaths = {
   shield: <><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></>,
   file: <><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></>,
   printer: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
 }
 function Icon({ name, size = 20 }) { return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{iconPaths[name] || iconPaths.documents}</svg> }
 function Status({ value }) { return <span className={`status status-${value || 'unknown'}`}><i />{STATUS_LABELS[value] || value?.replaceAll('_', ' ') || 'Not available'}</span> }
@@ -751,74 +752,144 @@ function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error 
 }
 
 function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
-  const { documentId, documentName, pageNumber, bbox, evidenceText, field } = docInfo || {}
+  const {
+    documentId,
+    documentName,
+    pageNumber = 1,
+    bbox,
+    evidenceText,
+    field,
+    missingFields,
+    findingReason,
+    findingTitle,
+    findingStatus,
+  } = docInfo || {}
+
   const fileUrl = applicationId && documentId ? getDocumentFileUrl(applicationId, documentId) : ''
   const [blobUrl, setBlobUrl] = useState(null)
+  const [pageImageUrl, setPageImageUrl] = useState(null)
+  const [pageMeta, setPageMeta] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [highlightVisible, setHighlightVisible] = useState(true)
+  const [viewMode, setViewMode] = useState('inspector')
+  const [zoomLevel, setZoomLevel] = useState(1.0)
+  const [imgLoaded, setImgLoaded] = useState(false)
+  const targetBoxRef = useRef(null)
 
+  // Compute percentage coordinates with precision
   const bboxOverlay = useMemo(() => {
     if (!bbox || !Array.isArray(bbox) || bbox.length < 4) return null
     const [x0, y0, x1, y1] = bbox.map(Number)
     if (isNaN(x0) || isNaN(y0) || isNaN(x1) || isNaN(y1)) return null
+
+    // Normalized 0..1 coordinates
     if (x0 <= 1.0 && x1 <= 1.0 && y0 <= 1.0 && y1 <= 1.0) {
       return {
-        left: `${(x0 * 100).toFixed(1)}%`,
-        top: `${(y0 * 100).toFixed(1)}%`,
-        width: `${Math.max(6, (x1 - x0) * 100).toFixed(1)}%`,
-        height: `${Math.max(3, (y1 - y0) * 100).toFixed(1)}%`,
+        left: `${(x0 * 100).toFixed(2)}%`,
+        top: `${(y0 * 100).toFixed(2)}%`,
+        width: `${Math.max(5, (x1 - x0) * 100).toFixed(2)}%`,
+        height: `${Math.max(2.5, (y1 - y0) * 100).toFixed(2)}%`,
       }
     }
-    const pw = 595.3
-    const ph = 841.9
-    const leftPct = Math.min(92, Math.max(0, (x0 / pw) * 100))
-    const topPct = Math.min(92, Math.max(0, (y0 / ph) * 100))
-    const widthPct = Math.min(100 - leftPct, Math.max(6, ((x1 - x0) / pw) * 100))
-    const heightPct = Math.min(100 - topPct, Math.max(3, ((y1 - y0) / ph) * 100))
-    return {
-      left: `${leftPct.toFixed(1)}%`,
-      top: `${topPct.toFixed(1)}%`,
-      width: `${widthPct.toFixed(1)}%`,
-      height: `${heightPct.toFixed(1)}%`,
+
+    // PDF Points (standard 72 DPI, A4 is 595.3 x 841.9)
+    const pw = pageMeta?.pageWidth || 595.3
+    const ph = pageMeta?.pageHeight || 841.9
+    const iw = pageMeta?.imageWidth || 1240
+    const ih = pageMeta?.imageHeight || 1754
+
+    let baseW = pw
+    let baseH = ph
+
+    // If coordinates exceed point bounds, they are in 150-DPI pixel space
+    if (x1 > 650 || y1 > 950) {
+      baseW = iw
+      baseH = ih
     }
-  }, [bbox])
+
+    const leftPct = Math.min(94, Math.max(0, (x0 / baseW) * 100))
+    const topPct = Math.min(94, Math.max(0, (y0 / baseH) * 100))
+    const widthPct = Math.min(100 - leftPct, Math.max(5, ((x1 - x0) / baseW) * 100))
+    const heightPct = Math.min(100 - topPct, Math.max(2.5, ((y1 - y0) / baseH) * 100))
+
+    return {
+      left: `${leftPct.toFixed(2)}%`,
+      top: `${topPct.toFixed(2)}%`,
+      width: `${widthPct.toFixed(2)}%`,
+      height: `${heightPct.toFixed(2)}%`,
+    }
+  }, [bbox, pageMeta])
+
+  // Smooth scroll into target evidence bounding box when canvas is ready
+  useEffect(() => {
+    if (imgLoaded && bboxOverlay && targetBoxRef.current) {
+      const timer = setTimeout(() => {
+        targetBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [imgLoaded, bboxOverlay])
 
   useEffect(() => {
     if (!isOpen || !applicationId || !documentId) {
       setBlobUrl(null)
+      setPageImageUrl(null)
+      setPageMeta(null)
+      setImgLoaded(false)
+      setZoomLevel(1.0)
       return undefined
     }
 
     let active = true
-    let createdUrl = null
+    let createdPdfUrl = null
+    let createdImgUrl = null
     setLoading(true)
     setLoadError('')
     setBlobUrl(null)
+    setPageImageUrl(null)
+    setImgLoaded(false)
 
-    fetchDocumentBlob(applicationId, documentId)
-      .then((blob) => {
-        if (!active) return
-        createdUrl = URL.createObjectURL(blob)
-        setBlobUrl(createdUrl)
-      })
-      .catch((err) => {
-        if (!active) return
-        setLoadError(err.message || 'Could not load document preview.')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+    // Load rendered page image & raw PDF simultaneously
+    Promise.allSettled([
+      fetchDocumentPageImageBlob(applicationId, documentId, pageNumber || 1),
+      fetchDocumentBlob(applicationId, documentId),
+    ]).then(([imgRes, pdfRes]) => {
+      if (!active) return
+
+      if (imgRes.status === 'fulfilled') {
+        const { blob, pageWidth, pageHeight, imageWidth, imageHeight } = imgRes.value
+        createdImgUrl = URL.createObjectURL(blob)
+        setPageImageUrl(createdImgUrl)
+        setPageMeta({ pageWidth, pageHeight, imageWidth, imageHeight })
+        setViewMode('inspector')
+      } else {
+        setViewMode('pdf')
+      }
+
+      if (pdfRes.status === 'fulfilled') {
+        createdPdfUrl = URL.createObjectURL(pdfRes.value)
+        setBlobUrl(createdPdfUrl)
+      }
+
+      if (imgRes.status === 'rejected' && pdfRes.status === 'rejected') {
+        setLoadError(pdfRes.reason?.message || 'Could not load document preview.')
+      }
+    }).finally(() => {
+      if (active) setLoading(false)
+    })
 
     return () => {
       active = false
-      if (createdUrl) {
-        URL.revokeObjectURL(createdUrl)
-      }
+      if (createdPdfUrl) URL.revokeObjectURL(createdPdfUrl)
+      if (createdImgUrl) URL.revokeObjectURL(createdImgUrl)
     }
-  }, [isOpen, applicationId, documentId])
+  }, [isOpen, applicationId, documentId, pageNumber])
 
   if (!isOpen || !docInfo) return null
+
+  const hasMissingFields = missingFields && missingFields.length > 0
+  const isDeficiency = hasMissingFields || findingStatus === 'missing'
 
   return (
     <div className="viewer-drawer-backdrop" onClick={onClose}>
@@ -847,10 +918,52 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
               )}
             </div>
           </div>
-          <button type="button" className="icon-button close-drawer" onClick={onClose}>
-            <Icon name="close" size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {pageImageUrl && blobUrl && (
+              <div className="viewer-mode-tabs">
+                <button
+                  type="button"
+                  className={`viewer-tab-btn ${viewMode === 'inspector' ? 'is-active' : ''}`}
+                  onClick={() => setViewMode('inspector')}
+                  title="Inspect with pinpoint bounding box overlay"
+                >
+                  <Icon name="search" size={13} />
+                  <span>AI Inspector</span>
+                </button>
+                <button
+                  type="button"
+                  className={`viewer-tab-btn ${viewMode === 'pdf' ? 'is-active' : ''}`}
+                  onClick={() => setViewMode('pdf')}
+                  title="View original multi-page PDF"
+                >
+                  <Icon name="file" size={13} />
+                  <span>Raw PDF</span>
+                </button>
+              </div>
+            )}
+            <button type="button" className="icon-button close-drawer" onClick={onClose}>
+              <Icon name="close" size={20} />
+            </button>
+          </div>
         </div>
+
+        {/* Missing Field / Regulatory Deficiency Banner */}
+        {isDeficiency && (
+          <div className="viewer-deficiency-banner" role="alert">
+            <div className="deficiency-icon"><Icon name="alert" size={20} /></div>
+            <div className="deficiency-content">
+              <div className="deficiency-title">MANDATORY FIELD DEFICIENCY IDENTIFIED</div>
+              <p className="deficiency-desc">
+                {hasMissingFields
+                  ? `Required field(s) '${missingFields.map(displayFieldName).join(', ')}' could not be found anywhere in this document.`
+                  : findingReason || 'A required regulatory clause is missing from this document.'}
+              </p>
+              <span className="deficiency-guide">
+                The OCR engine scanned all pages. Because the mandatory clause is absent, no localized bounding box exists. Scrutinize the document below to confirm if the clause is omitted or requires re-submission.
+              </span>
+            </div>
+          </div>
+        )}
 
         {evidenceText && (
           <div className="viewer-evidence-snippet">
@@ -860,7 +973,7 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
         )}
 
         <div className="viewer-frame-container" style={{ position: 'relative', minHeight: '400px' }}>
-          {loading && <Loading label="Loading document preview…" />}
+          {loading && <Loading label="Rendering document evidence canvas…" />}
           {loadError && (
             <div style={{ padding: '32px 20px', textAlign: 'center' }}>
               <ErrorNotice message={loadError} />
@@ -872,42 +985,82 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
               </a>
             </div>
           )}
-          {blobUrl && (
-            <>
-              <iframe
-                src={`${blobUrl}#page=${pageNumber || 1}`}
-                title="Document Viewer"
-                className="viewer-iframe"
-              />
-              {bboxOverlay && highlightVisible && (
-                <div
-                  className="bbox-interactive-overlay"
-                  style={{
-                    position: 'absolute',
-                    left: bboxOverlay.left,
-                    top: bboxOverlay.top,
-                    width: bboxOverlay.width,
-                    height: bboxOverlay.height,
-                  }}
-                >
-                  <div className="bbox-target-badge">
-                    <span className="bbox-pulse-dot" />
-                    <span>{field ? String(field).replaceAll('_', ' ').toUpperCase() : 'TARGET EVIDENCE REGION'}</span>
+
+          {/* AI Inspector Canvas Mode (Page Image with Pixel-Perfect Overlays) */}
+          {viewMode === 'inspector' && pageImageUrl && (
+            <div className="evidence-inspector-scrollarea">
+              <div className="evidence-page-wrapper" style={{ width: `${Math.round(zoomLevel * 100)}%` }}>
+                <img
+                  src={pageImageUrl}
+                  alt={`Document Page ${pageNumber || 1}`}
+                  className="evidence-page-img"
+                  onLoad={() => setImgLoaded(true)}
+                />
+                {bboxOverlay && highlightVisible && (
+                  <div
+                    ref={targetBoxRef}
+                    className="bbox-interactive-overlay"
+                    style={{
+                      left: bboxOverlay.left,
+                      top: bboxOverlay.top,
+                      width: bboxOverlay.width,
+                      height: bboxOverlay.height,
+                    }}
+                  >
+                    <div className="bbox-target-badge">
+                      <span className="bbox-pulse-dot" />
+                      <span>{field ? displayFieldName(field).toUpperCase() : 'TARGET EVIDENCE REGION'}</span>
+                    </div>
+                    <div className="bbox-corner ch-tl" />
+                    <div className="bbox-corner ch-tr" />
+                    <div className="bbox-corner ch-bl" />
+                    <div className="bbox-corner ch-br" />
                   </div>
-                  <div className="bbox-corner ch-tl" />
-                  <div className="bbox-corner ch-tr" />
-                  <div className="bbox-corner ch-bl" />
-                  <div className="bbox-corner ch-br" />
-                </div>
-              )}
-            </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Raw Full PDF Mode (Native Iframe) */}
+          {(viewMode === 'pdf' || (!pageImageUrl && blobUrl)) && blobUrl && (
+            <iframe
+              src={`${blobUrl}#page=${pageNumber || 1}`}
+              title="Document Viewer"
+              className="viewer-iframe"
+            />
           )}
         </div>
 
         <div className="viewer-footer">
-          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="quiet-link">
-            Open in new tab <Icon name="arrow" size={14} />
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {viewMode === 'inspector' && pageImageUrl && (
+              <div className="viewer-zoom-controls">
+                <button
+                  type="button"
+                  className="viewer-zoom-btn"
+                  onClick={() => setZoomLevel((z) => Math.max(0.75, Number((z - 0.25).toFixed(2))))}
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <span>{Math.round(zoomLevel * 100)}%</span>
+                <button
+                  type="button"
+                  className="viewer-zoom-btn"
+                  onClick={() => setZoomLevel((z) => Math.min(2.0, Number((z + 0.25).toFixed(2))))}
+                  title="Zoom In"
+                >
+                  +
+                </button>
+              </div>
+            )}
+            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="quiet-link">
+              Open in new tab <Icon name="arrow" size={14} />
+            </a>
+          </div>
+          <span style={{ fontSize: '11px', color: '#889290' }}>
+            {viewMode === 'inspector' ? '✦ AI Pinpoint Visual Scrutiny' : '📄 Full Document Browser View'}
+          </span>
         </div>
       </div>
     </div>
@@ -1469,6 +1622,18 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
               )}
               {evidence.raw_text || evidence.text ? (
                 <blockquote>{evidence.raw_text || evidence.text}</blockquote>
+              ) : evidence.missing_fields && evidence.missing_fields.length > 0 ? (
+                <div className="deficiency-missing-fields-badge">
+                  <span className="deficiency-tag">MISSING MANDATORY FIELDS</span>
+                  <div className="missing-pills">
+                    {evidence.missing_fields.map((mf) => (
+                      <span key={mf} className="missing-field-pill">⚠️ {displayFieldName(mf)}</span>
+                    ))}
+                  </div>
+                  <p className="missing-explanation">
+                    The automated engine scanned this document, but no matching clause for these required fields was found.
+                  </p>
+                </div>
               ) : (
                 <p className="evidence-unavailable">Supporting text snippet unavailable.</p>
               )}
@@ -1482,7 +1647,11 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
                     pageNumber: evidence?.page_number || 1,
                     bbox: evidence?.bbox || null,
                     evidenceText: evidence?.raw_text || evidence?.text || (evidence?.value != null ? String(evidence.value) : ''),
-                    field: evidence?.field || null,
+                    field: evidence?.field || (evidence?.missing_fields ? evidence.missing_fields.join(', ') : null),
+                    missingFields: evidence?.missing_fields || null,
+                    findingReason: finding.reason,
+                    findingTitle: finding.title,
+                    findingStatus: finding.status,
                   })}
                 >
                   <Icon name="search" size={13} /> Inspect Evidence in Viewer {evidence?.bbox ? '✦ With Overlay' : ''}

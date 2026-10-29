@@ -121,16 +121,29 @@ def find_region_for_text(pages: List[PageResult], target_snippet: str) -> Tuple[
 
     snippet_clean = target_snippet.lower().strip()
 
+    # 1. Exact or substring match in any region
     for page in pages:
         for reg in page.regions:
             reg_clean = reg.text.lower().strip()
             if snippet_clean in reg_clean or reg_clean in snippet_clean:
                 return page.page_number, reg.confidence, reg.bbox
 
-    # Default fallback to page 1 if any region exists
-    if pages and pages[0].regions:
-        return pages[0].page_number, pages[0].regions[0].confidence, pages[0].regions[0].bbox
+    # 2. Token overlap match (e.g. date tokens, name tokens)
+    target_words = [w for w in re.split(r"[\s\-\/\.,]+", snippet_clean) if len(w) >= 3]
+    if target_words:
+        best_match = None
+        best_score = 0
+        for page in pages:
+            for reg in page.regions:
+                reg_clean = reg.text.lower().strip()
+                score = sum(1 for w in target_words if w in reg_clean)
+                if score > best_score:
+                    best_score = score
+                    best_match = (page.page_number, reg.confidence, reg.bbox)
+        if best_match and best_score >= max(1, len(target_words) // 2):
+            return best_match
 
+    # If no region matches, return None for bbox (do not fall back to header at top!)
     return 1 if pages else None, None, None
 
 

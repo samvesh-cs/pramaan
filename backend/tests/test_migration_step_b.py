@@ -228,24 +228,11 @@ async def test_legacy_mode_persists_advisory_for_ter_rules(institution_client: A
 
         advisory_map = {f.rule_id: f.advisory for f in findings}
 
-        from app.rules.legacy_adapter import is_advisory_rule
-        # Check advisory rules produced during validation
+        # 1. Assert advisory findings produced through /validate persist advisory=True in DB
         assert advisory_map.get("FIELD_004") is True, f"FIELD_004 expected advisory=True, got {advisory_map.get('FIELD_004')}"
         assert advisory_map.get("TER_PAYMENT_001") is True, f"TER_PAYMENT_001 expected advisory=True, got {advisory_map.get('TER_PAYMENT_001')}"
-        assert is_advisory_rule("PRESENCE_004") is True
 
-        # Directly insert a PRESENCE_004 finding as validation_engine does, ensuring advisory persists
-        pres4_finding = Finding(
-            id="finding_pres4_test",
-            application_id=app_id,
-            rule_id="PRESENCE_004",
-            status="not_applicable",
-            title="TER Payment Receipt Presence Check",
-            reason="Optional under APH 2024-27 Annexure-2 Section 2.1(ii)",
-            advisory=is_advisory_rule("PRESENCE_004"),
-        )
-        session.add(pres4_finding)
-        await session.commit()
-
-        refreshed = (await session.execute(select(Finding).where(Finding.id == "finding_pres4_test"))).scalar_one()
-        assert refreshed.advisory is True
+        # 2. Assert non-advisory findings produced through /validate persist advisory=False in DB
+        assert advisory_map.get("PRESENCE_001") is False, f"PRESENCE_001 expected advisory=False, got {advisory_map.get('PRESENCE_001')}"
+        assert advisory_map.get("PRESENCE_002") is False, f"PRESENCE_002 expected advisory=False, got {advisory_map.get('PRESENCE_002')}"
+        assert advisory_map.get("PRESENCE_003") is False, f"PRESENCE_003 expected advisory=False, got {advisory_map.get('PRESENCE_003')}" 

@@ -88,7 +88,7 @@ rules:
     severity: "info"
     signal_type: "rule"
     advisory: true
-    status: "verified"
+    status: "pending_review" # Advisory-only rule per APH 2024-27 Annexure-2 §2.1(ii) ("if any"); fee amounts are not validated
     is_active: true
     condition:
       operator: "exists"

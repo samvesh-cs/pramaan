@@ -145,6 +145,10 @@ To transition from named Python handlers to pure declarative YAML AST evaluation
      - `next_action = branch.next_action`
    - If any branch condition evaluates to `EvaluationResult.UNKNOWN` and no earlier branch evaluates to `TRUE`, emit `status = "unresolved"`.
    - If all branch conditions evaluate to `EvaluationResult.FALSE`, emit `status = "flagged"` using the rule's `flag_title` and `flag_reason_template`.
-3. **Parity Testing Harness:**
+3. **Year Arithmetic Semantics (Calendar-Year Subtraction vs. Exact Dates):**
+   - In legacy `BuildingAgeStructuralStabilityRule`, building age is computed via pure calendar-year subtraction: `building_age = current_year - completion_year`.
+   - For the generic evaluator pilot to achieve exact parity with `_eval_structural()`, `date_gt_years` and `date_lte_years` must use legacy calendar-year subtraction (`ref_date.year - act_date.year`).
+   - Exact anniversary-based calendar date calculations (`calculate_calendar_years_between`) will remain isolated until a dedicated PR is approved by the PO to transition the regulatory logic.
+4. **Parity Testing Harness:**
    - Implement `test_structural_001_generic_evaluator_parity.py` comparing the output of `_eval_structural(ctx)` and the generic evaluator across all 10 structural boundary fixtures (age <= 30, age > 30 with valid cert, age > 30 with expired cert, age > 50 with letter, age > 50 without letter).
    - Assert exact match on `status`, `rule_id`, `clause_id`, and finding titles.

@@ -410,6 +410,71 @@ def build_synthetic_scenario_contexts() -> list[tuple[str, dict[str, Any]]]:
     }
     contexts.append(("a0_case_2b_building_age_gt_50_with_letter", ctx_a0_2b))
 
+    # (a) 35-year-old building with a letter but no certificate (vintage 1989)
+    ext_bcc_1989 = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Synthetic ABC Institute of Technology", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": "BCC-1989-035", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "1989-01-01", "confidence": 0.95, "status": "extracted"},
+            "issuing_authority": {"value": "Municipal Corporation", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_35yo_letter_no_cert = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff, doc_letter],
+        "extractions": {"d_f": ext_fire, "d_b": ext_bcc_1989, "d_a": ext_aff, "d_let": ext_letter},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff, doc_letter],
+    }
+    contexts.append(("building_35yo_letter_no_cert", ctx_35yo_letter_no_cert))
+
+    # (b) Expired 5-year structural certificate (building age > 30, structural cert date > 5 years old)
+    doc_ssc = SimpleNamespace(id="d_s", document_type="structural_stability_certificate", processing_status="processed", original_filename="ssc.pdf", file_hash="h5", application_id="app_syn")
+    ext_ssc_expired = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Synthetic ABC Institute of Technology", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": "SSC-2017-001", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "2017-01-01", "confidence": 0.95, "status": "extracted"},
+            "engineer_license_number": {"value": "SE-LIC-12345", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_expired_ssc = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff, doc_ssc],
+        "extractions": {"d_f": ext_fire, "d_b": ext_bcc_1989, "d_a": ext_aff, "d_s": ext_ssc_expired},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff, doc_ssc],
+    }
+    contexts.append(("structural_certificate_expired_5yr", ctx_expired_ssc))
+
+    # (c) TER receipt present
+    doc_ter = SimpleNamespace(id="d_t", document_type="ter_payment_receipt", processing_status="processed", original_filename="ter.pdf", file_hash="h6", application_id="app_syn")
+    ext_ter = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Synthetic ABC Institute of Technology", "confidence": 0.95, "status": "extracted"},
+            "receipt_number": {"value": "TER-REC-2024-001", "confidence": 0.95, "status": "extracted"},
+            "transaction_date": {"value": "2024-01-15", "confidence": 0.95, "status": "extracted"},
+            "amount_inr": {"value": 100000, "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_ter_present = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff, doc_ter],
+        "extractions": {"d_f": ext_fire, "d_b": ext_bcc, "d_a": ext_aff, "d_t": ext_ter},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff, doc_ter],
+    }
+    contexts.append(("ter_receipt_present", ctx_ter_present))
+
+    # (d) TER receipt absent
+    ctx_ter_absent = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff],
+        "extractions": {"d_f": ext_fire, "d_b": ext_bcc, "d_a": ext_aff},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff],
+    }
+    contexts.append(("ter_receipt_absent", ctx_ter_absent))
+
     return contexts
 
 

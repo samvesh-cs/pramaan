@@ -8,6 +8,7 @@ OCR_CONFIDENCE_REVIEW_THRESHOLD = 0.70
 class BaseRule(ABC):
     rule_id: str
     title: str
+    advisory: bool = False
 
     @abstractmethod
     def evaluate(self, context: dict[str, Any]) -> list[FindingCreate]:

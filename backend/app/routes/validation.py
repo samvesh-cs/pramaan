@@ -123,7 +123,7 @@ async def review_finding(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "REVIEW_FINALIZED", "message": "Scrutiny has been finalized. Reviewer decisions are read-only.", "details": None},
         )
-    # Reviewer identity comes from the authenticated account, never a client-supplied value.
+    # Actor is strictly the authenticated reviewer user, never a client-supplied reviewed_by (D-021)
     payload.reviewed_by = current_user.email
 
     return await validation_engine.review_finding(

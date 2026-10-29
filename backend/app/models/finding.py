@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -18,6 +18,12 @@ class Finding(Base):
     document_name = Column(String(500), nullable=True)
     evidence = Column(JSON, nullable=True)  # {page_number, text, field, value, bbox}
     next_action = Column(Text, nullable=True)
+    clause_ref = Column(JSON, nullable=True)  # {clause_id, chapter_or_annexure, clause_number, handbook_page, pdf_page, title}
+    severity = Column(String(20), nullable=True, default="medium")  # critical | high | medium | low | info
+    signal_type = Column(String(20), nullable=True, default="rule")  # rule | tamper | issuer | duplicate
+    advisory = Column(Boolean, nullable=True, default=False)
+    ruleset_version = Column(String(64), nullable=True)
+    rule_engine_mode = Column(String(32), nullable=True)
     reviewer_decision = Column(String(50), nullable=True)  # verified | confirmed_discrepancy | requested_resubmission | escalated
     reviewer_notes = Column(Text, nullable=True)
     reviewed_by = Column(String(100), nullable=True)

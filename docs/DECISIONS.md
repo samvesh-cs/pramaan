@@ -92,6 +92,78 @@ Record settled choices here so the team and coding agents do not repeatedly reco
 **Reason:** Satisfies multi-tenant security requirements, human-in-the-loop review boundaries, and seamless demo UX without requiring external SSO infrastructure.  
 **Date / Owner:** 2026-10-27 / Integration
 
+### D-015 — Hybrid unresolved handling via engine interception
+**Status:** Accepted  
+**Decision:** Extends D-013. Unresolved handling is a hybrid, with the scrutiny engine intercepting by default. The engine intercepts any rule whose input field has OCR confidence below 0.70 and returns a standard system `unresolved` finding, which does not count as pass or flag and routes to the reviewer queue. Rules declare their input dependencies explicitly via `depends_on_fields` rather than deriving them from templates. Rules may optionally specify `unresolved_title`, `unresolved_reason_template`, and `unresolved_next_action` overrides when custom wording is necessary. Cross-document rules (e.g. `CONSISTENCY_001`) are marked `unresolved` if either side has low confidence. A missing field is a flag (or `FIELD_001`), whereas a low-confidence field is unresolved. `null` confidence (digital PDF extraction) is exempt and evaluated directly. Boundary tests: 0.69 -> unresolved, 0.70 -> evaluated, null -> evaluated. Tested with synthetic confidences since OCR is unverified.  
+**Reason:** Avoids boilerplate `unresolved_*` templates across 30+ rules while keeping threshold testing centralized in one place.  
+**Date / Owner:** 2026-10-28 / Product Owner
+
+### D-016 — Reviewer override audit via dedicated append-only table
+**Status:** Accepted  
+**Decision:** Reviewer overrides are stored in a dedicated append-only `finding_audits` table, rather than columns on `Finding`. Columns: `id`, `finding_id`, `application_id`, `actor_user_id`, `actor_role`, `prior_status`, `new_decision`, `reason` (NOT NULL, minimum length enforced), `internal_note` (optional, reviewer-only), `created_at`, plus an immutable snapshot of `rule_id` and clause IDs so overrides survive finding re-generation. Append-only enforcement via database triggers or revoked UPDATE/DELETE grants. Gated strictly to `REVIEWER` role on submitted applications (D-014). The original finding `status` is never mutated; the current decision is derived from the latest audit row (or cached in a nullable column). Institutions have read-only visibility of reviewer determinations and the shared `reason` on their own submitted applications; the optional `internal_note` column is restricted to reviewer visibility.  
+**Reason:** Scrutiny audit trail must preserve original automated signals and maintain a complete, tamper-evident history of multiple successive reviewer determinations while supporting internal scrutiny notes.  
+**Date / Owner:** 2026-10-28 / Product Owner
+
+### D-017 — Compound condition logic for declarative rules
+**Status:** Accepted  
+**Decision:** Extend `RuleCondition` to support compound boolean logic via `all_of` and `any_of` lists of child `RuleCondition` objects. Requirements:
+1. Nesting Depth: Maximum nesting depth capped at 3; enforced at startup during YAML loading/validation.
+2. Three-Valued Logic: Follows Kleene-style three-valued logic incorporating `unresolved` (D-015):
+   - `all_of`: Evaluates to `false` if any operand is false; `unresolved` if none is false and at least one operand is unresolved; `true` otherwise.
+   - `any_of`: Evaluates to `true` if any operand is true; `unresolved` if none is true and at least one operand is unresolved; `false` otherwise.
+3. Operators: Support conditions for document presence, field existence/comparisons, and age greater than N (`date_gt_years`).
+4. Boundary Tests: Unit test all truth tables, nesting limits, and boundary conditions.
+5. `STRUCTURAL_001` Target: Once compound conditions are implemented, `STRUCTURAL_001`'s pass condition becomes `any_of: [age <= 30, structural_stability_certificate present, all_of(age > 50, competent_authority_letter present)]`.  
+**Reason:** Enables expressive, declarative rule modelling for compound statutory criteria without code duplication or hardcoded Python branching.  
+**Date / Owner:** 2026-10-28 / Product Owner
+
+### D-018 — Age and expiry reference date semantics
+**Status:** Accepted  
+**Decision:** Deterministic reference date evaluation for temporal scrutiny rules:
+1. Scrutiny Reference Date:
+   - For submitted applications: Use `application.submitted_at.date()`.
+   - For draft applications: Use current calendar date at evaluation time (`date.today()`).
+   - Do NOT use `application.created_at` (a draft created in January and submitted in March must not be evaluated against January dates).
+2. Deterministic Injection: The reference date is computed at application context level and injected into the rule execution engine as a parameter; rules must NOT invoke `date.today()` internally.
+3. Finding Transparency: Every temporal finding (including `STRUCTURAL_001` and `EXPIRY_001`) must explicitly include the reference date used for evaluation in its finding reason and evidence dictionary.
+4. Application Deadline Exception: For clauses referencing AICTE application deadlines (e.g. the 50-year government building exception referencing "last date of application"), support an optional per-academic-year configuration parameter (`last_date_of_application`) without inventing placeholder dates.  
+**Reason:** Prevents stale-draft false passes, eliminates time-of-day non-determinism in CI test fixtures, and provides clear audit trails for institutions and scrutiny officers.  
+**Date / Owner:** 2026-10-28 / Product Owner
+
+### D-019 — TER receipt verification and finding behavior
+**Status:** Accepted  
+**Approver:** Product Owner  
+**Date:** 2026-10-28  
+**Decision:** 
+1. The live TER payment amount check against fixed fee amounts is retired. `EOA_STATUTORY_TER_FEES` is removed.
+2. A TER payment receipt is advisory/informational only per APH Annexure-2 §2.1(ii) ("if any").
+3. An absent receipt produces NO finding (Option A) and does not impede application approval.
+4. When a receipt is present, an informational finding (status: `pass`, severity: `info`) is emitted indicating that the payment receipt was uploaded, but fee amounts are not validated against AICTE portal records.
+5. In addition, when a receipt is present, FIELD_004 is informational only (severity: `info`) and missing/unclear fields on the optional receipt do not block application processing.  
+**Reason:** Annexure-2 §2.1(ii) specifies pay receipt "if any", and AICTE portal fee amounts vary by specific institutional category rather than uniform thresholds.
+
+### D-020 — Structural stability requirement and government exemption
+**Status:** Accepted  
+**Approver:** Product Owner  
+**Date:** 2026-10-28  
+**Decision:** 
+1. No institution-name matching: Heuristic string matching on applicant institution name is completely removed.
+2. Building age is computed using exact date arithmetic from the Building Completion Certificate `issue_date` to the scrutiny reference date.
+3. The >50-year government building exemption requires both building age > 50 years AND a `competent_authority_letter` present per Annexure-2 §2.1 preamble.
+4. The competent authority letter is evaluated on document presence only (its content is not extracted or assessed).
+5. For buildings > 30 years without a Structural Stability Certificate, if age > 50 and no letter is provided, the finding flags the missing Structural Stability Certificate per Clause 6.17(h) and Annexure-2 §2.1(iv) (it must not yield an unresolved state).  
+**Reason:** Regulatory compliance under Clause 6.17(h) and Annexure-2 §2.1 preamble requires strict, objective document presence rather than name heuristics.
+
+### D-021 — Reviewer determination justification requirement
+**Status:** Accepted  
+**Approver:** Product Owner  
+**Date:** 2026-10-28  
+**Decision:** 
+1. Option 1 selected: A justification reason of at least 10 characters is mandatory on every reviewer determination.
+2. The frontend must stop pre-filling a default note (it previously pre-filled a generic note that bypassed the length check and asserted unverified claims).
+3. The actor recorded in the audit trail is strictly the authenticated user from the session token, never a client-supplied `reviewed_by` parameter.  
+**Reason:** Ensures accountability and an uncompromised audit trail for human scrutiny decisions on regulatory findings.
+
 ## Open questions — resolve before implementing rules
 
 ### Q-001 — Application category

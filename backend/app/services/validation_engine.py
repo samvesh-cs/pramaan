@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
@@ -6,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
+from app.config import settings
 from app.models.application import Application
 from app.models.document import Document
 from app.models.extraction import ExtractionRun
@@ -16,14 +18,19 @@ from app.rules.cross_document_check import InstitutionNameConsistencyRule
 from app.rules.duplicate_check import DuplicateDocumentRule
 from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
+from app.rules.legacy_adapter import is_advisory_rule, wrap_legacy_rules
 from app.rules.presence_check import DocumentPresenceRule
+from app.rules.shadow_runner import dispatch_shadow_evaluation
 from app.rules.ter_payment_check import TerPaymentRule
 from app.rules.qr_verification_check import IssuingAuthorityVerificationRule
+from app.rules.declarative_engine import default_declarative_engine
 from app.schemas.application import OverallStatus
 from app.schemas.finding import FindingResponse, FindingReviewUpdate
 from app.schemas.report import ReportResponse
 from app.utils.id_generator import generate_id
 from app.utils.review_policy import finding_has_recorded_decision, finding_requires_reviewer_decision
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_overall_status(findings: list[Finding | Any], documents: list[Document]) -> OverallStatus:
@@ -32,8 +39,12 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
     processing_incomplete > missing_documents > discrepancies_found > unresolved_checks > checks_passed / ready_for_review
     Accounts for human reviewer verification overrides per D-002, D-011, and APH 2024-2027 Scrutiny Desk.
     """
-    # 1. Any document not processed?
-    if not documents or any(d.processing_status != "processed" for d in documents):
+    # 1. Any mandatory document not processed? (Optional TER receipt & presence-only exemption letter do not block application per D-019/D-020)
+    mandatory_docs = [
+        d for d in documents
+        if getattr(d, "document_type", None) not in ("ter_payment_receipt", "competent_authority_letter")
+    ]
+    if not mandatory_docs or any(getattr(d, "processing_status", None) != "processed" for d in mandatory_docs):
         return "processing_incomplete"
 
     effective_statuses: list[str] = []
@@ -42,6 +53,13 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
     for f in findings:
         decision = getattr(f, "reviewer_decision", None)
         status = f.status
+        rule_id = getattr(f, "rule_id", "")
+
+        # Step A: Advisory / informational rules (e.g. TER payment receipt checks per D-019)
+        # do not block application approval even if missing, uncertain, or extraction failed.
+        if getattr(f, "advisory", False) or is_advisory_rule(rule_id):
+            effective_statuses.append("pass" if status == "pass" else "not_applicable")
+            continue
 
         if decision == "verified":
             effective_statuses.append("pass")
@@ -68,7 +86,7 @@ def calculate_overall_status(findings: list[Finding | Any], documents: list[Docu
 
 class ValidationEngine:
     def __init__(self):
-        self.rules: list[BaseRule] = [
+        raw_rules: list[BaseRule] = [
             DocumentPresenceRule(),
             FieldCompletenessRule(),
             ExpiryDateRule(),
@@ -78,6 +96,7 @@ class ValidationEngine:
             DuplicateDocumentRule(),
             IssuingAuthorityVerificationRule(),
         ]
+        self.rules: list[BaseRule] = wrap_legacy_rules(raw_rules)
 
     async def validate_application(
         self,
@@ -130,24 +149,64 @@ class ValidationEngine:
             "all_system_documents": all_system_documents,
         }
 
-        generated_findings: list[Finding] = []
-        for rule in self.rules:
-            rule_findings = rule.evaluate(context)
-            for rf in rule_findings:
-                finding_model = Finding(
-                    id=generate_id("finding"),
-                    application_id=application_id,
-                    document_id=rf.document_id,
-                    rule_id=rf.rule_id,
-                    status=rf.status,
-                    title=rf.title,
-                    reason=rf.reason,
-                    document_name=rf.document_name,
-                    evidence=rf.evidence,
-                    next_action=rf.next_action,
+        # Step B3: Inspect RULE_ENGINE_MODE per-request (default: "legacy")
+        # In declarative mode, if the declarative engine raises an unexpected error,
+        # fall back to legacy for that request, log DECLARATIVE_FALLBACK with application_id
+        # and rule_id (no document text), and return a normal response, never a 500.
+        engine_mode = getattr(settings, "RULE_ENGINE_MODE", "legacy")
+        raw_findings = []
+        effective_mode = engine_mode
+
+        if engine_mode == "declarative":
+            try:
+                raw_findings = default_declarative_engine.evaluate(context)
+            except Exception as exc:
+                failed_rule_id = getattr(exc, "rule_id", "DECLARATIVE_ENGINE")
+                logger.warning(
+                    "DECLARATIVE_FALLBACK: application_id=%s rule_id=%s error=%s",
+                    application_id,
+                    failed_rule_id,
+                    type(exc).__name__,
                 )
-                db.add(finding_model)
-                generated_findings.append(finding_model)
+                effective_mode = "legacy"
+                raw_findings = []
+                for rule in self.rules:
+                    raw_findings.extend(rule.evaluate(context))
+        else:
+            effective_mode = "legacy"
+            raw_findings = []
+            for rule in self.rules:
+                raw_findings.extend(rule.evaluate(context))
+
+        # Stamping ruleset_version and engine_mode per Step B4
+        stamped_ruleset_ver = getattr(default_declarative_engine, "ruleset_version", None) if effective_mode == "declarative" else None
+
+        generated_findings: list[Finding] = []
+        for rf in raw_findings:
+            clause_data = None
+            if getattr(rf, "clause_ref", None):
+                clause_data = rf.clause_ref.model_dump() if hasattr(rf.clause_ref, "model_dump") else rf.clause_ref
+
+            finding_model = Finding(
+                id=generate_id("finding"),
+                application_id=application_id,
+                document_id=rf.document_id,
+                rule_id=rf.rule_id,
+                status=rf.status,
+                title=rf.title,
+                reason=rf.reason,
+                document_name=rf.document_name,
+                evidence=rf.evidence,
+                next_action=rf.next_action,
+                clause_ref=clause_data,
+                severity=getattr(rf, "severity", "medium"),
+                signal_type=getattr(rf, "signal_type", "rule"),
+                advisory=getattr(rf, "advisory", False) or is_advisory_rule(rf.rule_id),
+                ruleset_version=stamped_ruleset_ver,
+                rule_engine_mode=effective_mode,
+            )
+            db.add(finding_model)
+            generated_findings.append(finding_model)
 
         # Flush to persist findings
         await db.flush()
@@ -155,10 +214,22 @@ class ValidationEngine:
         # 6. Calculate overall status
         new_status = calculate_overall_status(generated_findings, documents)
         application.overall_status = new_status
+        application.ruleset_version = stamped_ruleset_ver
+        application.rule_engine_mode = effective_mode
         await db.commit()
 
+        # Step A: Dispatch asynchronous shadow evaluation if enabled (zero request impact)
+        await dispatch_shadow_evaluation(
+            application_id=application_id,
+            application=application,
+            documents=documents,
+            extractions_by_doc_id=extractions_by_doc_id,
+            all_system_documents=all_system_documents,
+            legacy_findings=generated_findings,
+        )
+
         # 7. Generate report response
-        return self._build_report(application_id, new_status, generated_findings, documents)
+        return self._build_report(application_id, new_status, generated_findings, documents, application)
 
     async def get_report(self, db: AsyncSession, application_id: str) -> ReportResponse:
         """Retrieve existing validation report."""
@@ -184,7 +255,7 @@ class ValidationEngine:
         findings_res = await db.execute(findings_stmt)
         findings = list(findings_res.scalars().all())
 
-        return self._build_report(application_id, application.overall_status, findings, documents)
+        return self._build_report(application_id, application.overall_status, findings, documents, application)
 
     async def review_finding(
         self,
@@ -327,12 +398,20 @@ class ValidationEngine:
         overall_status: str,
         findings: list[Finding],
         documents: list[Document],
+        application: Any = None,
     ) -> ReportResponse:
         # Check for unresolved duplicate warnings that block report generation
+        # Exact file or certificate number duplicates block report generation until acknowledged;
+        # perceptual visual similarity matches remain flagged findings in the report for reviewer scrutiny.
         unresolved_duplicates = [
             f for f in findings
             if f.rule_id.startswith("DUPLICATE_") and f.status in ("flagged", "unresolved")
             and not f.reviewer_decision
+            and (f.evidence or {}).get("type") in (
+                "cross_institution_duplicate_file",
+                "cross_institution_duplicate_certificate_number",
+                "same_file_in_application",
+            )
         ]
 
         if unresolved_duplicates:
@@ -412,12 +491,21 @@ class ValidationEngine:
 
         finding_responses = [FindingResponse.model_validate(f) for f in findings]
 
+        ruleset_ver = getattr(application, "ruleset_version", None)
+        engine_mode = getattr(application, "rule_engine_mode", None)
+        if not ruleset_ver and findings:
+            ruleset_ver = getattr(findings[0], "ruleset_version", None)
+        if not engine_mode and findings:
+            engine_mode = getattr(findings[0], "rule_engine_mode", None)
+
         return ReportResponse(
             application_id=application_id,
             overall_status=overall_status,
             summary=summary_counts,
             missing_document_types=missing_doc_types,
             findings=finding_responses,
+            ruleset_version=ruleset_ver,
+            rule_engine_mode=engine_mode,
             generated_at=datetime.now(timezone.utc),
         )
 

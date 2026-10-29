@@ -119,7 +119,13 @@ The server rejects decisions on `pass` or `not_applicable` findings with `409 RE
 
 Request: `multipart/form-data`
 - `file`: required PDF, JPG, or PNG file.
-- `document_type`: required stable document-type code, selected from the configured checklist. Example: `fire_safety_certificate`.
+- `document_type`: required stable document-type code, selected from the configured checklist:
+  - `fire_safety_certificate` (mandatory)
+  - `building_completion_certificate` (mandatory)
+  - `affidavit_2` (mandatory)
+  - `structural_stability_certificate` (conditional: required if building age > 30 years)
+  - `ter_payment_receipt` (advisory/optional per D-019; does not block validation)
+  - `competent_authority_letter` (presence-only, no required extraction fields; optional exemption for buildings > 50 years where original documents cannot be submitted per Annexure-2 §2.1 preamble and D-020; does not block validation when omitted or processing)
 - `issued_date` and `expiry_date` are not supplied by the client as authoritative data; they must be extracted or entered through an explicitly marked reviewer correction flow, if such a flow is implemented.
 
 Response: `201 Created`
@@ -243,13 +249,19 @@ Each rule returns one finding in this format:
   "reviewer_decision": null,
   "reviewer_notes": null,
   "reviewed_by": null,
-  "reviewed_at": null
+  "reviewed_at": null,
+  "advisory": false,
+  "ruleset_version": "2024-2027.1.0+abcdef01",
+  "rule_engine_mode": "declarative",
+  "ruleset_display_name": "2024-2027.1.0+abcdef01" 
 }
 ```
 
 Rules:
 - `document_id` may be `null` for an application-level finding such as a missing document type.
 - `evidence` may be `null` if no reliable evidence is available; explain why in `reason`.
+- `advisory` is an additive boolean persisting whether the finding is informational/advisory.
+- `ruleset_version` and `rule_engine_mode` are additive traceability fields. Legacy runs have `null` for `ruleset_version` and serialize `ruleset_display_name` as `"Legacy ruleset"`. Database migration is verified on SQLite; PostgreSQL dialect execution is untested in this environment.
 - Never say that a document is forged based only on OCR or a mismatch.
 - The rule engine must not silently treat missing extracted values as passing checks.
 
@@ -272,6 +284,9 @@ Response:
   },
   "missing_document_types": ["affidavit_2"],
   "findings": [],
+  "ruleset_version": "2024-2027.1.0+abcdef01",
+  "rule_engine_mode": "declarative",
+  "ruleset_display_name": "2024-2027.1.0+abcdef01",
   "generated_at": "2026-10-24T12:05:00Z"
 }
 ```

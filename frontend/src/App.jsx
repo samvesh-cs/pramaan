@@ -655,8 +655,9 @@ function AuditWorkspace() {
   </div>
 }
 
-function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error }) {
-  const action = REVIEW_ACTIONS[decision]
+function AuditorReviewModal({ isOpen, onClose, finding, decision = 'verified', onSave, error }) {
+  const { user } = useAuth()
+  const action = REVIEW_ACTIONS[decision] || REVIEW_ACTIONS.verified
   const [details, setDetails] = useState('')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -721,7 +722,7 @@ function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error 
       <div ref={modalRef} className="auditor-modal" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" aria-describedby="review-modal-description" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="auditor-modal-head">
           <div>
-            <span className="eyebrow">HUMAN REVIEW · {reviewerStateLabel(finding)}</span>
+            <span className="eyebrow">HUMAN-IN-THE-LOOP SCRUTINY DESK · {reviewerStateLabel(finding)}</span>
             <h3 id="review-modal-title">{action.title}</h3>
           </div>
           <button type="button" className="icon-button" onClick={onClose} disabled={saving} aria-label="Close"><Icon name="close" size={18}/></button>
@@ -1857,6 +1858,8 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
   const reviewerDecision = finding.reviewer_decision
   const decisionRequired = requiresReviewerDecision(finding)
   const reviewState = reviewerStateLabel(finding)
+  const clauseRef = finding.clause_ref
+  const severity = finding.severity || 'medium'
 
   return (
     <article className={`finding finding-${status}`}>
@@ -1866,8 +1869,25 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
           <div>
             <span className="finding-kicker">What was found · {String(status).replaceAll('_', ' ')}</span>
             <h3>{finding.title || 'Finding title not provided by the validation service'}</h3>
+            {clauseRef && (
+              <div className="statutory-clause-pill" title={`${clauseRef.title} (${clauseRef.summary || ''})`}>
+                <span className="pill-prefix">APH Handbook Reference</span>
+                <span className="pill-citation">
+                  {clauseRef.chapter_or_annexure} §{clauseRef.clause_number} · Handbook p. {clauseRef.handbook_page} (PDF p. {clauseRef.pdf_page})
+                </span>
+                <span className="pill-title">{clauseRef.title}</span>
+              </div>
+            )}
           </div>
-          <Status value={status} />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span className={`severity-badge severity-${severity}`} aria-label={`Severity: ${severity}`}>
+              <span className="severity-icon" aria-hidden="true">
+                {severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'low' ? '🟢' : severity === 'info' ? 'ℹ️' : '🟡'}
+              </span>
+              <span className="severity-text">[{String(severity).toUpperCase()}]</span>
+            </span>
+            <Status value={status} />
+          </div>
         </header>
 
         {reviewerDecision && (

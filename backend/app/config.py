@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = False
     RATE_LIMIT_ENABLED: bool = True
 
+    # Feature flags & Engine modes
+    ENABLE_SHADOW_DECLARATIVE_ENGINE: bool = False
+    RULE_ENGINE_MODE: str = "legacy"  # "legacy" (default) | "declarative"
+    NAME_SIMILARITY_THRESHOLD: float = 0.85
+    OCR_CONFIDENCE_THRESHOLD: float = 0.70
+
     # One-time admin setup token for reviewer account creation
     ADMIN_SETUP_TOKEN: str = "pramaan-admin-setup-secret-token-2026"
 

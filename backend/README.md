@@ -15,12 +15,14 @@ Provides automated institutional document compliance verification for AICTE Exte
 ## Getting Started
 
 ### 1. Setup Virtual Environment
+The canonical virtual environment directory is `backend/venv` (both `venv/` and `.venv/` are gitignored).
 ```bash
 cd backend
 python -m venv venv
 .\venv\Scripts\activate   # Windows
 # source venv/bin/activate # Linux/macOS
 ```
+
 
 ### 2. Install Dependencies
 ```bash

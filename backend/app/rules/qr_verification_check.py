@@ -83,10 +83,10 @@ class IssuingAuthorityVerificationRule(BaseRule):
                     FindingCreate(
                         rule_id=self.rule_id,
                         status="pass",
-                        title=f"Authority Verification: Verified ({doc.original_filename})",
+                        title=f"Authority Verification: Record Confirmed ({doc.original_filename})",
                         reason=(
-                            f"Verified against {auth_res.authority_name} via {auth_res.source_channel}. "
-                            f"Certificate '{auth_res.reference_number}' confirmed authentic and active."
+                            f"Authority records from {auth_res.authority_name} via {auth_res.source_channel} "
+                            f"confirm active reference '{auth_res.reference_number}'."
                         ),
                         document_id=doc.id,
                         document_name=doc.original_filename,
@@ -121,7 +121,7 @@ class IssuingAuthorityVerificationRule(BaseRule):
                             "bbox": target_bbox,
                             "discrepancy": auth_res.discrepancy_reason,
                         },
-                        next_action="Examine conflicting record details and confirm authenticity with original issuing authority.",
+                        next_action="Examine conflicting record details and confirm record details with original issuing authority.",
                     )
                 )
             # 3. expired -> flagged
@@ -166,7 +166,8 @@ class IssuingAuthorityVerificationRule(BaseRule):
                             "reference_number": auth_res.reference_number,
                             "bbox": target_bbox,
                         },
-                        next_action="Scrutiny officer should manually verify certificate reference with competent authority.",
+                        next_action="Scrutiny officer should manually confirm certificate reference with competent authority.",
+                        advisory=True if not qr_payload else False,
                     )
                 )
 

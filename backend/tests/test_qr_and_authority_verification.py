@@ -156,6 +156,6 @@ def test_issuing_authority_rule_evaluation():
     findings = rule.evaluate(context)
     assert len(findings) == 1
     assert findings[0].status == "pass"
-    assert "Verified" in findings[0].title
+    assert "Verification" in findings[0].title
     assert findings[0].evidence["authority_status"] == "verified"
 

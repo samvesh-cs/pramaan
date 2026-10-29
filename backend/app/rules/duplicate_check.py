@@ -181,66 +181,89 @@ class DuplicateDocumentRule(BaseRule):
                             )
                         )
 
-                # Check Visual Perceptual Duplicate (when exact hash differs, but visual appearance matches)
-                elif doc_phash and other_phash and doc_hash != other_hash:
-                    dist = hamming_distance(doc_phash, other_phash)
-                    if dist <= 6:
-                        sim = visual_similarity(doc_phash, other_phash)
-                        if is_same_institution:
-                            findings.append(
-                                FindingCreate(
-                                    rule_id=self.rule_id,
-                                    status="pass",
-                                    title=f"Re-scanned document reused from earlier submission ({doc.document_type})",
-                                    reason=(
-                                        f"Document '{doc.original_filename}' is visually identical ({sim:.0%} match, Hamming distance {dist}/64) "
-                                        f"to a document in previous application '{other_doc.application_id}' from the same institution. "
-                                        f"Re-scanned document reuse detected."
-                                    ),
-                                    document_id=doc.id,
-                                    document_name=doc.original_filename,
-                                    evidence={
-                                        "type": "visual_duplicate_same_institution",
-                                        "perceptual_hash": doc_phash,
-                                        "matched_perceptual_hash": other_phash,
-                                        "visual_similarity": round(sim, 3),
-                                        "hamming_distance": dist,
-                                        "current_application_id": current_app_id,
-                                        "matched_application_id": other_doc.application_id,
-                                        "matched_document_id": other_doc.id,
-                                        "matched_filename": other_doc.original_filename,
-                                    },
-                                    next_action="Verify validity period against current academic year submission.",
-                                )
+                # Check Visual Perceptual Duplicate (when exact hash differs, but visual appearance matches for same document type)
+                elif doc_phash and other_phash and doc_hash != other_hash and doc.document_type == other_doc.document_type:
+                    # If both documents have distinct extracted certificate numbers, they are distinct documents
+                    cert_differs = False
+                    if cert_val and len(str(cert_val).strip()) >= 4:
+                        other_extractions = getattr(other_doc, "extractions", [])
+                        other_ext = other_extractions[0] if other_extractions else extractions_by_doc_id.get(other_doc.id)
+                        other_fields = getattr(other_ext, "fields", None) if other_ext else {}
+                        if not other_fields and isinstance(other_ext, dict):
+                            other_fields = other_ext.get("fields", {})
+                        if other_fields and isinstance(other_fields, dict):
+                            other_cert_entry = (
+                                other_fields.get("certificate_number")
+                                or other_fields.get("order_number")
+                                or other_fields.get("approval_number")
+                                or other_fields.get("transaction_id")
                             )
-                        else:
-                            findings.append(
-                                FindingCreate(
-                                    rule_id=self.rule_id,
-                                    status="flagged",
-                                    title=f"Possible visual duplicate document detected ({doc.document_type})",
-                                    reason=(
-                                        f"Document '{doc.original_filename}' visually matches ({sim:.0%} match, Hamming distance {dist}/64) "
-                                        f"a document uploaded in another institution's application ('{other_doc.application_id}'). "
-                                        f"Possible re-scanned duplicate, requires review."
-                                    ),
-                                    document_id=doc.id,
-                                    document_name=doc.original_filename,
-                                    evidence={
-                                        "type": "visual_duplicate_cross_institution",
-                                        "perceptual_hash": doc_phash,
-                                        "matched_perceptual_hash": other_phash,
-                                        "visual_similarity": round(sim, 3),
-                                        "hamming_distance": dist,
-                                        "current_application_id": current_app_id,
-                                        "matched_application_id": other_doc.application_id,
-                                        "matched_document_id": other_doc.id,
-                                        "matched_filename": other_doc.original_filename,
-                                        "matched_institution_name": other_inst,
-                                    },
-                                    next_action="Review documents side-by-side to verify if document was reused across different institutions.",
-                                )
+                            other_cert_val = (
+                                (other_cert_entry.get("value") if isinstance(other_cert_entry, dict) else getattr(other_cert_entry, "value", None))
+                                if other_cert_entry else None
                             )
+                            if other_cert_val and str(other_cert_val).strip() != str(cert_val).strip():
+                                cert_differs = True
+
+                    if not cert_differs:
+                        dist = hamming_distance(doc_phash, other_phash)
+                        if dist <= 6:
+                            sim = visual_similarity(doc_phash, other_phash)
+                            if is_same_institution:
+                                findings.append(
+                                    FindingCreate(
+                                        rule_id=self.rule_id,
+                                        status="pass",
+                                        title=f"Re-scanned document reused from earlier submission ({doc.document_type})",
+                                        reason=(
+                                            f"Document '{doc.original_filename}' is visually identical ({sim:.0%} match, Hamming distance {dist}/64) "
+                                            f"to a document in previous application '{other_doc.application_id}' from the same institution. "
+                                            f"Re-scanned document reuse detected."
+                                        ),
+                                        document_id=doc.id,
+                                        document_name=doc.original_filename,
+                                        evidence={
+                                            "type": "visual_duplicate_same_institution",
+                                            "perceptual_hash": doc_phash,
+                                            "matched_perceptual_hash": other_phash,
+                                            "visual_similarity": round(sim, 3),
+                                            "hamming_distance": dist,
+                                            "current_application_id": current_app_id,
+                                            "matched_application_id": other_doc.application_id,
+                                            "matched_document_id": other_doc.id,
+                                            "matched_filename": other_doc.original_filename,
+                                        },
+                                        next_action="Verify validity period against current academic year submission.",
+                                    )
+                                )
+                            else:
+                                findings.append(
+                                    FindingCreate(
+                                        rule_id=self.rule_id,
+                                        status="flagged",
+                                        title=f"Possible visual duplicate document detected ({doc.document_type})",
+                                        reason=(
+                                            f"Document '{doc.original_filename}' visually matches ({sim:.0%} match, Hamming distance {dist}/64) "
+                                            f"a document uploaded in another institution's application ('{other_doc.application_id}'). "
+                                            f"Possible re-scanned duplicate, requires review."
+                                        ),
+                                        document_id=doc.id,
+                                        document_name=doc.original_filename,
+                                        evidence={
+                                            "type": "visual_duplicate_cross_institution",
+                                            "perceptual_hash": doc_phash,
+                                            "matched_perceptual_hash": other_phash,
+                                            "visual_similarity": round(sim, 3),
+                                            "hamming_distance": dist,
+                                            "current_application_id": current_app_id,
+                                            "matched_application_id": other_doc.application_id,
+                                            "matched_document_id": other_doc.id,
+                                            "matched_filename": other_doc.original_filename,
+                                            "matched_institution_name": other_inst,
+                                        },
+                                        next_action="Review documents side-by-side to verify if document was reused across different institutions.",
+                                    )
+                                )
 
                 # Check Certificate Number Duplication across applications
                 if cert_val and len(cert_val) >= 4:

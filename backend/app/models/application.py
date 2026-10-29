@@ -15,6 +15,8 @@ class Application(Base):
     application_category = Column(String(50), nullable=False, default="eoa")
     academic_year = Column(String(10), nullable=False)
     overall_status = Column(String(50), nullable=False, default="processing_incomplete")
+    ruleset_version = Column(String(64), nullable=True)
+    rule_engine_mode = Column(String(32), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

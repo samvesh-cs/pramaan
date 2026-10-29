@@ -65,6 +65,19 @@ def process_document(
             error=f"Unsupported file type '{ext}'. Supported types: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
 
+    # 2b. Skip OCR processing for presence-only document types (no required extraction fields)
+    from app.checklist.eoa_checklist import EOA_DOCUMENT_CHECKLIST
+    chk_entry = EOA_DOCUMENT_CHECKLIST.get(document_type or "")
+    if chk_entry and chk_entry.get("required_fields") == []:
+        return ExtractionResult(
+            document_id=document_id,
+            document_type=document_type,
+            processing_status="processed",
+            pages=[],
+            fields={},
+            error=None,
+        )
+
     # 3. Process pages
     try:
         if ext == ".pdf":

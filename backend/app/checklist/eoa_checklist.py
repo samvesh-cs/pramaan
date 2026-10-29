@@ -1,13 +1,6 @@
 from typing import Any
 
-# AICTE APH 2024-2027 Table 2.1 Statutory TER Charges for Extension of Approval (EoA)
-EOA_STATUTORY_TER_FEES: dict[str, int] = {
-    "government_aided": 50000,
-    "minority_unaided": 75000,
-    "private_unaided": 100000,
-    "standalone_pgdm": 150000,
-    "default": 100000,
-}
+# AICTE APH 2024-2027 Document Checklist for Extension of Approval (EoA)
 
 EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
     "fire_safety_certificate": {
@@ -52,7 +45,7 @@ EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
     "ter_payment_receipt": {
         "display_name": "TER Payment Receipt",
         "applicability": "required_if_applicable",
-        "source": "APH 2024-2027, Annexure-2, §2.1(ii) & Table 2.1",
+        "source": "APH 2024-2027, Annexure-2, §2.1(ii)",
         "has_expiry": False,
         "required_fields": [
             "institution_name",
@@ -75,6 +68,15 @@ EOA_DOCUMENT_CHECKLIST: dict[str, dict[str, Any]] = {
             "issue_date",
         ],
         "description": "Certificate from registered Structural Engineer regarding building stability (> 30 yrs)",
+    },
+    "competent_authority_letter": {
+        "display_name": "Letter from Competent Authority (>50 Years Old Building)",
+        "applicability": "required_if_applicable",
+        "source": "APH 2024-2027, Annexure-2 §2.1 (Preamble)",
+        "condition": "Optional exemption document for buildings > 50 years where original documents cannot be submitted",
+        "has_expiry": False,
+        "required_fields": [],
+        "description": "Letter from the Competent Authority for buildings older than 50 years where original completion documents cannot be submitted (presence-only)",
     },
 }
 

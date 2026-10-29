@@ -1,0 +1,176 @@
+"""
+Legacy Rule Adapter for Zero-Regression Compatibility.
+Wraps existing Python rules so they emit findings decorated with statutory clause references,
+severities, and signal types from the verified ClauseRegistry.
+"""
+
+from typing import Any, Optional
+from app.rules.base import BaseRule
+from app.rules.declarative_engine import ClauseRegistry, default_clause_registry
+from app.schemas.finding import FindingCreate
+from app.schemas.rule_definition import ClauseCitation, SeverityLevel, SignalType
+
+# Mapping existing rule IDs to statutory clause keys and severities
+RULE_STATUTORY_METADATA: dict[str, dict[str, Any]] = {
+    "DOC_PRESENCE_001": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_CHECK": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_001": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_002": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_003": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "PRESENCE_004": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
+        "severity": "info",
+        "signal_type": "rule",
+        "advisory": True,
+    },
+    "FIELD_001": {
+        "clause_id": None,
+        "severity": "high",
+        "signal_type": "internal_check",
+    },
+    "FIELD_002": {
+        "clause_id": None,
+        "severity": "high",
+        "signal_type": "internal_check",
+    },
+    "FIELD_003": {
+        "clause_id": None,
+        "severity": "high",
+        "signal_type": "internal_check",
+    },
+    "FIELD_004": {
+        "clause_id": None,
+        "severity": "info",
+        "signal_type": "internal_check",
+        "advisory": True,
+    },
+    "FIELD_005": {
+        "clause_id": None,
+        "severity": "high",
+        "signal_type": "internal_check",
+    },
+    "EXPIRY_001": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_V",
+        "severity": "critical",
+        "signal_type": "rule",
+    },
+    "CONSISTENCY_001": {
+        "clause_id": None,
+        "severity": "critical",
+        "signal_type": "internal_check",
+    },
+    "TER_PAYMENT_001": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_II",
+        "severity": "info",
+        "signal_type": "rule",
+        "advisory": True,
+    },
+    "STRUCTURAL_001": {
+        "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+        "severity": "high",
+        "signal_type": "rule",
+    },
+    "STRUCTURAL_002": {
+        "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+        "severity": "high",
+        "signal_type": "rule",
+    },
+    "STRUCTURAL_STABILITY_001": {
+        "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+        "severity": "high",
+        "signal_type": "rule",
+    },
+    "DUPLICATE_DOC_001": {
+        "clause_id": "APH_2024_27_ANNEX_2_CLAUSE_2_1_I",
+        "severity": "critical",
+        "signal_type": "duplicate",
+    },
+    "AUTHORITY_VERIFY_001": {
+        "clause_id": None,
+        "severity": "medium",
+        "signal_type": "issuer",
+        "advisory": True,
+    },
+}
+
+
+def is_advisory_rule(rule_id: str) -> bool:
+    """Returns True if the rule is registered as advisory/informational."""
+    if RULE_STATUTORY_METADATA.get(rule_id, {}).get("advisory", False):
+        return True
+    try:
+        from app.rules.declarative_engine import default_declarative_engine
+        dec_rule = default_declarative_engine.get_rule(rule_id)
+        if dec_rule and dec_rule.advisory:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+class EnhancedRuleWrapper(BaseRule):
+    """
+    Wraps an existing BaseRule.
+    Evaluates the inner rule and decorates every generated FindingCreate
+    with statutory clause_ref, severity, signal_type, and advisory flag.
+    """
+
+    def __init__(self, inner_rule: BaseRule, registry: Optional[ClauseRegistry] = None):
+        self.inner_rule = inner_rule
+        self.rule_id = getattr(inner_rule, "rule_id", inner_rule.__class__.__name__)
+        self.title = getattr(inner_rule, "title", self.rule_id)
+        self.registry = registry or default_clause_registry
+        meta = RULE_STATUTORY_METADATA.get(self.rule_id, {})
+        self.advisory = getattr(inner_rule, "advisory", False) or meta.get("advisory", False)
+
+    def evaluate(self, context: dict[str, Any]) -> list[FindingCreate]:
+        raw_findings = self.inner_rule.evaluate(context)
+        decorated_findings: list[FindingCreate] = []
+
+        for f in raw_findings:
+            # Check metadata lookup for this rule_id
+            meta = RULE_STATUTORY_METADATA.get(f.rule_id, {})
+            clause_id = meta.get("clause_id")
+            clause_ref = self.registry.get(clause_id) if clause_id else None
+            severity: SeverityLevel = meta.get("severity", "medium")
+            signal_type: SignalType = meta.get("signal_type", "rule")
+            is_advisory: bool = meta.get("advisory", False) or getattr(self.inner_rule, "advisory", False)
+
+            # Update finding with statutory citation
+            if hasattr(f, "clause_ref") and getattr(f, "clause_ref", None) is None:
+                f.clause_ref = clause_ref
+            if hasattr(f, "severity"):
+                f.severity = severity
+            if hasattr(f, "signal_type"):
+                f.signal_type = signal_type
+            if hasattr(f, "advisory"):
+                f.advisory = is_advisory or getattr(f, "advisory", False)
+
+            decorated_findings.append(f)
+
+        return decorated_findings
+
+
+def wrap_legacy_rules(rules: list[BaseRule], registry: Optional[ClauseRegistry] = None) -> list[BaseRule]:
+    """Wraps a list of legacy rules with statutory decoration."""
+    return [EnhancedRuleWrapper(r, registry=registry) for r in rules]

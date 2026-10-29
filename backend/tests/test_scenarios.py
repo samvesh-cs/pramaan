@@ -13,10 +13,10 @@ def read_sample(filename: str) -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_scenario_1_all_valid(client: AsyncClient):
+async def test_scenario_1_all_valid(institution_client: AsyncClient):
     """Scenario 1: All 3 documents valid and matching -> checks_passed."""
     # 1. Create Application
-    res = await client.post(
+    res = await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic ABC Institute of Technology",
@@ -30,23 +30,23 @@ async def test_scenario_1_all_valid(client: AsyncClient):
     # 2. Upload Fire Safety
     files = {"file": ("valid_fire_safety.pdf", read_sample("valid_fire_safety.pdf"), "application/pdf")}
     data = {"document_type": "fire_safety_certificate"}
-    u1 = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
     assert u1.status_code == 201
 
     # 3. Upload Building Completion
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
     data = {"document_type": "building_completion_certificate"}
-    u2 = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
     assert u2.status_code == 201
 
     # 4. Upload Affidavit-2
     files = {"file": ("valid_affidavit_2.pdf", read_sample("valid_affidavit_2.pdf"), "application/pdf")}
     data = {"document_type": "affidavit_2"}
-    u3 = await client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
+    u3 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data=data)
     assert u3.status_code == 201
 
     # 5. Validate
-    v = await client.post(f"/api/applications/{app_id}/validate")
+    v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
     report = v.json()
 
@@ -59,9 +59,9 @@ async def test_scenario_1_all_valid(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_scenario_2_missing_document(client: AsyncClient):
+async def test_scenario_2_missing_document(institution_client: AsyncClient):
     """Scenario 2: Only 2 of 3 documents uploaded -> missing_documents."""
-    res = await client.post(
+    res = await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic ABC Institute of Technology",
@@ -73,12 +73,14 @@ async def test_scenario_2_missing_document(client: AsyncClient):
 
     # Upload only Fire Safety and Building Completion (Affidavit-2 missing)
     files = {"file": ("valid_fire_safety.pdf", read_sample("valid_fire_safety.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
-    v = await client.post(f"/api/applications/{app_id}/validate")
+    v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
     report = v.json()
 
@@ -88,9 +90,9 @@ async def test_scenario_2_missing_document(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_scenario_3_expired_document(client: AsyncClient):
+async def test_scenario_3_expired_document(institution_client: AsyncClient):
     """Scenario 3: Expired Fire Safety Certificate -> discrepancies_found with EXPIRY_001 flagged."""
-    res = await client.post(
+    res = await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic ABC Institute of Technology",
@@ -102,16 +104,19 @@ async def test_scenario_3_expired_document(client: AsyncClient):
 
     # Upload expired fire safety
     files = {"file": ("expired_fire_safety.pdf", read_sample("expired_fire_safety.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     # Upload other valid docs
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
     files = {"file": ("valid_affidavit_2.pdf", read_sample("valid_affidavit_2.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    u3 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    assert u3.status_code == 201
 
-    v = await client.post(f"/api/applications/{app_id}/validate")
+    v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
     report = v.json()
 
@@ -125,9 +130,9 @@ async def test_scenario_3_expired_document(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_scenario_4_missing_fields(client: AsyncClient):
+async def test_scenario_4_missing_fields(institution_client: AsyncClient):
     """Scenario 4: Building certificate missing certificate number -> missing fields finding."""
-    res = await client.post(
+    res = await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic ABC Institute of Technology",
@@ -139,9 +144,10 @@ async def test_scenario_4_missing_fields(client: AsyncClient):
 
     # Upload missing fields building cert
     files = {"file": ("missing_fields_building.pdf", read_sample("missing_fields_building.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u1.status_code == 201
 
-    v = await client.post(f"/api/applications/{app_id}/validate")
+    v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
     report = v.json()
 
@@ -151,9 +157,9 @@ async def test_scenario_4_missing_fields(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_scenario_5_name_mismatch(client: AsyncClient):
+async def test_scenario_5_name_mismatch(institution_client: AsyncClient):
     """Scenario 5: Cross-document institution name mismatch -> discrepancies_found with CONSISTENCY_001 flagged."""
-    res = await client.post(
+    res = await institution_client.post(
         "/api/applications",
         json={
             "institution_name": "Synthetic ABC Institute of Technology",
@@ -165,15 +171,18 @@ async def test_scenario_5_name_mismatch(client: AsyncClient):
 
     # Upload mismatched fire safety
     files = {"file": ("mismatched_fire_safety.pdf", read_sample("mismatched_fire_safety.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    u1 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "fire_safety_certificate"})
+    assert u1.status_code == 201
 
     files = {"file": ("valid_building_completion.pdf", read_sample("valid_building_completion.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    u2 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "building_completion_certificate"})
+    assert u2.status_code == 201
 
     files = {"file": ("valid_affidavit_2.pdf", read_sample("valid_affidavit_2.pdf"), "application/pdf")}
-    await client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    u3 = await institution_client.post(f"/api/applications/{app_id}/documents", files=files, data={"document_type": "affidavit_2"})
+    assert u3.status_code == 201
 
-    v = await client.post(f"/api/applications/{app_id}/validate")
+    v = await institution_client.post(f"/api/applications/{app_id}/validate")
     assert v.status_code == 200
     report = v.json()
 

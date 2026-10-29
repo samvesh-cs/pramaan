@@ -504,6 +504,9 @@ def extract_fields(document_type: Optional[str], pages: List[PageResult]) -> Dic
         return extract_ter_payment_fields(pages, full_text)
     elif doc_type == "structural_stability_certificate":
         return extract_structural_stability_fields(pages, full_text)
+    elif doc_type == "competent_authority_letter":
+        # Presence-only document type per D-020: no extraction fields required
+        return {}
     else:
         # Fallback for generic or other document types
         logger.info("Extracting with generic fallback for document_type='%s'", doc_type)

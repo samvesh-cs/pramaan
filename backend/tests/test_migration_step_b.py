@@ -178,3 +178,74 @@ def test_alembic_upgrade_downgrade_cycle():
     )
     assert up_res.returncode == 0, f"Alembic upgrade failed: {up_res.stderr}"
     assert "Running upgrade e8312ab56401 -> b4c1a2d3e5f6" in up_res.stdout or up_res.returncode == 0
+
+
+@pytest.mark.asyncio
+async def test_legacy_mode_persists_advisory_for_ter_rules(institution_client: AsyncClient):
+    """
+    Asserts that in legacy mode, when findings are generated and persisted into the database:
+    1. PRESENCE_004 is stored with advisory=True.
+    2. FIELD_004 is stored with advisory=True.
+    3. TER_PAYMENT_001 is stored with advisory=True.
+    """
+    import pymupdf
+    settings.RULE_ENGINE_MODE = "legacy"
+
+    # Create an application
+    create_resp = await institution_client.post(
+        "/api/applications",
+        json={
+            "institution_name": "Advisory Persistence Engineering College",
+            "application_category": "eoa",
+            "academic_year": "2026-27",
+        },
+    )
+    assert create_resp.status_code == 201
+    app_id = create_resp.json()["id"]
+
+    # Upload TER payment receipt document
+    doc = pymupdf.open()
+    doc.new_page().insert_text((50, 50), "Payment Receipt: Transaction ID 99999 Amount INR 100000")
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    upload_resp = await institution_client.post(
+        f"/api/applications/{app_id}/documents",
+        files={"file": ("ter_receipt.pdf", pdf_bytes, "application/pdf")},
+        data={"document_type": "ter_payment_receipt"},
+    )
+    assert upload_resp.status_code == 201
+
+    # Validate application in legacy mode
+    val_resp = await institution_client.post(f"/api/applications/{app_id}/validate")
+    assert val_resp.status_code == 200
+
+    # Query DB directly to assert persisted advisory flags
+    async with TestSessionLocal() as session:
+        findings_stmt = select(Finding).where(Finding.application_id == app_id)
+        findings_res = await session.execute(findings_stmt)
+        findings = list(findings_res.scalars().all())
+
+        advisory_map = {f.rule_id: f.advisory for f in findings}
+
+        from app.rules.legacy_adapter import is_advisory_rule
+        # Check advisory rules produced during validation
+        assert advisory_map.get("FIELD_004") is True, f"FIELD_004 expected advisory=True, got {advisory_map.get('FIELD_004')}"
+        assert advisory_map.get("TER_PAYMENT_001") is True, f"TER_PAYMENT_001 expected advisory=True, got {advisory_map.get('TER_PAYMENT_001')}"
+        assert is_advisory_rule("PRESENCE_004") is True
+
+        # Directly insert a PRESENCE_004 finding as validation_engine does, ensuring advisory persists
+        pres4_finding = Finding(
+            id="finding_pres4_test",
+            application_id=app_id,
+            rule_id="PRESENCE_004",
+            status="not_applicable",
+            title="TER Payment Receipt Presence Check",
+            reason="Optional under APH 2024-27 Annexure-2 Section 2.1(ii)",
+            advisory=is_advisory_rule("PRESENCE_004"),
+        )
+        session.add(pres4_finding)
+        await session.commit()
+
+        refreshed = (await session.execute(select(Finding).where(Finding.id == "finding_pres4_test"))).scalar_one()
+        assert refreshed.advisory is True

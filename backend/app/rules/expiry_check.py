@@ -86,14 +86,12 @@ class ExpiryDateRule(BaseRule):
             raw_val = expiry_data["value"]
             parsed_date: date | None = None
 
-            # Try parsing ISO YYYY-MM-DD
+            # Parse ISO YYYY-MM-DD date strictly
             if isinstance(raw_val, str):
-                for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
-                    try:
-                        parsed_date = datetime.strptime(raw_val.strip(), fmt).date()
-                        break
-                    except ValueError:
-                        continue
+                try:
+                    parsed_date = date.fromisoformat(raw_val.strip())
+                except (ValueError, TypeError):
+                    parsed_date = None
             elif isinstance(raw_val, date):
                 parsed_date = raw_val
 

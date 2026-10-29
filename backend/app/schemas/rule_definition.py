@@ -65,6 +65,8 @@ class RuleCondition(BaseModel):
         "not_in",
         "date_lte_years",
         "date_gte_years",
+        "date_gt_years",
+        "date_lt_years",
         "date_not_expired",
         "years_between",
         "days_between",

@@ -258,13 +258,12 @@ def build_boundary_fixture_contexts() -> list[tuple[str, dict[str, Any]]]:
 
 
 def build_synthetic_scenario_contexts() -> list[tuple[str, dict[str, Any]]]:
-    """Builds contexts representing the synthetic test scenarios."""
+    """Builds contexts representing all 5 synthetic test scenarios plus A0/A0b cases."""
     contexts = []
 
-    # Scenario 1: All valid
-    doc_fire = SimpleNamespace(id="d_f", document_type="fire_safety_certificate", processing_status="processed", original_filename="fire.pdf", file_hash="h1", application_id="app_syn_1")
-    doc_bcc = SimpleNamespace(id="d_b", document_type="building_completion_certificate", processing_status="processed", original_filename="bcc.pdf", file_hash="h2", application_id="app_syn_1")
-    doc_aff = SimpleNamespace(id="d_a", document_type="affidavit_2", processing_status="processed", original_filename="aff.pdf", file_hash="h3", application_id="app_syn_1")
+    doc_fire = SimpleNamespace(id="d_f", document_type="fire_safety_certificate", processing_status="processed", original_filename="fire.pdf", file_hash="h1", application_id="app_syn")
+    doc_bcc = SimpleNamespace(id="d_b", document_type="building_completion_certificate", processing_status="processed", original_filename="bcc.pdf", file_hash="h2", application_id="app_syn")
+    doc_aff = SimpleNamespace(id="d_a", document_type="affidavit_2", processing_status="processed", original_filename="aff.pdf", file_hash="h3", application_id="app_syn")
 
     ext_fire = SimpleNamespace(
         processing_status="processed",
@@ -295,20 +294,31 @@ def build_synthetic_scenario_contexts() -> list[tuple[str, dict[str, Any]]]:
     )
 
     app_syn = SimpleNamespace(
-        id="app_syn_1",
+        id="app_syn",
         institution_name="Synthetic ABC Institute of Technology",
         academic_year="2026-27",
         status="submitted",
     )
+
+    # Scenario 1: All valid
     ctx_syn_1 = {
         "application": app_syn,
         "documents": [doc_fire, doc_bcc, doc_aff],
         "extractions": {"d_f": ext_fire, "d_b": ext_bcc, "d_a": ext_aff},
         "all_system_documents": [doc_fire, doc_bcc, doc_aff],
     }
-    contexts.append(("synthetic_scenario_1_valid", ctx_syn_1))
+    contexts.append(("synthetic_scenario_1_all_valid", ctx_syn_1))
 
-    # Scenario 2: Expired Fire Certificate
+    # Scenario 2: Missing Document (e.g. fire certificate omitted)
+    ctx_syn_2 = {
+        "application": app_syn,
+        "documents": [doc_bcc, doc_aff],
+        "extractions": {"d_b": ext_bcc, "d_a": ext_aff},
+        "all_system_documents": [doc_bcc, doc_aff],
+    }
+    contexts.append(("synthetic_scenario_2_missing_document", ctx_syn_2))
+
+    # Scenario 3: Expired Fire Certificate
     ext_fire_exp = SimpleNamespace(
         processing_status="processed",
         fields={
@@ -319,13 +329,86 @@ def build_synthetic_scenario_contexts() -> list[tuple[str, dict[str, Any]]]:
             "issuing_authority": {"value": "Fire Department", "confidence": 0.95, "status": "extracted"},
         },
     )
-    ctx_syn_2 = {
+    ctx_syn_3 = {
         "application": app_syn,
         "documents": [doc_fire, doc_bcc, doc_aff],
         "extractions": {"d_f": ext_fire_exp, "d_b": ext_bcc, "d_a": ext_aff},
         "all_system_documents": [doc_fire, doc_bcc, doc_aff],
     }
-    contexts.append(("synthetic_scenario_2_expired", ctx_syn_2))
+    contexts.append(("synthetic_scenario_3_expired_document", ctx_syn_3))
+
+    # Scenario 4: Missing Fields (certificate_number missing from fire cert)
+    ext_fire_missing_field = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Synthetic ABC Institute of Technology", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": None, "confidence": 0.0, "status": "unextracted"},
+            "issue_date": {"value": "2024-01-10", "confidence": 0.95, "status": "extracted"},
+            "expiry_date": {"value": "2027-01-09", "confidence": 0.95, "status": "extracted"},
+            "issuing_authority": {"value": "Fire Department", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_syn_4 = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff],
+        "extractions": {"d_f": ext_fire_missing_field, "d_b": ext_bcc, "d_a": ext_aff},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff],
+    }
+    contexts.append(("synthetic_scenario_4_missing_fields", ctx_syn_4))
+
+    # Scenario 5: Name Mismatch
+    ext_fire_mismatch = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Completely Unrelated Polytechnic Institute", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": "FS-2024-098", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "2024-01-10", "confidence": 0.95, "status": "extracted"},
+            "expiry_date": {"value": "2027-01-09", "confidence": 0.95, "status": "extracted"},
+            "issuing_authority": {"value": "Fire Department", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_syn_5 = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff],
+        "extractions": {"d_f": ext_fire_mismatch, "d_b": ext_bcc, "d_a": ext_aff},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff],
+    }
+    contexts.append(("synthetic_scenario_5_name_mismatch", ctx_syn_5))
+
+    # A0 Case 2a: Building Age > 50 Years, No Competent Authority Letter
+    ext_bcc_1970 = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Synthetic ABC Institute of Technology", "confidence": 0.95, "status": "extracted"},
+            "certificate_number": {"value": "BCC-1970-001", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "1970-01-01", "confidence": 0.95, "status": "extracted"},
+            "issuing_authority": {"value": "Municipal Corporation", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_a0_2a = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff],
+        "extractions": {"d_f": ext_fire, "d_b": ext_bcc_1970, "d_a": ext_aff},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff],
+    }
+    contexts.append(("a0_case_2a_building_age_gt_50_no_letter", ctx_a0_2a))
+
+    # A0 Case 2b: Building Age > 50 Years, With Competent Authority Letter
+    doc_letter = SimpleNamespace(id="d_let", document_type="competent_authority_letter", processing_status="processed", original_filename="letter.pdf", file_hash="h4", application_id="app_syn")
+    ext_letter = SimpleNamespace(
+        processing_status="processed",
+        fields={
+            "institution_name": {"value": "Synthetic ABC Institute of Technology", "confidence": 0.95, "status": "extracted"},
+            "issue_date": {"value": "2024-01-01", "confidence": 0.95, "status": "extracted"},
+        },
+    )
+    ctx_a0_2b = {
+        "application": app_syn,
+        "documents": [doc_fire, doc_bcc, doc_aff, doc_letter],
+        "extractions": {"d_f": ext_fire, "d_b": ext_bcc_1970, "d_a": ext_aff, "d_let": ext_letter},
+        "all_system_documents": [doc_fire, doc_bcc, doc_aff, doc_letter],
+    }
+    contexts.append(("a0_case_2b_building_age_gt_50_with_letter", ctx_a0_2b))
 
     return contexts
 

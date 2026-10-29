@@ -389,6 +389,20 @@ class DeclarativeRuleEngine:
             years = calculate_calendar_years_between(act_date, ref_date)
             return EvaluationResult.TRUE if years >= int(target_value) else EvaluationResult.FALSE
 
+        if operator in ("date_gt_years", "greater_than") and unit == "years":
+            act_date = parse_iso_date(actual)
+            if not act_date:
+                return EvaluationResult.UNKNOWN
+            years = calculate_calendar_years_between(act_date, ref_date)
+            return EvaluationResult.TRUE if years > int(target_value) else EvaluationResult.FALSE
+
+        if operator in ("date_lt_years", "less_than") and unit == "years":
+            act_date = parse_iso_date(actual)
+            if not act_date:
+                return EvaluationResult.UNKNOWN
+            years = calculate_calendar_years_between(act_date, ref_date)
+            return EvaluationResult.TRUE if years < int(target_value) else EvaluationResult.FALSE
+
         if operator == "greater_or_equal":
             try:
                 return EvaluationResult.TRUE if float(actual) >= float(target_value) else EvaluationResult.FALSE

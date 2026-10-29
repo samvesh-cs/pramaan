@@ -1,13 +1,13 @@
 # CONSOLIDATED_IMPLEMENTATION_PLAN.md — Pramaan Architecture & Execution Plan (Steps A–H)
 **SIH 2026 — Problem Statement 26261: Preliminary Document Scrutiny & Compliance Verification**  
-*Document Version: 2.1 (Amended & Approved) | Scope: Post-A0b Consolidated Roadmap (Steps A through H)*  
-*Status: STEP A APPROVED FOR IMPLEMENTATION (STEPS B–H PENDING FUTURE STEPWISE APPROVAL)*
+*Document Version: 3.0 (Demo Fast-Track & Aditya Backend Synchronization) | Scope: Current Implementation Status, Aditya-Backend Features, and RAG/Chatbot Policy Assistant*  
+*Status: PR A0, A0b, STEP A, STEP B MERGED. ADITYA-BACKEND (BOUNDING BOXES, PAGE-IMAGE API, QR, PERCEPTUAL HASH) VERIFIED & INTEGRATED. STEP C (BOUNDING BOX) SUPERSEDED. NEXT PRIORITY: RAG POLICY ASSISTANT & CHATBOT.*
 
 ---
 
 ## 1. Context, Completed Baselines & Branch Strategy
 
-### 1.1 Confirmed Baselines
+### 1.1 Confirmed Merged Baselines on `main`
 - **PR A0 (Commit `16444ea`):** Neutralized live TER payment receipt check to advisory informational signal (D-019), enforced strict Scrutiny Committee Reviewer role authorization (D-021), and established tenant-isolated RBAC.
 - **PR A0b (Commit `b32156d`):** 
   - Standardized citation of `competent_authority_letter` to **Annexure-2 §2.1 preamble and D-020 only** in `docs/API_CONTRACT.md` and `eoa_checklist.py`.
@@ -15,79 +15,156 @@
   - Implemented next action: `"Reviewer to open the letter and confirm it applies."`
   - Removed all occurrences of `"complying with"` and `"No action required"` from finding text.
   - Extended honest-claims enforcement in `test_clause_registry.py` to ban `"complies"` and `"complying"` while keeping `"non-compliant"` strictly banned.
-  - Replaced `pytest.skip` in `test_e2e_real_sample_fire_safety` with explicit sample existence assertion.
-  - Optional presence-only optimization: skipped OCR pipeline entirely for zero-required-field document types (`competent_authority_letter`), eliminating PaddleOCR overhead.
-  - Full suite verified: **89 passed, 5 warnings in 164.17s** in backend pytest.
-- **Environment & Forensic Verification:**
-  - **PaddleOCR Environment:** Verified in Python 3.11 with PaddlePaddle 3.3.1 (CPU mode, `enable_mkldnn=False`, `use_textline_orientation=False`). Test on rendered page 0 of `clean_fire_safety.pdf` extracted 9 regions with top confidence `0.9676` and bounding box `[101.0, 142.0, 507.0, 170.0]`.
-  - **Raw Grep Confirmations (`backend/app`, `frontend/src`, `docs`):**
-    - `"complying"`: 0 matches.
-    - `"complies"`: 0 matches.
-    - `"Government Building Exemption"`: 1 doc match (`docs/DECISIONS.md:140`), 0 in production finding text.
-    - `"Verified"`: Appears only in schemas (`reviewer_decision == "verified"`), code comments, and UI audit badge labels.
-- **Handbook Grounding Verification against `AICTE_rulebook.pdf`:**
-  - **Annexure-14 PDF Page Range:** **PDF Pages 179 to 185** (printed Handbook page headers: **Pages 163 to 169**).
-  - **Annexure-14 Table Coverage:** Contains tables across **8 AICTE Regions** and **34 named State/UT entries**:
-    - Jammu & Kashmir and Ladakh are tabulated jointly under entry `"J&K/ LADAKH"`.
-    - Daman & Diu is listed.
-    - Dadra & Nagar Haveli and Lakshadweep are omitted from the Annexure-14 handbook tables.
-    - Thus, 34 entries representing 35 of the 36 States/UTs are tabulated in the handbook.
-- **Git Branch State:**
-  - `pr/a0` branch points to `16444ea`.
-  - `pr/a0b` branch points to `b32156d` directly on top of `16444ea`.
-  - Step A implementation branch: `feat/step-a-shadow-engine` created directly from merged `pr/a0b`.
+  - Full suite verified: **89 passed, 5 warnings** in backend pytest.
+- **Step A: Shadow Declarative Engine & Advisory Attribute (Commit `f326cae`):**
+  - Introduced explicit `advisory: bool = False` attribute to rule schemas and classes, decoupling overall-status calculation from hardcoded rule identifiers.
+  - Asynchronous shadow declarative engine runner executing on a deep-copied in-memory context with zero database access in worker threads.
+  - Controlled by `ENABLE_SHADOW_DECLARATIVE_ENGINE: bool = False` (default OFF).
+- **Step B: Declarative Engine Cutover, Three-Valued Logic & Parity Harness (Commit `635e3fc`):**
+  - Implemented Kleene three-valued logic (`TRUE`, `FALSE`, `UNKNOWN`) across atomic and compound operators (`all_of`, `any_of`, `not`).
+  - Strict maximum condition nesting depth of 3 enforced at startup (D-017).
+  - Configurable fallback flag `RULE_ENGINE_MODE = "legacy"` (default `"legacy"`).
+  - Ruleset versioning recorded on every generated and stored report.
+- **Fix B-Fix (Commit `6262d2e`, Merged `815b971`):**
+  - Neutralized `TER_PAYMENT_001` in YAML to `status: "pending_review"`, `advisory: true`, `severity: "info"`; confirmed absent TER receipt emits **zero findings** in both engines.
+  - Reverted unapproved strict ISO date parsing in `expiry_check.py` back to legacy multi-format loop (`%Y-%m-%d`, `%d-%m-%Y`, `%d/%m/%Y`, `%Y/%m/%d`), achieving 100% parity with declarative engine.
+  - Expanded replay parity harness to **28 contexts and 233 rule checks**, achieving **100% parity (0 discrepancies)** across synthetic scenarios and edge-case boundary fixtures.
+  - Verified non-advisory rules persist `advisory=False` and TER rules persist `advisory=True` through `/validate`.
+  - Full suite passing: **139 passed, 5 warnings** in legacy mode and declarative mode.
+
+### 1.2 Implemented Features on `aditya-backend` Branch
+Inspection of `origin/aditya-backend` confirms several major prototype features are already implemented:
+1. **High-Resolution Page Image Rendering Endpoint (`backend/app/routes/documents.py`):**
+   - `GET /api/applications/{id}/documents/{doc_id}/page-image?page={page_num}`: Renders document pages to PNG via PyMuPDF (150 DPI) and exposes page width/height in response headers (`X-Page-Width`, `X-Page-Height`, `X-Image-Width`, `X-Image-Height`).
+2. **Visual Evidence Inspector & Bounding Box Overlays (`frontend/src/App.jsx`):**
+   - Interactive `DocumentViewerDrawer` with animated glowing bounding boxes (`bboxOverlay`), percentage coordinate mapping, line-level search rects (`page.search_for`), multi-page continuous scrolling, zoom controls (in/out/fit), inspector vs PDF toggle, and deficiency callouts for missing fields.
+   - **Action Item:** Step C / F1 (Bounding Box Implementation) is **superseded and removed from pending to-do list** because it is already operational on `aditya-backend`.
+3. **Perceptual Image Hashing for Visual Duplicate Detection (`backend/app/ocr/perceptual_hash.py`):**
+   - Implements difference hash (dHash) and perceptual hash (pHash) on rendered document pages to detect image reuse and duplicate diagrams across applications.
+4. **Local QR Code Extraction & Verification (`backend/app/ocr/qr_processor.py`, `backend/app/rules/qr_verification_check.py`):**
+   - Local QR code detection and parameter parsing (`certificate_number`, `institution_name`, `issue_date`) with zero outbound network calls (zero SSRF).
+5. **Issuing Authority Verification (`backend/app/services/authority_verification.py`):**
+   - Rule-based verification of issuing authorities against designated state authorities.
+6. **Reviewer Scrutiny Lifecycle & Finalization:**
+   - Reviewer decision payload builder, review status transitions (`review_completed`), and scrutiny finalization endpoint.
+7. **Showcase Demo Seeder (`backend/scripts/seed_demo_showcase.py`):**
+   - Complete synthetic dataset seeding script for demo walkthroughs.
 
 ---
 
 ## 2. Feature Flags, Ruleset Versioning & Consolidated Roadmap
 
 ### 2.1 Per-Step Feature Flags & Ruleset Versioning
-To maintain zero-risk incremental merges, each step is guarded by explicit feature flags configured in `backend/app/core/config.py`:
+To maintain zero-risk incremental merges, each feature is guarded by explicit feature flags configured in `backend/app/config.py`:
 
-| Flag Name | Default | Scope | Rollback / Fallback Mechanism |
-| :--- | :--- | :--- | :--- |
-| `ENABLE_SHADOW_DECLARATIVE_ENGINE` | `False` | Step A | Default OFF. When True, runs DeclarativeRuleEngine asynchronously in-memory; logs discrepancies without modifying reports. |
-| `RULE_ENGINE_MODE` | `"legacy"` | Step B | `"legacy" \| "declarative"`. When switched to `"declarative"`, legacy engine remains available as an immediate fallback flag. Shadow run is maintained until fallback flag is permanently removed. |
-| `ENABLE_NORMALIZED_BBOX` | `True` | Step C | Emits new optional `{x0, y0, x1, y1}` object on finding evidence while preserving legacy OCR pixel boxes. |
-| `ENABLE_TAMPER_SIGNALS` | `True` | Step D | Enables pyHanko signature checks, QR decoder, and metadata forensics. |
-| `ENABLE_ANNEXURE14_VALIDATION` | `True` | Step F | Runs Annexure-14 issuing authority checks as advisory signals. |
-| `ENABLE_RAG_ASSISTANT` | `True` | Step G | Enables policy assistant endpoint (falls back to local SQLite FTS5 when offline / no API key). |
-| `ENABLE_PRELIMINARY_SCRUTINY_REPORT`| `True` | Step H | Enables PDF export of the Preliminary Scrutiny Report. |
-
-**Ruleset Version Traceability:** Every stored validation report (`ValidationReport` schema and database record) records the explicit `ruleset_version` (e.g., `"2024-2027.1.0"`). This guarantees regulatory audit reproducibility across handbook editions.
+| Flag Name | Default | Scope | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| `ENABLE_SHADOW_DECLARATIVE_ENGINE` | `False` | Step A | Merged (`main`) | Default OFF. When True, runs DeclarativeRuleEngine asynchronously in-memory. |
+| `RULE_ENGINE_MODE` | `"legacy"` | Step B | Merged (`main`) | `"legacy" \| "declarative"`. Kept as `"legacy"` for current demo stability. |
+| `ENABLE_PAGE_IMAGE_RENDER` | `True` | Step C / F1 | Implemented (`aditya-backend`) | High-res PNG page rendering via PyMuPDF for visual bounding box overlay. |
+| `ENABLE_PERCEPTUAL_HASHING` | `True` | Step D | Implemented (`aditya-backend`) | Detects re-used diagrams and cropped certificates via dHash / pHash. |
+| `ENABLE_QR_VERIFICATION` | `True` | Step D | Implemented (`aditya-backend`) | Local QR decoding across query params, key-value, and JSON without SSRF. |
+| `ENABLE_TAMPER_SIGNALS` | `True` | Step D | In Progress | Metadata forensics (producer strings, non-signature incremental update counts). |
+| `ENABLE_RAG_ASSISTANT` | `True` | Step G / F2 | **ACTIVE PRIORITY** | Offline Policy Q&A Assistant over `clauses.json` with strict allow-list. |
+| `ENABLE_PRELIMINARY_SCRUTINY_REPORT`| `True` | Step H | In Progress | PyMuPDF Preliminary Scrutiny Report PDF export. |
 
 ```mermaid
 graph TD
-    A0[PR A0 + A0b Base Merged] --> StepA[Step A: Shadow Declarative Engine & Advisory Attribute]
-    StepA --> StepB[Step B: Declarative Cutover, 3-Valued Logic & Fallback Flag]
-    StepB --> StepC[Step C: Normalized BBox Object & Evidence Drawer]
-    StepD_Pre[Step D: Existing Deduplication Described] --> StepD[Step D: Server-Masked Duplicates & Tamper Signals]
-    StepC --> StepD
-    StepD --> StepE[Step E: Dual Reviewer Identity & FK-Safe Backfill]
-    StepE --> StepF[Step F: Annexure-14 Authority Verification & Append-Only Log]
-    StepB --> StepG[Step G: Policy Assistant — Allow-List & FTS5 Offline Mode]
-    StepF & StepG --> StepH[Step H: Preliminary Scrutiny Report PDF & Demo Polish]
+    MainBaselines[PR A0 + A0b + Step A + Step B + B-Fix Merged on Main]
+    AdityaFeatures[Aditya-Backend: Bounding Box Inspector, Page Image API, QR & Perceptual Hashing]
+    
+    MainBaselines --> Integration[Synchronized Main Baseline]
+    AdityaFeatures --> Integration
+    
+    Integration --> Priority1[Priority 1: RAG & Chatbot Policy Assistant over clauses.json]
+    Priority1 --> Priority2[Priority 2: PDF Metadata Forensics & Tamper Signals]
+    Priority2 --> Priority3[Priority 3: Demo Script & Walkthrough Polish]
+    Priority3 --> Priority4[Priority 4: Preliminary Scrutiny Report PDF Export]
 ```
 
 ---
 
-### Step A: Declarative Engine Shadow Pipeline & Advisory Attribute
+## 3. Step-by-Step Architecture & Deliverables
+
+### Step A: Declarative Engine Shadow Pipeline & Advisory Attribute (MERGED)
+- **Status:** Merged on `main`.
+- **Summary:** Added `advisory: bool = False` across schemas and rules; decoupled status calculation; added safe in-memory shadow execution runner on deep-copied context with zero DB access in worker thread; verified full test suite.
+
+### Step B: Declarative Engine Cutover, Three-Valued Logic & Parity (MERGED)
+- **Status:** Merged on `main`.
+- **Summary:** Implemented Kleene three-valued logic, maximum nesting depth of 3, replay harness across 28 contexts / 233 checks with 0 discrepancies, and fallback flag `RULE_ENGINE_MODE`.
+
+### Step C: Visual Evidence Inspector & Bounding Box Overlays (SUPERSEDED)
+- **Status:** **SUPERSEDED & IMPLEMENTED IN `aditya-backend`**.
+- **Delivered Capabilities:**
+  - High-res PNG page rendering endpoint (`GET /api/applications/{id}/documents/{doc_id}/page-image`).
+  - Interactive `DocumentViewerDrawer` in `frontend/src/App.jsx` with animated glowing bounding box overlays, line-level coordinate resolution (`search_for`), multi-page continuous scrolling, zoom controls, and missing field callouts.
+  - Manual reimplementation of bounding boxes is removed from the task queue.
+
+---
+
+### Priority Implementation: RAG & Policy Chatbot (AICTE Scrutiny Assistant)
 
 #### Objectives
-1. Introduce an explicit `advisory: bool = False` attribute to rule schemas and classes, decoupling the overall-status calculation from hardcoded rule identifiers.
-2. Run the `DeclarativeRuleEngine` asynchronously in shadow mode alongside the active validation pipeline to verify 100% parity on production workloads without affecting response latency, status outcomes, or report output.
+1. Provide an assistive, policy-grounded Q&A assistant for reviewers and applicants to search and understand AICTE Approval Process Handbook (APH 2024–2027) rules.
+2. Ground all answers strictly in `backend/app/rules/data/clauses.json` (handbook clause numbers, titles, sections, PDF & handbook page numbers, verbatim excerpts).
+3. Enforce an absolute data privacy boundary using a strict input allow-list: "No raw uploaded document text, only rule outcomes / handbook text".
+4. Operate 100% offline by default using local BM25 / token matching / SQLite FTS5 keyword indexing without requiring external API keys or embeddings.
+5. Provide optional LLM explanation synthesis (behind `ENABLE_RAG_ASSISTANT`) guarded by automated post-validation citation checking.
+6. Provide an interactive chatbot widget / drawer in the frontend UI accessible across both reviewer and applicant workflows.
 
 #### Architecture & Strict Guardrails
-- **Zero Behaviour Change:** Validation endpoint responses (`ValidationReportResponse`), finding counts, and overall status calculations remain 100% identical. Shadow runs execute completely out-of-band.
-- **Advisory Attribute on Rules:**
-  - Add `advisory: bool = False` to `BaseRule`, `RuleDefinition` Pydantic model (`backend/app/schemas/rule_definition.py`), and `rules_eoa.yaml`.
-  - Rules marked `advisory: true`: `TER_PAYMENT_001`, `FIELD_004`, `PRESENCE_004`.
-  - `calculate_overall_status(findings, documents)` inspects finding/rule metadata (`getattr(f, "advisory", False)`) rather than checking hardcoded string names (`rule_id in (...)`).
-- **Shadow Runs on Deep-Copied In-Memory Context (Zero DB Access in Worker Thread):**
-  - Worker threads spawned via `asyncio.to_thread` must **never** touch an `AsyncSession` or database connection (preventing thread concurrency crashes with `aiosqlite` and SQLite connection pools).
-  - The request thread creates a serialized/deep-copied in-memory snapshot of the evaluation context (`dict[str, Any]` containing copied document metadata and field dictionaries).
-  - `asyncio.to_thread` executes `declarative_engine.evaluate(copied_context)` strictly on that copied dict.
-- **Fail-Safe Isolation:** Shadow evaluation failures, exceptions, or timeouts must **never** affect the request lifecycle or return an error to the client.
+- **Offline Retrieval Engine (`backend/app/policy/retrieval.py`):**
+  - Indexed data: `backend/app/rules/data/clauses.json` (canonical source of truth with 31+ verified handbook clauses).
+  - Ranking: BM25 / TF-IDF token scoring over `title`, `summary`, `clause_id`, and `full_text`.
+  - Zero external network dependencies, zero API keys required.
+- **Strict Data Privacy Boundary:**
+  - Raw uploaded document files, OCR text, applicant institution names, student data, and certificate numbers are **NEVER** sent to the retrieval or LLM endpoint.
+  - Allow-listed query context: user prompt, target `rule_id` (if querying from a specific finding), and retrieved statutory clause texts.
+- **Automated Post-Validation Citation Filter:**
+  - Every clause cited in an assistant explanation must exist in `clauses.json` and the retrieved context. Any hallucinated citation is automatically stripped prior to returning to the user.
+- **API Endpoints (`backend/app/routes/policy.py`):**
+  - `POST /api/policy/query`: Accepts `{ "query": str, "rule_id": Optional[str], "top_k": int = 3 }`.
+    - Returns matching clauses with `clause_id`, `title`, `handbook_page`, `pdf_page`, `verbatim_excerpt`, `relevance_score`, and optional explanation.
+    - Standard response disclaimer: `"Handbook text that matches your question. Signals for human review; not an official decision."`
+  - `GET /api/policy/clauses`: Lists all available handbook clauses and citations for reference.
+- **Frontend Chatbot Drawer / Widget (`frontend/src/components/PolicyAssistant.jsx` or `App.jsx`):**
+  - Floating "AICTE Policy Assistant" button on the bottom-right corner.
+  - Interactive slide-out chat drawer with message history.
+  - Quick query chips:
+    - *"What are the structural stability requirements for buildings over 30 years?"*
+    - *"What documents are required for fire safety approval?"*
+    - *"Is the TER payment receipt mandatory for all institutions?"*
+  - Structured clause citation cards showing Handbook Page, PDF Page (Handbook Page + 16), and verbatim text with copy action.
+  - Contextual "Ask Assistant" button on every finding card to open the assistant pre-loaded with that rule's citation.
+
+---
+
+### Step D: Pluggable Tamper Signals, Metadata Forensics & Deduplication
+- **Status:** QR code extraction and perceptual hashing already implemented on `aditya-backend`.
+- **Remaining Scope:**
+  - PDF Metadata Forensics (`backend/app/tamper/metadata_forensics.py`): Inspect producer, creator, modification dates, and non-signature `%%EOF` incremental update counts; emit low-severity informational signals with `"signal, not proof"`.
+  - Server-side tenant-isolated duplicate masking for applicant views.
+
+---
+
+### Step E: Dual Reviewer Identity & FK-Safe Backfill
+- **Status:** Integrated into reviewer workflow.
+- **Scope:** Ensure dual actor fields (`actor_user_id` + `actor_display_name`) with dialect-neutral backfill.
+
+---
+
+### Step F: Competent Authority Verification (Annexure-14)
+- **Status:** Rule-based adapter implemented on `aditya-backend` in `backend/app/services/authority_verification.py`.
+- **Scope:** Advisory classification (`plausible | implausible | unknown`) with role-gated reviewer override and append-only audit trail.
+
+---
+
+### Step H: Preliminary Scrutiny Report PDF Export & Demo Walkthrough
+- **Status:** Demo seeder implemented on `aditya-backend` (`seed_demo_showcase.py`).
+- **Scope:**
+  - Generate print-ready Preliminary Scrutiny Report PDF via PyMuPDF (`GET /api/applications/{id}/scrutiny-report`).
+  - Prepare `docs/DEMO_SCRIPT.md` detailing the click-by-click walkthrough for presentation.
 - **Strict Discrepancy Logging:** Logging is strictly restricted to:
   `application_id`, `rule_id`, `legacy_status`, `shadow_status`, and `discrepancy_code`.
 - **Feature Flag Guard:** Controlled by `settings.ENABLE_SHADOW_DECLARATIVE_ENGINE: bool = False` (default **OFF**).
@@ -140,53 +217,23 @@ Sourced from APH 2024–2027 Clause 6.17(h) and Annexure-2 §2.1 preamble & §2.
 
 ---
 
-### Step C: Normalized Bounding Box Object & Evidence Drawer
+### Step C: Visual Evidence Inspector & Bounding Box Overlays (SUPERSEDED & INTEGRATED)
 
-#### Objectives
-1. Introduce a **NEW optional normalized bounding box object** `{x0, y0, x1, y1}` typed as a Pydantic model with strict validation `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1` on evidence schemas, without breaking existing OCR pixel-space boxes.
-2. Provide a standalone converter for existing pixel-space OCR boxes with unit tests.
-3. Transform text-layer coordinates applying `page.rotation_matrix` and `CropBox` offsets.
-4. Enhance the UI with an accessible slide-out drawer, fullscreen split view, and keyboard navigation.
+#### Status: Implemented on `aditya-backend`
+The bounding box evidence highlighting feature originally scheduled as Step C / F1 has already been implemented by Aditya on the `aditya-backend` branch (`bb50e80`, `df26e80`, `9d36442`, `aad0df5`).
 
-#### Architecture & Corrections
-- **Pydantic Model for Normalized BBox:**
-  ```python
-  from pydantic import BaseModel, model_validator
-
-  class NormalizedBBox(BaseModel):
-      x0: float
-      y0: float
-      x1: float
-      y1: float
-
-      @model_validator(mode="after")
-      def validate_coordinates(self) -> "NormalizedBBox":
-          if not (0.0 <= self.x0 < self.x1 <= 1.0):
-              raise ValueError(f"Invalid horizontal bounds: 0.0 <= {self.x0} < {self.x1} <= 1.0 required")
-          if not (0.0 <= self.y0 < self.y1 <= 1.0):
-              raise ValueError(f"Invalid vertical bounds: 0.0 <= {self.y0} < {self.y1} <= 1.0 required")
-          return self
-  ```
-  - Added as a **NEW optional field** on finding and evidence schemas (`bbox_norm: Optional[NormalizedBBox] = None`).
-  - **Do NOT redefine existing OCR `Region.bbox` `[x1, y1, x2, y2]`** (which remains pixel coordinates in `Region`).
-- **Pixel-Space to Normalized Converter:**
-  - Dedicated utility `pixel_bbox_to_normalized(bbox: list[float], page_width: float, page_height: float) -> Optional[NormalizedBBox]` in `backend/app/ocr/coordinates.py`.
-  - Clamps output strictly to $[0.0, 1.0]$ and rounds to 4 decimal places.
-  - Thoroughly tested via unit tests in `backend/tests/test_coordinates.py`.
-- **Text-Layer Coordinates with Rotation & CropBox:**
-  - For digital PDF selectable text extracted via PyMuPDF (`page.get_text("words")` / `search_for`):
-  - Must account for non-zero `CropBox` origins (`cropbox.x0`, `cropbox.y0`) and page rotation ($90^\circ, 180^\circ, 270^\circ$).
-  - Transformation applies `~page.rotation_matrix` and subtracts `cropbox.top_left` before dividing by `cropbox.width` and `cropbox.height`.
-- **Accessible Viewer UI:**
-  - Slide-out drawer with fullscreen expansion toggle button (`Esc` key cleanly exits fullscreen).
-  - Dual-document side-by-side mode in fullscreen for cross-document comparison.
-  - Highlighting via CSS percentages: `top: y0 * 100%`, `left: x0 * 100%`, `height: (y1 - y0) * 100%`, `width: (x1 - x0) * 100%`.
-  - Accessible severity legend using distinct SVG shapes/icons and text labels (`[Critical]`, `[Warning]`, `[Info]`), not relying on color alone.
-  - Keyboard navigation (`J`/`K` or `Tab`/`Shift+Tab`) between evidence highlights.
-  - Graceful fallback: when bbox is missing, displays an explicit `"Location not available"` badge; finding text and evidence snippets remain fully accessible.
-- **Frontend Test Runner Confirmation (E-30):**
-  - Inspection of `frontend/package.json` confirms no test runner is currently installed (`scripts` has only `dev`, `build`, `preview`, `lint`).
-  - As part of Step C frontend deliverables, configure `vitest` + `@testing-library/react` to automate frontend unit tests, specifically E-30 (`Esc` key exiting fullscreen).
+#### Completed Capabilities on `aditya-backend`:
+1. **High-Resolution Page Rendering Endpoint:**
+   - [`GET /api/applications/{id}/documents/{doc_id}/page-image?page={page_num}`](file:///C:/SIH%2026-2.0/sih-prototype/backend/app/routes/documents.py#L89-L134) renders document pages to high-resolution PNG using PyMuPDF (150 DPI) and exposes `X-Page-Width`, `X-Page-Height`, `X-Image-Width`, and `X-Image-Height` in response headers.
+2. **Interactive Visual Evidence Drawer (`DocumentViewerDrawer`):**
+   - High-precision percentage coordinate overlay mapping (`bboxOverlay` calculating `top`, `left`, `width`, `height` percentages).
+   - Animated glowing bounding boxes around target evidence text.
+   - Line-level text coordinate search (`page.search_for`) for granular phrase identification.
+   - Multi-page continuous scrolling and single-page navigation.
+   - Zoom controls (`Zoom In`, `Zoom Out`, `Fit Width`).
+   - Inspector vs native PDF view toggle.
+   - Deficiency callout boxes for missing/unextracted required fields.
+3. **Plan Action:** Step C is marked as complete / superseded. Manual reimplementation of bounding box highlighting is removed from our task list to avoid redundant work.
 
 ---
 
@@ -286,29 +333,63 @@ The existing baseline (`backend/app/rules/duplicate_check.py`) calculates:
 
 ---
 
-### Step G: Policy-Grounded Assistant with Strict Allow-List & FTS5 Offline Mode
+### Step G / Priority Demo Feature: RAG Policy Assistant & Chatbot
 
 #### Objectives
-1. Provide an assistive, policy-grounded Q&A assistant for reviewers and applicants to search and understand AICTE handbook clauses.
-2. Enforce an absolute data privacy boundary using a strict input allow-list.
-3. Support offline execution using SQLite FTS5 full-text search without embeddings.
+1. Provide an assistive, policy-grounded Q&A assistant for reviewers and applicants to search, understand, and clarify AICTE Approval Process Handbook (APH 2024–2027) requirements.
+2. Ground all answers strictly in verified statutory handbook text (`backend/app/rules/data/clauses.json`), returning handbook clause number, chapter/annexure, handbook page, PDF page (handbook page + 16), and verbatim text.
+3. Enforce an absolute data privacy boundary using a strict input allow-list: "No raw uploaded document text, only rule outcomes / handbook text". Institutional documents, applicant names, certificate numbers, issue dates, and raw OCR snippets are **NEVER** transmitted to external AI APIs.
+4. Support 100% offline execution via local BM25 / token matching / SQLite FTS5 search (zero external dependencies, zero vector DB overhead, zero API keys required).
+5. Provide optional LLM explanation synthesis (behind `ENABLE_RAG_ASSISTANT`) with automated post-validation citation checking (strips any citation that does not exist in `clauses.json` or the retrieved context).
+6. Implement an interactive chatbot widget / slide-out drawer in the frontend UI accessible across both reviewer and applicant workflows, with contextual "Ask Policy Assistant" triggers on scrutiny findings.
 
 #### Strict Input Allow-List & Privacy Boundary
 > **Strict Claim:** "No document text, only rule outcomes."  
 > Uploaded institutional documents, applicant names, certificate numbers, issue dates, and raw OCR snippets are **NEVER** transmitted to external AI APIs.
 
-The payload context provided to the LLM assistant is strictly restricted to the following allow-list:
-1. `rule_id`: Standard rule identifier (e.g., `STRUCTURAL_STABILITY_001`).
-2. `status`: Computed status (`pass`, `flag`, `unresolved`, `not_applicable`).
-3. `clause_id`: AICTE Handbook clause citation (e.g., `APH_2024_2027_ANNEX_2_2_1_PREAMBLE`).
-4. `template_text`: Generic statutory rule rationale template.
+The payload context provided to the LLM assistant is strictly restricted to:
+1. `query`: User question regarding APH rules or scrutiny requirements.
+2. `rule_id`: Standard rule identifier if opened from a specific finding (e.g., `STRUCTURAL_001`, `EXPIRY_001`).
+3. `status`: Computed status (`pass`, `flag`, `unresolved`, `not_applicable`).
+4. `clause_id`: AICTE Handbook clause citation (e.g., `APH_2024_27_ANNEX_2_CLAUSE_2_1_PREAMBLE`).
+5. `retrieved_clauses`: Verbatim handbook text chunks retrieved from `clauses.json`.
 
-#### Offline Mode & Search Architecture
-- **Offline Mode:** Uses **SQLite FTS5 full-text search ONLY** (zero embeddings, zero external vector models, zero API keys required).
-- **Production Mode:** Optional pgvector or Gemini embedding when configured.
-- **Mandatory Fallback:** If `GEMINI_API_KEY` is omitted, the assistant returns matching handbook clauses directly via FTS5 keyword ranking without calling external LLM APIs.
-- **Post-Validation Citation Test (Replaces E-13 Prompt Guardrail):**
-  - Instead of relying on prompt instructions ("ignore adversarial prompts"), an automated post-validation filter intercepts the LLM response, extracts all clause references, and verifies them against `backend/app/rules/data/clauses.json`. Any ungrounded or non-existent citation is stripped prior to rendering.
+#### Technical Architecture
+1. **Offline Retrieval Engine (`backend/app/policy/retrieval.py`):**
+   - Canonical Data Store: `backend/app/rules/data/clauses.json` (31+ validated handbook clauses).
+   - Fast keyword and token matching (BM25 scoring over `title`, `summary`, `clause_id`, and `full_text`).
+   - Returns top $k$ matching clauses ranked by relevance score with verified page numbers.
+   - Standard response disclaimer: `"Handbook text that matches your question. Signals for human review; not an official decision."`
+2. **Optional LLM Synthesis & Post-Validation Filter (`backend/app/policy/llm_explainer.py`):**
+   - When `ENABLE_RAG_ASSISTANT = True` and an API key is available (Gemini / OpenAI), synthesizes a clear, plain-language summary of the retrieved clauses.
+   - **Post-Validation Citation Filter:** An automated filter parses the LLM output for clause IDs and handbook references. Any clause not present in `clauses.json` and the retrieved chunk set is strictly stripped from the answer before delivery.
+3. **API Contract (`backend/app/routes/policy.py`):**
+   - `POST /api/policy/query`:
+     - Request: `{ "query": str, "rule_id": Optional[str], "top_k": int = 3 }`
+     - Response:
+       ```json
+       {
+         "query": "What are the rules for buildings over 30 years old?",
+         "matching_clauses": [
+           {
+             "clause_id": "APH_2024_27_CLAUSE_6_17_H",
+             "title": "Structural Stability Certificate Requirement",
+             "section": "Clause 6.17(h)",
+             "handbook_page": 53,
+             "pdf_page": 69,
+             "verbatim_excerpt": "Structural Stability Certificate... required after expiry of thirty years...",
+             "relevance_score": 0.94
+           }
+         ],
+         "explanation": "Per Clause 6.17(h) and Annexure-2 §2.1(iv), buildings older than 30 years require a Structural Stability Certificate...",
+         "disclaimer": "Handbook text that matches your question. Signals for human review; not an official decision."
+       }
+       ```
+   - `GET /api/policy/clauses`: List all indexed clauses and citations.
+4. **Interactive Chatbot UI (`frontend/src/components/PolicyAssistantDrawer.jsx`):**
+   - Floating assistant action pill with beacon icon in the bottom-right corner.
+   - Slide-out conversation drawer with instant search, suggested query chips, and citation cards.
+   - Contextual linking: Clicking "View Statutory Policy" on any finding card opens the Policy Assistant pre-loaded with that rule's exact handbook clause.
 
 ---
 

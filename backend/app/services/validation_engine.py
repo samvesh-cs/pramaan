@@ -18,6 +18,7 @@ from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
 from app.rules.presence_check import DocumentPresenceRule
 from app.rules.ter_payment_check import TerPaymentRule
+from app.rules.qr_verification_check import IssuingAuthorityVerificationRule
 from app.schemas.application import OverallStatus
 from app.schemas.finding import FindingResponse, FindingReviewUpdate
 from app.schemas.report import ReportResponse
@@ -75,6 +76,7 @@ class ValidationEngine:
             TerPaymentRule(),
             BuildingAgeStructuralStabilityRule(),
             DuplicateDocumentRule(),
+            IssuingAuthorityVerificationRule(),
         ]
 
     async def validate_application(

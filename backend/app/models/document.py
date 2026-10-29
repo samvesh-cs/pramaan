@@ -16,6 +16,7 @@ class Document(Base):
     mime_type = Column(String(100), nullable=False)
     file_size_bytes = Column(BigInteger, nullable=False)
     file_hash = Column(String(64), nullable=True, index=True)
+    perceptual_hash = Column(String(64), nullable=True, index=True)
     processing_status = Column(String(50), nullable=False, default="uploaded")
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

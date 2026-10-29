@@ -10,6 +10,7 @@ from app.config import settings
 from app.models.application import Application
 from app.models.document import Document
 from app.models.extraction import ExtractionRun
+from app.ocr.perceptual_hash import compute_perceptual_hash, hamming_distance, visual_similarity
 from app.schemas.document import DocumentResponse, DuplicateWarning
 from app.services.ocr_service import extraction_service
 from app.utils.file_validation import (
@@ -79,7 +80,10 @@ class DocumentService:
                     saved_path.unlink()
                 raise
 
-        # 6. Insert document record
+        # 6. Compute visual perceptual hash
+        perceptual_hash = compute_perceptual_hash(saved_path)
+
+        # 7. Insert document record
         doc_model = Document(
             id=doc_id,
             application_id=application_id,
@@ -89,13 +93,14 @@ class DocumentService:
             mime_type=content_type,
             file_size_bytes=file_size,
             file_hash=file_hash,
+            perceptual_hash=perceptual_hash,
             processing_status="processing",
         )
         db.add(doc_model)
         await db.commit()
         await db.refresh(doc_model)
 
-        # 7. Run extraction
+        # 8. Run extraction
         try:
             extraction_result = await extraction_service.extract(
                 file_path=saved_path,
@@ -108,7 +113,7 @@ class DocumentService:
             extraction_error = str(e)
             extraction_result = {"pages": [], "fields": {}, "error": str(e)}
 
-        # 8. Record extraction run
+        # 9. Record extraction run
         run_model = ExtractionRun(
             id=generate_id("run"),
             document_id=doc_id,
@@ -119,12 +124,12 @@ class DocumentService:
         )
         db.add(run_model)
 
-        # 9. Update document processing status
+        # 10. Update document processing status
         doc_model.processing_status = extraction_status
         await db.commit()
         await db.refresh(doc_model)
 
-        # 10. Detect duplicate documents
+        # 11. Detect duplicate documents (exact hash, visual perceptual, certificate collision)
         duplicate_warnings = await self._detect_duplicates(
             db, doc_model, application_id, extraction_result.get("fields", {})
         )
@@ -175,7 +180,7 @@ class DocumentService:
         if not doc:
             raise HTTPException(
                 status_code=404,
-                detail={"code": "DOCUMENT_NOT_FOUND", "message": f"Document '{document_id}' not found.", "details": None},
+                detail={"code": "DOCUMENT_NOT_FOUND", "message": f"Document '{document_id}' not found in application '{application_id}'.", "details": None},
             )
 
         file_path = settings.upload_path / doc.stored_filename
@@ -198,9 +203,9 @@ class DocumentService:
         Detect duplicate documents:
         (a) Same SHA-256 file hash within the same application
         (b) Same file hash across other applications
-        (c) Same certificate_number / document_number across applications (when extracted)
+        (c) Visual perceptual duplicate (re-scanned / re-compressed) via dHash
+        (d) Same certificate_number / document_number across applications (when extracted)
         Returns a list of warning dicts, empty list if no duplicates found.
-        Each warning dict contains: type, title, message, evidence, next_action
         """
         warnings: list[dict[str, any]] = []
 
@@ -269,13 +274,41 @@ class DocumentService:
                     }
                 )
 
-        # (c) Check for same certificate_number / document_number when fields are extracted
+        # (c) Check perceptual visual similarity across all documents
+        if new_doc.perceptual_hash:
+            for d in all_system_docs:
+                if d.perceptual_hash and d.file_hash != new_doc.file_hash:
+                    dist = hamming_distance(new_doc.perceptual_hash, d.perceptual_hash)
+                    if dist <= 6:
+                        sim = visual_similarity(new_doc.perceptual_hash, d.perceptual_hash)
+                        warnings.append(
+                            {
+                                "type": "visual_duplicate",
+                                "title": "Perceptual Visual Duplicate Detected",
+                                "message": (
+                                    f"'{new_doc.original_filename}' is visually identical ({sim:.0%} match, Hamming distance {dist}/64) "
+                                    f"to document '{d.original_filename}' in application '{d.application_id}'. "
+                                    f"Appears to be a re-scanned or modified copy."
+                                ),
+                                "evidence": {
+                                    "perceptual_hash": new_doc.perceptual_hash,
+                                    "matched_perceptual_hash": d.perceptual_hash,
+                                    "visual_similarity": round(sim, 3),
+                                    "hamming_distance": dist,
+                                    "related_application_id": d.application_id,
+                                    "related_document_id": d.id,
+                                    "related_document_name": d.original_filename,
+                                },
+                                "next_action": "Compare documents side-by-side to verify if document was re-used or re-scanned.",
+                            }
+                        )
+
+        # (d) Check for same certificate_number / document_number when fields are extracted
         doc_type = new_doc.document_type
-        # Map document types to their expected field names for certificate number
         cert_field_map = {
             "fire_safety_certificate": "certificate_number",
             "building_completion_certificate": "certificate_number",
-            "affidavit_2": "affidavit_date",  # using affidavit_date as identifier
+            "affidavit_2": "affidavit_date",
             "ter_payment_receipt": "receipt_number",
             "structural_stability_certificate": "certificate_number",
         }
@@ -288,7 +321,6 @@ class DocumentService:
                 for d in all_system_docs:
                     if d.id == new_doc.id:
                         continue
-                    # Find the latest extraction run for this document
                     ext_stmt = (
                         select(ExtractionRun)
                         .where(ExtractionRun.document_id == d.id)

@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+from app.ocr.perceptual_hash import hamming_distance, visual_similarity
 from app.rules.base import BaseRule
 from app.schemas.finding import FindingCreate
 
@@ -18,10 +19,13 @@ class DuplicateDocumentRule(BaseRule):
     3. Same file hash in ANOTHER institution's application:
        - Flagged finding: "possible duplicate, requires review".
          Status: 'flagged' (Manual review required) with evidence of both applications.
-    4. Same certificate number extracted across different institutions:
+    4. Perceptual visual duplicate (re-scanned / re-compressed file):
+       - Detected via 64-bit difference hashing (dHash) and Hamming distance <= 6.
+       - Flagged finding if cross-institution, pass/info if same institution.
+    5. Same certificate number extracted across different institutions:
        - Flagged finding: "possible duplicate certificate number, requires review".
          Status: 'flagged' (Manual review required) with evidence of certificate number and conflicting applications.
-         
+          
     Wording guardrail:
     Always uses "possible duplicate, requires review" — NEVER "fraud" or "forged".
     """
@@ -81,8 +85,11 @@ class DuplicateDocumentRule(BaseRule):
         # Map current docs' hashes and extracted cert numbers
         for doc in uploaded_docs:
             doc_hash = getattr(doc, "file_hash", None)
+            doc_phash = getattr(doc, "perceptual_hash", None)
             extraction = extractions_by_doc_id.get(doc.id)
-            fields = extraction.fields if extraction else {}
+            fields = getattr(extraction, "fields", None) if extraction else {}
+            if not fields and isinstance(extraction, dict):
+                fields = extraction.get("fields", {})
 
             # Extract certificate / approval numbers if available
             cert_no_entry = (
@@ -90,8 +97,14 @@ class DuplicateDocumentRule(BaseRule):
                 or fields.get("order_number")
                 or fields.get("approval_number")
                 or fields.get("transaction_id")
+            ) if isinstance(fields, dict) else None
+
+            cert_val = (
+                cert_no_entry.get("value")
+                if isinstance(cert_no_entry, dict) and cert_no_entry.get("value")
+                else getattr(cert_no_entry, "value", "")
             )
-            cert_val = (cert_no_entry.get("value") if cert_no_entry and cert_no_entry.get("value") else "").strip().lower()
+            cert_val = str(cert_val or "").strip().lower()
 
             # Compare against other documents in the system
             for other_doc in all_system_documents:
@@ -103,8 +116,11 @@ class DuplicateDocumentRule(BaseRule):
                 other_inst = (getattr(other_app, "institution_name", "") or "").strip().lower() if other_app else ""
                 is_same_institution = (current_institution and other_inst and current_institution == other_inst)
 
-                # Check Hash Duplication across applications
-                if doc_hash and getattr(other_doc, "file_hash", None) == doc_hash:
+                other_hash = getattr(other_doc, "file_hash", None)
+                other_phash = getattr(other_doc, "perceptual_hash", None)
+
+                # Check Exact Hash Duplication across applications
+                if doc_hash and other_hash == doc_hash:
                     if is_same_institution:
                         # Legitimate reuse from previous application of the same institution
                         logger.info(
@@ -158,30 +174,100 @@ class DuplicateDocumentRule(BaseRule):
                                     "current_application_id": current_app_id,
                                     "matched_application_id": other_doc.application_id,
                                     "matched_document_id": other_doc.id,
-                                    "document_type": doc.document_type,
+                                    "matched_filename": other_doc.original_filename,
+                                    "matched_institution_name": other_inst,
                                 },
-                                next_action="Manual review required: Inspect original hard-copy certificates to verify issuance ownership.",
+                                next_action="Investigate why an identical file was submitted by different applicants.",
                             )
                         )
 
-                # Check Extracted Certificate Number Duplication across different institutions
+                # Check Visual Perceptual Duplicate (when exact hash differs, but visual appearance matches)
+                elif doc_phash and other_phash and doc_hash != other_hash:
+                    dist = hamming_distance(doc_phash, other_phash)
+                    if dist <= 6:
+                        sim = visual_similarity(doc_phash, other_phash)
+                        if is_same_institution:
+                            findings.append(
+                                FindingCreate(
+                                    rule_id=self.rule_id,
+                                    status="pass",
+                                    title=f"Re-scanned document reused from earlier submission ({doc.document_type})",
+                                    reason=(
+                                        f"Document '{doc.original_filename}' is visually identical ({sim:.0%} match, Hamming distance {dist}/64) "
+                                        f"to a document in previous application '{other_doc.application_id}' from the same institution. "
+                                        f"Re-scanned document reuse detected."
+                                    ),
+                                    document_id=doc.id,
+                                    document_name=doc.original_filename,
+                                    evidence={
+                                        "type": "visual_duplicate_same_institution",
+                                        "perceptual_hash": doc_phash,
+                                        "matched_perceptual_hash": other_phash,
+                                        "visual_similarity": round(sim, 3),
+                                        "hamming_distance": dist,
+                                        "current_application_id": current_app_id,
+                                        "matched_application_id": other_doc.application_id,
+                                        "matched_document_id": other_doc.id,
+                                        "matched_filename": other_doc.original_filename,
+                                    },
+                                    next_action="Verify validity period against current academic year submission.",
+                                )
+                            )
+                        else:
+                            findings.append(
+                                FindingCreate(
+                                    rule_id=self.rule_id,
+                                    status="flagged",
+                                    title=f"Possible visual duplicate document detected ({doc.document_type})",
+                                    reason=(
+                                        f"Document '{doc.original_filename}' visually matches ({sim:.0%} match, Hamming distance {dist}/64) "
+                                        f"a document uploaded in another institution's application ('{other_doc.application_id}'). "
+                                        f"Possible re-scanned duplicate, requires review."
+                                    ),
+                                    document_id=doc.id,
+                                    document_name=doc.original_filename,
+                                    evidence={
+                                        "type": "visual_duplicate_cross_institution",
+                                        "perceptual_hash": doc_phash,
+                                        "matched_perceptual_hash": other_phash,
+                                        "visual_similarity": round(sim, 3),
+                                        "hamming_distance": dist,
+                                        "current_application_id": current_app_id,
+                                        "matched_application_id": other_doc.application_id,
+                                        "matched_document_id": other_doc.id,
+                                        "matched_filename": other_doc.original_filename,
+                                        "matched_institution_name": other_inst,
+                                    },
+                                    next_action="Review documents side-by-side to verify if document was reused across different institutions.",
+                                )
+                            )
+
+                # Check Certificate Number Duplication across applications
                 if cert_val and len(cert_val) >= 4:
                     other_extractions = getattr(other_doc, "extractions", [])
-                    other_ext = other_extractions[0] if other_extractions else None
-                    if other_ext and hasattr(other_ext, "fields") and isinstance(other_ext.fields, dict):
-                        other_fields = other_ext.fields
+                    other_ext = other_extractions[0] if other_extractions else extractions_by_doc_id.get(other_doc.id)
+                    other_fields = getattr(other_ext, "fields", None) if other_ext else {}
+                    if not other_fields and isinstance(other_ext, dict):
+                        other_fields = other_ext.get("fields", {})
+
+                    if other_fields and isinstance(other_fields, dict):
                         other_cert_entry = (
                             other_fields.get("certificate_number")
                             or other_fields.get("order_number")
                             or other_fields.get("approval_number")
                             or other_fields.get("transaction_id")
                         )
-                        other_val = (other_cert_entry.get("value") if other_cert_entry and other_cert_entry.get("value") else "").strip().lower()
+                        other_cert_val = (
+                            other_cert_entry.get("value")
+                            if isinstance(other_cert_entry, dict) and other_cert_entry.get("value")
+                            else getattr(other_cert_entry, "value", "")
+                        )
+                        other_cert_val = str(other_cert_val or "").strip().lower()
 
-                        if other_val and other_val == cert_val and not is_same_institution:
+                        if other_cert_val and cert_val == other_cert_val and not is_same_institution:
                             logger.warning(
-                                f"[DUPLICATE_CHECK] CROSS-INSTITUTION CERTIFICATE NUMBER MATCH: "
-                                f"number='{cert_val}' in app {current_app_id} and app {other_doc.application_id}"
+                                f"[DUPLICATE_CHECK] CROSS-INSTITUTION CERTIFICATE NUMBER COLLISION: cert='{cert_val}' "
+                                f"in app {current_app_id} (doc {doc.id}) and app {other_doc.application_id} (doc {other_doc.id})"
                             )
                             findings.append(
                                 FindingCreate(
@@ -189,8 +275,8 @@ class DuplicateDocumentRule(BaseRule):
                                     status="flagged",
                                     title=f"Possible duplicate certificate number detected ({doc.document_type})",
                                     reason=(
-                                        f"Certificate number '{cert_val}' in '{doc.original_filename}' matches the "
-                                        f"certificate number in document from another application ('{other_doc.application_id}'). "
+                                        f"The extracted certificate number '{cert_val}' in document '{doc.original_filename}' "
+                                        f"was also found in another institution's application ('{other_doc.application_id}'). "
                                         f"Possible duplicate, requires review."
                                     ),
                                     document_id=doc.id,
@@ -201,9 +287,10 @@ class DuplicateDocumentRule(BaseRule):
                                         "current_application_id": current_app_id,
                                         "matched_application_id": other_doc.application_id,
                                         "matched_document_id": other_doc.id,
-                                        "document_type": doc.document_type,
+                                        "matched_filename": other_doc.original_filename,
+                                        "matched_institution_name": other_inst,
                                     },
-                                    next_action="Manual review required: Verify authority issuing ledger for certificate number assignment.",
+                                    next_action="Verify with the issuing authority which institution was legitimately issued this certificate.",
                                 )
                             )
 

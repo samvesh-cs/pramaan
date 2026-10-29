@@ -6,6 +6,7 @@ from app.rules.expiry_check import ExpiryDateRule
 from app.rules.field_completeness import FieldCompletenessRule
 from app.rules.presence_check import DocumentPresenceRule
 from app.rules.ter_payment_check import TerPaymentRule
+from app.rules.qr_verification_check import IssuingAuthorityVerificationRule
 
 __all__ = [
     "BaseRule",
@@ -16,4 +17,5 @@ __all__ = [
     "TerPaymentRule",
     "BuildingAgeStructuralStabilityRule",
     "DuplicateDocumentRule",
+    "IssuingAuthorityVerificationRule",
 ]

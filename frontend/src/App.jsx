@@ -751,11 +751,38 @@ function AuditorReviewModal({ isOpen, onClose, finding, decision, onSave, error 
 }
 
 function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
-  const { documentId, documentName, pageNumber, bbox, evidenceText } = docInfo || {}
+  const { documentId, documentName, pageNumber, bbox, evidenceText, field } = docInfo || {}
   const fileUrl = applicationId && documentId ? getDocumentFileUrl(applicationId, documentId) : ''
   const [blobUrl, setBlobUrl] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [highlightVisible, setHighlightVisible] = useState(true)
+
+  const bboxOverlay = useMemo(() => {
+    if (!bbox || !Array.isArray(bbox) || bbox.length < 4) return null
+    const [x0, y0, x1, y1] = bbox.map(Number)
+    if (isNaN(x0) || isNaN(y0) || isNaN(x1) || isNaN(y1)) return null
+    if (x0 <= 1.0 && x1 <= 1.0 && y0 <= 1.0 && y1 <= 1.0) {
+      return {
+        left: `${(x0 * 100).toFixed(1)}%`,
+        top: `${(y0 * 100).toFixed(1)}%`,
+        width: `${Math.max(6, (x1 - x0) * 100).toFixed(1)}%`,
+        height: `${Math.max(3, (y1 - y0) * 100).toFixed(1)}%`,
+      }
+    }
+    const pw = 595.3
+    const ph = 841.9
+    const leftPct = Math.min(92, Math.max(0, (x0 / pw) * 100))
+    const topPct = Math.min(92, Math.max(0, (y0 / ph) * 100))
+    const widthPct = Math.min(100 - leftPct, Math.max(6, ((x1 - x0) / pw) * 100))
+    const heightPct = Math.min(100 - topPct, Math.max(3, ((y1 - y0) / ph) * 100))
+    return {
+      left: `${leftPct.toFixed(1)}%`,
+      top: `${topPct.toFixed(1)}%`,
+      width: `${widthPct.toFixed(1)}%`,
+      height: `${heightPct.toFixed(1)}%`,
+    }
+  }, [bbox])
 
   useEffect(() => {
     if (!isOpen || !applicationId || !documentId) {
@@ -807,6 +834,17 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
                   BBox: [{bbox.map((v) => (typeof v === 'number' ? v.toFixed(1) : v)).join(', ')}]
                 </span>
               )}
+              {bbox && (
+                <button
+                  type="button"
+                  className={`button-toggle-highlight ${highlightVisible ? 'is-active' : ''}`}
+                  onClick={() => setHighlightVisible(!highlightVisible)}
+                  title="Toggle evidence overlay"
+                >
+                  <Icon name="check" size={13} />
+                  <span>Overlay: {highlightVisible ? 'ON' : 'OFF'}</span>
+                </button>
+              )}
             </div>
           </div>
           <button type="button" className="icon-button close-drawer" onClick={onClose}>
@@ -835,11 +873,34 @@ function DocumentViewerDrawer({ isOpen, onClose, applicationId, docInfo }) {
             </div>
           )}
           {blobUrl && (
-            <iframe
-              src={`${blobUrl}#page=${pageNumber || 1}`}
-              title="Document Viewer"
-              className="viewer-iframe"
-            />
+            <>
+              <iframe
+                src={`${blobUrl}#page=${pageNumber || 1}`}
+                title="Document Viewer"
+                className="viewer-iframe"
+              />
+              {bboxOverlay && highlightVisible && (
+                <div
+                  className="bbox-interactive-overlay"
+                  style={{
+                    position: 'absolute',
+                    left: bboxOverlay.left,
+                    top: bboxOverlay.top,
+                    width: bboxOverlay.width,
+                    height: bboxOverlay.height,
+                  }}
+                >
+                  <div className="bbox-target-badge">
+                    <span className="bbox-pulse-dot" />
+                    <span>{field ? String(field).replaceAll('_', ' ').toUpperCase() : 'TARGET EVIDENCE REGION'}</span>
+                  </div>
+                  <div className="bbox-corner ch-tl" />
+                  <div className="bbox-corner ch-tr" />
+                  <div className="bbox-corner ch-bl" />
+                  <div className="bbox-corner ch-br" />
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -1410,6 +1471,22 @@ function Finding({ finding, index, onReview, onInspectDoc, isReviewer, saving, r
                 <blockquote>{evidence.raw_text || evidence.text}</blockquote>
               ) : (
                 <p className="evidence-unavailable">Supporting text snippet unavailable.</p>
+              )}
+              {finding.document_id && onInspectDoc && (
+                <button
+                  type="button"
+                  className="button-inspect-evidence"
+                  onClick={() => onInspectDoc({
+                    documentId: finding.document_id,
+                    documentName: finding.document_name,
+                    pageNumber: evidence?.page_number || 1,
+                    bbox: evidence?.bbox || null,
+                    evidenceText: evidence?.raw_text || evidence?.text || (evidence?.value != null ? String(evidence.value) : ''),
+                    field: evidence?.field || null,
+                  })}
+                >
+                  <Icon name="search" size={13} /> Inspect Evidence in Viewer {evidence?.bbox ? '✦ With Overlay' : ''}
+                </button>
               )}
             </>
           ) : (

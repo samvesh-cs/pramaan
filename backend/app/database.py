@@ -71,6 +71,8 @@ def _migrate_sqlite_columns(connection):
     doc_cols = {row[1] for row in cursor.fetchall()}
     if "file_hash" not in doc_cols:
         cursor.execute("ALTER TABLE documents ADD COLUMN file_hash VARCHAR(64)")
+    if "perceptual_hash" not in doc_cols:
+        cursor.execute("ALTER TABLE documents ADD COLUMN perceptual_hash VARCHAR(64)")
 
     cursor.execute("PRAGMA table_info(users)")
     user_cols = {row[1] for row in cursor.fetchall()}
@@ -113,4 +115,3 @@ async def init_db() -> None:
                 await conn.run_sync(_migrate_sqlite_columns)
         else:
             raise e
-

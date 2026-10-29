@@ -7,9 +7,10 @@ import logging
 from pathlib import Path
 from typing import Optional, Union
 
-from .models import ExtractionResult, PageResult
+from .models import ExtractionResult, PageResult, ExtractedField
 from .pdf_processor import process_pdf, process_image_file
 from .field_extractor import extract_fields
+from .qr_processor import extract_qr_from_document
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def process_document(
 ) -> ExtractionResult:
     """Process a document file (PDF, JPG, PNG) and return structured ExtractionResult.
 
-    Complies with docs/API_CONTRACT.md section 5.
+    Complies with docs/API_CONTRACT.md section 5 and SIH 2026 PS 26261.
     Never crashes on invalid, corrupt, or unsupported files; returns
     processing_status="processing_failed" with error description.
     """
@@ -99,6 +100,32 @@ def process_document(
     except Exception as e:
         logger.warning("Field extraction encountered error: %s", e)
         fields = {}
+
+    # 6. Extract QR code (Pillar 3 digital issuing authority verification)
+    try:
+        qr_data = extract_qr_from_document(path)
+        if qr_data and qr_data.get("detected"):
+            fields["qr_code"] = ExtractedField(
+                value=qr_data.get("parsed"),
+                raw_text=qr_data.get("raw_text"),
+                confidence=1.0,
+                page_number=qr_data.get("page_number", 1),
+                bbox=qr_data.get("bbox"),
+                status="extracted",
+            )
+            # If certificate number was missing from text OCR but present in QR code, augment it
+            parsed = qr_data.get("parsed") or {}
+            if "certificate_number" in fields and not fields["certificate_number"].value and parsed.get("certificate_number"):
+                fields["certificate_number"] = ExtractedField(
+                    value=parsed["certificate_number"],
+                    raw_text=qr_data.get("raw_text"),
+                    confidence=1.0,
+                    page_number=qr_data.get("page_number", 1),
+                    bbox=qr_data.get("bbox"),
+                    status="extracted",
+                )
+    except Exception as e:
+        logger.warning("QR code extraction encountered error: %s", e)
 
     return ExtractionResult(
         document_id=document_id,

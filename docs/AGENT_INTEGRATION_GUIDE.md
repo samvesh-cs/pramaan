@@ -236,3 +236,4 @@ cd frontend; npm run lint; npm run build; cd ..
     4. Building > 30 years without structural stability certificate.
     5. Duplicate document detected across institutions.
   - Write `docs/DEMO_SCRIPT.md` with click-by-click instructions, talking points, and honest claims demarcation for the hackathon jury presentation.
+
